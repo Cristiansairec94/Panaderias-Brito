@@ -459,9 +459,9 @@ export function getStoredShiftStartBoundary(branchId?: string): number {
             let cutBranch = cut.branchId || "branch-matriz";
             if (cutBranch === "branch-matriz") {
               const resp = (cut.responsible || cut.outgoingCashier || "").toLowerCase();
-              if (resp.includes("silvia")) {
+              if (resp.includes("silvia") || resp.includes("ildefonso")) {
                 cutBranch = "branch-1790889237862";
-              } else if (resp.includes("andres")) {
+              } else if (resp.includes("angeles") || resp.includes("ángeles") || resp.includes("lazaro") || resp.includes("lázaro")) {
                 cutBranch = "branch-angeles";
               }
             }
@@ -486,11 +486,7 @@ export function getStoredShiftStartBoundary(branchId?: string): number {
       if (rawBranches) {
         const branches = JSON.parse(rawBranches);
         if (Array.isArray(branches)) {
-          const matchB = branches.find((b: any) => b && (
-            b.id === effectiveBranchId || 
-            (effectiveBranchId === "branch-1790889237862" && b.manager && b.manager.toLowerCase().includes("silvia")) ||
-            (effectiveBranchId === "branch-angeles" && b.manager && (b.manager.toLowerCase().includes("andres") || b.manager.toLowerCase().includes("andrés")))
-          ));
+          const matchB = branches.find((b: any) => b && b.id === effectiveBranchId);
           if (matchB) {
             if (matchB.lastCut) {
               const bCutTs = typeof matchB.lastCut.timestamp === "number"
@@ -696,15 +692,68 @@ export function resolveBranchId(rawBranchId: string | null | undefined, cashierN
     if (lower.includes("sanjuan") || lower.includes("san-juan") || lower.includes("san juan") || lower.includes("sju-02")) return "branch-sanjuan";
     if (lower.includes("flores") || lower.includes("flo-03")) return "branch-flores";
     if (lower.includes("matriz") || lower.includes("centro") || lower.includes("mat-01")) return "branch-matriz";
-    if (lower !== "branch-matriz" && lower.startsWith("branch-")) return rawBranchId;
+    if (lower.startsWith("branch-") && lower !== "branch-matriz") return rawBranchId;
   }
+
   if (cashierName) {
     const cLower = cashierName.toLowerCase().trim();
-    if (cLower.includes("silvia") || cLower.includes("puga")) return "branch-1790889237862";
-    if (cLower.includes("andres") || cLower.includes("andrés")) return "branch-angeles";
-    if (cLower.includes("noe") || cLower.includes("velasquez") || cLower.includes("velázquez")) return "branch-sanjuan";
-    if (cLower.includes("carlos") && !cLower.includes("bueno")) return "branch-benito";
-    if (cLower.includes("carlos bueno") || cLower.includes("toño") || cLower.includes("lupita")) return "branch-matriz";
+
+    // 1. Consultar dinámicamente la plantilla de usuarios del administrador (brito_custom_users)
+    if (typeof window !== "undefined") {
+      try {
+        const rawUsers = localStorage.getItem("brito_custom_users");
+        if (rawUsers) {
+          const users = JSON.parse(rawUsers);
+          if (Array.isArray(users)) {
+            const matchedUser = users.find((u: any) => {
+              const uName = (u.name || "").toLowerCase().trim();
+              const uUser = (u.username || "").toLowerCase().trim();
+              return (
+                uName === cLower ||
+                uUser === cLower ||
+                (uName.length > 2 && cLower.includes(uName)) ||
+                (cLower.length > 2 && uName.includes(cLower))
+              );
+            });
+            if (matchedUser?.assignedBranchId) {
+              return matchedUser.assignedBranchId;
+            }
+          }
+        }
+
+        // 2. Consultar las sucursales configuradas por el administrador (brito_branches_data)
+        const rawBranches = localStorage.getItem("brito_branches_data");
+        if (rawBranches) {
+          const branches = JSON.parse(rawBranches);
+          if (Array.isArray(branches)) {
+            const matchedBranch = branches.find((b: any) => {
+              const mName = (b.manager || "").toLowerCase().trim();
+              const aName = (b.assignedUserName || "").toLowerCase().trim();
+              const cName = (b.currentShift?.cashier || "").toLowerCase().trim();
+              return (
+                mName === cLower ||
+                aName === cLower ||
+                cName === cLower ||
+                (mName.length > 2 && cLower.includes(mName)) ||
+                (aName.length > 2 && cLower.includes(aName))
+              );
+            });
+            if (matchedBranch?.id) {
+              return matchedBranch.id;
+            }
+          }
+        }
+      } catch {}
+    }
+
+    // 3. Reconocimiento de palabras clave y nombres canónicos
+    if (cLower.includes("angeles") || cLower.includes("ángeles") || cLower.includes("lazaro") || cLower.includes("lázaro")) return "branch-angeles";
+    if (cLower.includes("benito")) return "branch-benito";
+    if (cLower.includes("ildefonso") || cLower.includes("silvia") || cLower.includes("puga")) return "branch-1790889237862";
+    if (cLower.includes("sanjuan") || cLower.includes("san juan") || cLower.includes("noe") || cLower.includes("velasquez")) return "branch-sanjuan";
+    if (cLower.includes("flores")) return "branch-flores";
+    if (cLower.includes("matriz") || cLower.includes("centro") || cLower.includes("toño") || cLower.includes("lupita")) return "branch-matriz";
   }
+
   return rawBranchId || "branch-matriz";
 }

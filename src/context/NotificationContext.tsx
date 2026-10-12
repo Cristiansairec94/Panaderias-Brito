@@ -10,6 +10,7 @@ import OrderDetailModal from "@/components/pedidos/OrderDetailModal";
 import OrderPaymentModal from "@/components/pedidos/OrderPaymentModal";
 import OrderReceiptModal from "@/components/pedidos/OrderReceiptModal";
 import ShiftCutDetailModal from "@/components/caja/ShiftCutDetailModal";
+import { resolveBranchId } from "@/lib/utils";
 
 export interface FBNotification {
   id: string;
@@ -312,6 +313,8 @@ export function mergeNotifications(existing: FBNotification, incoming: FBNotific
   };
 }
 
+const normalizeStr = (s?: string) => (s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+
 export function isNotificationVisibleForUser(
   notif: Partial<FBNotification>,
   user: AppUser | null,
@@ -320,58 +323,65 @@ export function isNotificationVisibleForUser(
   if (!notif) return false;
   if (!isAllowedNotification(notif)) return false;
 
-  // 1. Administrador (Dueño o Auxiliar Admin):
-  // Control total: ve todos los cortes de caja y todos los pedidos de todas las sucursales
-  // Perfiles operativos de sucursal (Andrés Sánchez, Carlos, cajeros, etc.) tienen vista limitada a pedidos de su tienda
-  const isBranchProfile = Boolean(
+  const normUser = normalizeStr(user?.name);
+  const normUsername = normalizeStr(user?.username);
+  const normEmail = normalizeStr(user?.email);
+
+  // Perfil específico de Andrés Sánchez (o cualquier alias de Los Ángeles):
+  const isAndres = Boolean(
+    user?.id === "usr-andres" ||
+    user?.id === "usr-angeles" ||
+    normUsername === "andres" ||
+    normUsername === "angeles" ||
+    normUser.includes("andres") ||
+    normUser.includes("sanchez") ||
+    normEmail.includes("andres") ||
+    user?.assignedBranchId === "branch-angeles" ||
+    normalizeStr(user?.assignedBranchName).includes("angeles")
+  );
+
+  const isBranchPersonnel = Boolean(
+    isAndres ||
     !user ||
     user.role === "cajero" ||
     user.role === "panadero" ||
     user.role === "supervisor" ||
-    user.username === "andres" ||
-    user.username === "carlos" ||
-    user.username === "carlos.bueno" ||
-    user.username === "silvia" ||
-    user.username === "noe" ||
-    user.username === "sanjuan" ||
-    user.username === "angeles" ||
-    user.username === "sofia" ||
-    user.username === "elena" ||
-    user.name?.toLowerCase().includes("andres") ||
-    user.name?.toLowerCase().includes("carlos") ||
-    user.name?.toLowerCase().includes("mendoza") ||
-    user.name?.toLowerCase().includes("bueno") ||
-    user.name?.toLowerCase().includes("sanchez") ||
-    user.name?.toLowerCase().includes("silvia") ||
-    user.name?.toLowerCase().includes("noe") ||
-    user.name?.toLowerCase().includes("cajero") ||
     user.roleLabel?.toLowerCase().includes("cajer") ||
     user.roleLabel?.toLowerCase().includes("mostrador") ||
     user.roleLabel?.toLowerCase().includes("supervisor") ||
     user.jobTitle?.toLowerCase().includes("cajer") ||
     user.jobTitle?.toLowerCase().includes("mostrador") ||
     user.jobTitle?.toLowerCase().includes("ayudante") ||
-    Boolean(user.assignedBranchId && user.role !== "admin" && user.role !== "auxiliar_admin") ||
+    normUser.includes("carlos") ||
+    normUser.includes("silvia") ||
+    normUser.includes("noe") ||
+    normUsername === "carlos" ||
+    normUsername === "carlos.bueno" ||
+    normUsername === "silvia" ||
+    normUsername === "noe" ||
+    normUsername === "sanjuan" ||
+    normUsername === "angeles" ||
     (user.role !== "admin" && user.role !== "auxiliar_admin")
   );
 
-  const isAdmin = !isBranchProfile && Boolean(
+  // 1. Administrador real (Don Toño, Paulina, Roberto Morales):
+  const isAdmin = !isBranchPersonnel && Boolean(
     user && 
     (user.role === "admin" || user.role === "auxiliar_admin") &&
-    (user.username === "admin" || user.username === "paulina" || user.username === "roberto" || user.name?.toLowerCase().includes("toño") || user.name?.toLowerCase().includes("paulina") || user.name?.toLowerCase().includes("morales"))
+    (normUsername === "admin" || normUsername === "paulina" || normUsername === "roberto" || normUser.includes("tono") || normUser.includes("paulina") || normUser.includes("morales"))
   );
 
-  // Si se está visualizando una sucursal específica (como Los Ángeles), incluso el administrador ve estrictamente solo los pedidos de esa sucursal
   const isSpecificBranchActive = Boolean(
     activeBranch && activeBranch.id && activeBranch.id !== "all"
   );
 
+  // Administrador viendo todas las sucursales (Consolidado General): acceso total a cortes y pedidos
   if (isAdmin && !isSpecificBranchActive) {
     return true;
   }
 
-  // 2. Perfiles Operativos de Sucursal y Vistas de Sucursal (Andrés Sánchez, Carlos, Cajeros, o Sucursal Los Ángeles activa):
-  // "en la sucursal de los angeles se sigue viendo asi, limitalo solo al boton de pedidos, lo demas eliminalo"
+  // 2. Perfiles Operativos de Sucursal (Andrés Sánchez, etc.) o filtro de Sucursal específica:
+  // "el perfil de andres sanchez me comenta que sigue viedo estos botones, cuando te dije que solo debe ver el boton de pedidos los demas quitalos"
   const text = `${notif.title || ""} ${notif.highlightText || ""} ${notif.description || ""} ${notif.senderName || ""}`.toLowerCase();
 
   const isPedido =
@@ -383,34 +393,26 @@ export function isNotificationVisibleForUser(
     text.includes("abono") ||
     text.includes("pastel");
 
-  // Bloqueo estricto: Cajeros y perfiles de sucursal NO ven notificaciones de cierres ni cortes de caja
+  // Bloqueo estricto: Andrés Sánchez, cajeros y personal de sucursales NUNCA ven cortes ni cierres de caja
   if (!isPedido) {
     return false;
   }
 
-  // Identificar el código canónico de la sucursal asignada del cajero.
-  let userAssigned = user?.assignedBranchId || user?.assignedBranchName || "";
-  if (!userAssigned && user) {
-    if (user.username === "andres" || user.name?.toLowerCase().includes("andres")) {
-      userAssigned = "branch-angeles";
-    } else if (user.username === "carlos" || user.name?.toLowerCase().includes("mendoza")) {
-      userAssigned = "branch-benito";
-    } else if (user.username === "carlos.bueno" || user.name?.toLowerCase().includes("bueno")) {
-      userAssigned = "branch-matriz";
-    }
+  // Identificar el código canónico de la sucursal activa o asignada al usuario
+  let targetBranchId = "";
+  if (isAndres) {
+    targetBranchId = "branch-angeles";
+  } else if (activeBranch?.id && activeBranch.id !== "all") {
+    targetBranchId = activeBranch.id;
+  } else if (user?.assignedBranchId) {
+    targetBranchId = user.assignedBranchId;
+  } else if (user) {
+    targetBranchId = resolveBranchId("", user.name || user.username);
   }
 
-  const cashierBranchCode = getCanonicalBranchCode(
-    userAssigned || (activeBranch?.id && activeBranch.id !== "all" ? activeBranch.id : "")
-  );
-
+  const cashierBranchCode = getCanonicalBranchCode(targetBranchId);
   if (!cashierBranchCode) {
-    if (user?.username === "andres" || user?.name?.toLowerCase().includes("andres")) {
-      return checkBranchMatchesTargetCode(notif, "branch-angeles");
-    }
-    if (user?.username === "carlos" || user?.name?.toLowerCase().includes("mendoza")) {
-      return checkBranchMatchesTargetCode(notif, "branch-benito");
-    }
+    if (isAndres) return checkBranchMatchesTargetCode(notif, "branch-angeles");
     return false;
   }
 
@@ -514,11 +516,11 @@ const INITIAL_FB_NOTIFICATIONS: FBNotification[] = [
   },
   {
     id: "corte-turno-vespertino-alerta",
-    senderName: "🏁 Cierre de Turno (Carlos R.)",
+    senderName: "🏁 Cierre de Turno (Vespertino)",
     senderAvatar: "⚠️",
     badgeIcon: "dinero",
     title: "Cierre a las 21:30 hrs: 🚨 NO CUADRÓ LA CAJA (Faltante -$50.00)",
-    highlightText: "Carlos R. entregó turno a Don Toño Brito",
+    highlightText: "Turno Vespertino entregó turno a Don Toño Brito",
     description: "Horario de turno: 14:00 a 21:30 hrs. Efectivo esperado: $3,920.00 | Efectivo contado: $3,870.00. Faltante detectado: -$50.00 MXN en entrega de turno. Fondo dejado: $800.00.",
     timeAgo: "Hace 1 hora",
     timestamp: Date.now() - 60 * 60 * 1000,
@@ -533,9 +535,9 @@ const INITIAL_FB_NOTIFICATIONS: FBNotification[] = [
       date: new Date().toLocaleDateString("es-MX", { weekday: "long", day: "numeric", month: "long", year: "numeric" }),
       timestamp: Date.now() - 60 * 60 * 1000,
       shiftRange: "14:00 a 21:30 hrs",
-      outgoingCashier: "Carlos R.",
+      outgoingCashier: "Turno Vespertino",
       incomingCashier: "Don Toño Brito",
-      responsible: "Carlos R.",
+      responsible: "Turno Vespertino",
       branchName: "Sucursal Matriz (Centro)",
       previousShift: "Vespertino",
       nextShift: "Nocturno / Cierre",
@@ -558,7 +560,7 @@ const INITIAL_FB_NOTIFICATIONS: FBNotification[] = [
           amount: 200,
           category: "limpieza",
           description: "Bolsas y productos de limpieza para cierre",
-          cashier: "Carlos R.",
+          cashier: "Turno Vespertino",
           date: new Date().toISOString().split("T")[0],
           authorizedBy: "Don Toño Brito",
         },

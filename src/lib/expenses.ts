@@ -107,8 +107,10 @@ export function recordCashOutflowAsExpense(options: {
       ? "Sucursal Los Ángeles"
       : branchId.includes("1790889237862")
       ? "San Ildefonso"
-      : (branchId.includes("sanjuan") || branchId.includes("benito"))
+      : branchId.includes("sanjuan")
       ? "San Juan"
+      : branchId.includes("benito")
+      ? "San Benito (Mercado)"
       : "Las Flores (Plaza)");
 
   let categoryKey = options.category ? options.category.toLowerCase().trim() : "otros";

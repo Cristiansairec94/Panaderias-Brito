@@ -1,5 +1,5 @@
 import { CashIncome, CashIncomeCategory, Sale, SimulatedSale } from "@/types";
-import { formatDateTimeSafe, formatCurrency } from "@/lib/utils";
+import { formatDateTimeSafe, formatCurrency, resolveBranchId } from "@/lib/utils";
 import { realtimeHub } from "@/lib/realtime/realtimeHub";
 import { createClient } from "@/lib/supabase/client";
 import { markRecordIdsAsSynced } from "@/lib/sync/syncService";
@@ -555,17 +555,7 @@ export async function fetchAndSyncIncomesFromSupabase(): Promise<{
     for (const mov of movements) {
       if (!mov || !mov.id || Number(mov.amount) <= 0) continue;
 
-      let bId = mov.branch_id || "branch-matriz";
-      const auth = (mov.authorized_by || "").toLowerCase();
-      if (auth.includes("silvia")) {
-        bId = "branch-1790889237862";
-      } else if (auth.includes("noe") || auth.includes("noé")) {
-        bId = "branch-sanjuan";
-      } else if (auth.includes("carlos")) {
-        bId = "branch-benito";
-      } else if (auth.includes("andres") || auth.includes("andrés")) {
-        bId = "branch-angeles";
-      }
+      const bId = resolveBranchId(mov.branch_id, mov.authorized_by);
 
       const bName = CANONICAL_BRANCH_NAMES[bId] || "Sucursal Matriz (Centro)";
 
@@ -696,17 +686,7 @@ if (typeof window !== "undefined") {
       }
       const finalConcept = cleanReason ? `${categoryLabel}: ${cleanReason}` : categoryLabel;
 
-      let bId = mov.branchId || "branch-matriz";
-      const auth = (mov.authorizedBy || mov.cashier || "").toLowerCase();
-      if (auth.includes("silvia")) {
-        bId = "branch-1790889237862";
-      } else if (auth.includes("noe") || auth.includes("noé")) {
-        bId = "branch-sanjuan";
-      } else if (auth.includes("carlos")) {
-        bId = "branch-benito";
-      } else if (auth.includes("andres") || auth.includes("andrés")) {
-        bId = "branch-angeles";
-      }
+      const bId = resolveBranchId(mov.branchId, mov.authorizedBy || mov.cashier);
 
       const bName = CANONICAL_BRANCH_NAMES[bId] || mov.branchName || "Sucursal Matriz (Centro)";
 

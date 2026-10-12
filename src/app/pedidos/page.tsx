@@ -43,7 +43,7 @@ import {
   XCircle
 } from "lucide-react";
 import { CustomOrder } from "@/types";
-import { formatCurrency, playScanBeep, formatOrderCreation } from "@/lib/utils";
+import { formatCurrency, playScanBeep, formatOrderCreation, resolveBranchId } from "@/lib/utils";
 import { useBranch } from "@/context/BranchContext";
 import { useAuth } from "@/context/AuthContext";
 import { useNotifications } from "@/context/NotificationContext";
@@ -107,52 +107,12 @@ export default function PedidosPage() {
 
   // Control de roles y asignación de sucursal:
   // Administradores: control y visualización total multi-sucursal ("all" y cualquier tienda)
-  // Perfiles de sucursal (Andrés Sánchez, Carlos, cajeros): estrictamente los pedidos de su sucursal asignada
-  const isBranchProfile = Boolean(
-    !user ||
-    user.role === "cajero" ||
-    user.role === "panadero" ||
-    user.role === "supervisor" ||
-    user.username === "andres" ||
-    user.username === "angeles" ||
-    user.username === "carlos" ||
-    user.username === "carlos.bueno" ||
-    user.username === "silvia" ||
-    user.username === "noe" ||
-    user.username === "sanjuan" ||
-    user.username === "sofia" ||
-    user.username === "elena" ||
-    user.name?.toLowerCase().includes("andres") ||
-    user.name?.toLowerCase().includes("angeles") ||
-    user.name?.toLowerCase().includes("carlos") ||
-    user.name?.toLowerCase().includes("mendoza") ||
-    user.name?.toLowerCase().includes("bueno") ||
-    user.name?.toLowerCase().includes("sanchez") ||
-    user.name?.toLowerCase().includes("silvia") ||
-    user.name?.toLowerCase().includes("noe") ||
-    user.roleLabel?.toLowerCase().includes("cajer") ||
-    user.roleLabel?.toLowerCase().includes("mostrador") ||
-    user.roleLabel?.toLowerCase().includes("supervisor") ||
-    user.jobTitle?.toLowerCase().includes("cajer") ||
-    user.jobTitle?.toLowerCase().includes("mostrador") ||
-    user.jobTitle?.toLowerCase().includes("ayudante") ||
-    Boolean(user.assignedBranchId && user.role !== "admin" && user.role !== "auxiliar_admin") ||
-    (user.role !== "admin" && user.role !== "auxiliar_admin")
-  );
-  const isAdmin = !isBranchProfile && Boolean(
-    user && 
-    (user.role === "admin" || user.role === "auxiliar_admin") &&
-    (user.username === "admin" || user.username === "paulina" || user.username === "roberto" || user.name?.toLowerCase().includes("toño") || user.name?.toLowerCase().includes("paulina") || user.name?.toLowerCase().includes("morales"))
-  );
+  // Perfiles de sucursal: estrictamente los pedidos de su sucursal asignada
+  const isAdmin = Boolean(user && (user.role === "admin" || user.role === "auxiliar_admin"));
   const canFilterBranches = isAdmin;
   const userBranchId = (
     user?.assignedBranchId ||
-    (user?.username === "andres" || user?.username === "angeles" || user?.name?.toLowerCase().includes("andres") || user?.name?.toLowerCase().includes("angeles") ? "branch-angeles" : "") ||
-    (user?.username === "silvia" || user?.name?.toLowerCase().includes("silvia") ? "branch-1790889237862" : "") ||
-    (user?.username === "noe" || user?.name?.toLowerCase().includes("noe") ? "branch-sanjuan" : "") ||
-    (user?.username === "carlos" || user?.name?.toLowerCase().includes("mendoza") ? "branch-benito" : "") ||
-    (user?.username === "carlos.bueno" || user?.name?.toLowerCase().includes("bueno") ? "branch-matriz" : "") ||
-    currentBranch?.id ||
+    resolveBranchId(currentBranch?.id, user?.name || user?.username) ||
     branches[0]?.id ||
     "branch-matriz"
   ).trim();
@@ -163,7 +123,7 @@ export default function PedidosPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedBranchFilter, setSelectedBranchFilter] = useState<string>(() => (canFilterBranches ? "all" : userBranchId));
 
-  // Filtro efectivo de sucursal: para cajeros/Andrés/Carlos SIEMPRE es userBranchId
+  // Filtro efectivo de sucursal: para personal de sucursal SIEMPRE es su userBranchId
   const effectiveBranchFilter = useMemo(() => {
     if (!canFilterBranches) return userBranchId;
     return selectedBranchFilter || userBranchId || "all";
@@ -552,14 +512,15 @@ export default function PedidosPage() {
       }
 
       // 3. Fallback estrictamente para pedidos huérfanos sin asignación de sucursal
-      const cashierText = stripAccents(order.cashier);
-      const cashierMatches =
-        (targetKeywords.includes("angeles") && (cashierText.includes("andres") || cashierText.includes("angeles"))) ||
-        (targetKeywords.includes("ildefonso") && cashierText.includes("silvia")) ||
-        (targetKeywords.includes("benito") && cashierText.includes("carlos")) ||
-        (targetKeywords.includes("sanjuan") && cashierText.includes("noe"));
+      if (order.cashier) {
+        const resolvedBranch = resolveBranchId(undefined, order.cashier);
+        const resolvedKeywords = getBranchKeywords(resolvedBranch);
+        if (targetKeywords.length > 0 && resolvedKeywords.some((k) => targetKeywords.includes(k))) {
+          return true;
+        }
+      }
 
-      return Boolean(cashierMatches);
+      return false;
     },
     [branches, getBranchKeywords, stripAccents]
   );
@@ -2561,16 +2522,6 @@ export default function PedidosPage() {
                             </div>
                           )}
 
-                          {/* Insignia destacada: Cuándo se levantó el pedido */}
-                          <div
-                            className="flex items-center gap-1.5 mt-2 px-2.5 py-1 rounded-xl bg-amber-100/90 border border-amber-300 text-amber-950 font-bold text-xs shadow-2xs w-fit"
-                            title={`Pedido registrado el: ${creationInfo.fullDateStr}`}
-                          >
-                            <Clock className="w-3.5 h-3.5 text-amber-700 shrink-0" />
-                            <span className="text-amber-900 font-extrabold text-[10px] uppercase tracking-wide">Levantado:</span>
-                            <span className="font-mono font-black text-amber-950">{creationInfo.fullBadgeStr}</span>
-                          </div>
-
                           <h4
                             className="font-black text-stone-900 text-sm leading-snug line-clamp-1 group-hover:text-amber-700 transition-colors mt-1.5"
                             title={order.items?.[0]?.name || order.description || "Pedido Encargado"}
@@ -2587,6 +2538,26 @@ export default function PedidosPage() {
                               ✨ &quot;{order.dedication}&quot;
                             </p>
                           )}
+
+                          {/* ── CUADRO EXACTO: FECHA Y HORA EN QUE SE ALZÓ EL PEDIDO ── */}
+                          <div
+                            className="mt-2 mb-1 p-2 px-2.5 rounded-xl bg-gradient-to-r from-amber-50 to-orange-50/80 border-2 border-amber-300 text-amber-950 shadow-2xs"
+                            title={`Pedido registrado el: ${creationInfo.fullDateStr}`}
+                          >
+                            <div className="flex items-center gap-1.5 text-amber-900 font-black text-[10px] uppercase tracking-wider mb-1">
+                              <Clock className="w-3.5 h-3.5 text-amber-700 shrink-0" />
+                              <span>Pedido Alzado El:</span>
+                            </div>
+                            <div className="flex items-center justify-between gap-1 text-xs">
+                              <div className="flex items-center gap-1 font-extrabold text-stone-800">
+                                <Calendar className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                                <span>{creationInfo.shortDateStr}</span>
+                              </div>
+                              <span className="font-mono tabular-nums font-black text-amber-950 bg-white/95 border border-amber-300 px-2 py-0.5 rounded-md text-[11px] shadow-2xs">
+                                {creationInfo.exactTimeStr}
+                              </span>
+                            </div>
+                          </div>
                         </div>
 
                         {/* Piezas y Total del Pedido perfectamente alineados */}
@@ -2995,14 +2966,24 @@ export default function PedidosPage() {
                         </div>
                       </div>
 
-                      {/* Día y Hora exacta en que se realizó/levantó el pedido */}
+                      {/* Día y Hora exacta en que se alzó el pedido */}
                       <div
-                        className="flex items-center gap-1.5 text-[11px] font-bold text-amber-900 bg-amber-50/80 border border-amber-200/80 px-2.5 py-1 rounded-xl w-fit shadow-2xs"
+                        className="p-2 px-2.5 rounded-xl bg-gradient-to-r from-amber-50 to-orange-50/80 border-2 border-amber-300 text-amber-950 shadow-2xs"
                         title={`Pedido registrado el: ${creationInfo.fullDateStr}`}
                       >
-                        <Clock className="w-3.5 h-3.5 text-amber-700 shrink-0" />
-                        <span className="text-stone-500 font-medium">Pedido realizado:</span>
-                        <span className="font-mono font-black text-amber-950">{creationInfo.fullBadgeStr}</span>
+                        <div className="flex items-center gap-1.5 text-amber-900 font-black text-[10px] uppercase tracking-wider mb-1">
+                          <Clock className="w-3.5 h-3.5 text-amber-700 shrink-0" />
+                          <span>Pedido Alzado El:</span>
+                        </div>
+                        <div className="flex items-center justify-between gap-1 text-xs">
+                          <div className="flex items-center gap-1 font-extrabold text-stone-800">
+                            <Calendar className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                            <span>{creationInfo.shortDateStr}</span>
+                          </div>
+                          <span className="font-mono tabular-nums font-black text-amber-950 bg-white/95 border border-amber-300 px-2 py-0.5 rounded-md text-[11px] shadow-2xs">
+                            {creationInfo.exactTimeStr}
+                          </span>
+                        </div>
                       </div>
 
                       {/* 2. Resumen: Piezas y Total del Pedido */}
@@ -3812,7 +3793,7 @@ export default function PedidosPage() {
         isOpen={isCreateOpen}
         onClose={() => setIsCreateOpen(false)}
         initialBranchId={effectiveBranchFilter !== "all" ? effectiveBranchFilter : currentBranch?.id}
-        cashierName={user?.name || (effectiveBranchFilter.includes("angeles") ? "andres sanchez" : userBranch?.manager || "Cajero")}
+        cashierName={user?.name || userBranch?.currentShift?.cashier || userBranch?.manager || "Don Toño Brito"}
         shiftName={userBranch?.currentShift?.name}
         onOrderCreated={(orderId) => {
           loadOrders();

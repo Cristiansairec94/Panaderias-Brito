@@ -118,7 +118,7 @@ export const INITIAL_CUSTOMERS: Customer[] = [
         date: "31/08/2026, 10:45 AM",
         total: 510,
         branchName: "Sucursal San Juan",
-        cashier: "Carlos Mendoza",
+        cashier: "Cajero San Juan",
         paymentMethod: "efectivo",
         items: [
           { name: "Telera Tradicional", quantity: 120, unitPrice: 3.5, subtotal: 420 },

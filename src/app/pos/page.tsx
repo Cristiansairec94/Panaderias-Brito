@@ -2156,11 +2156,10 @@ export default function POSPage() {
                                    (oOperatingName && ((bName && (oOperatingName === bName || oOperatingName.includes(bName) || bName.includes(oOperatingName))) ||
                                                        (bShort && (oOperatingName.includes(bShort) || bShort.includes(oOperatingName)))));
 
-          const cashierMatches = (activeBranch.currentShift?.cashier && o.cashier && matchesCashier(o.cashier, activeBranch.currentShift.cashier)) ||
-                                 (bId.includes("angeles") && o.cashier && (o.cashier.toLowerCase().includes("andres") || o.cashier.toLowerCase().includes("ángeles"))) ||
-                                 (bId.includes("1790889237862") && o.cashier && o.cashier.toLowerCase().includes("silvia")) ||
-                                 (bId.includes("benito") && o.cashier && o.cashier.toLowerCase().includes("carlos")) ||
-                                 (bId.includes("sanjuan") && o.cashier && o.cashier.toLowerCase().includes("noe"));
+          const cashierMatches = Boolean(
+            (activeBranch.currentShift?.cashier && o.cashier && matchesCashier(o.cashier, activeBranch.currentShift.cashier)) ||
+            (o.cashier && resolveBranchId("", o.cashier) === bId)
+          );
 
           if (!matchesPickup && !matchesOperating && !cashierMatches) {
             return false;
@@ -2200,11 +2199,10 @@ export default function POSPage() {
                       (oOperatingId && (oOperatingId === bId || bId.includes(oOperatingId) || oOperatingId.includes(bId))) ||
                       (oOperatingName && ((bName && (oOperatingName === bName || oOperatingName.includes(bName) || bName.includes(oOperatingName))) ||
                                           (bShort && (oOperatingName.includes(bShort) || bShort.includes(oOperatingName)))));
-        const cashierMatches = (activeBranch.currentShift?.cashier && o.cashier && matchesCashier(o.cashier, activeBranch.currentShift.cashier)) ||
-                               (bId.includes("angeles") && o.cashier && (o.cashier.toLowerCase().includes("andres") || o.cashier.toLowerCase().includes("ángeles"))) ||
-                               (bId.includes("1790889237862") && o.cashier && o.cashier.toLowerCase().includes("silvia")) ||
-                               (bId.includes("benito") && o.cashier && o.cashier.toLowerCase().includes("carlos")) ||
-                               (bId.includes("sanjuan") && o.cashier && o.cashier.toLowerCase().includes("noe"));
+        const cashierMatches = Boolean(
+          (activeBranch.currentShift?.cashier && o.cashier && matchesCashier(o.cashier, activeBranch.currentShift.cashier)) ||
+          (o.cashier && resolveBranchId("", o.cashier) === bId)
+        );
         if (!match && !cashierMatches) {
           return false;
         }

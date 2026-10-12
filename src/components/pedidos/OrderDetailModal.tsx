@@ -258,7 +258,7 @@ export default function OrderDetailModal({
             >
               <div className="flex items-center gap-1.5 text-[11px] font-black text-amber-900 uppercase tracking-wide">
                 <Clock className="w-3.5 h-3.5 text-amber-700 shrink-0" />
-                <span>Pedido Realizado</span>
+                <span>Pedido Alzado El</span>
               </div>
               <div className="mt-1">
                 <p className="text-sm font-black text-amber-950 truncate">

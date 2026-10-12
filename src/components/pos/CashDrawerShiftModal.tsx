@@ -315,11 +315,28 @@ export default function CashDrawerShiftModal({
   }, [usersList, currentBranch?.id]);
 
   useEffect(() => {
-    const effectiveName = cashierName || currentBranch?.currentShift?.cashier || user?.name || "Cajero";
+    const bId = currentBranch?.id;
+    // 1. Resolver el nombre de quien entrega ligado estrictamente a la plantilla de perfiles
+    let effectiveName = "";
+    if (cashierName && usersList.some((u) => matchesCashier(u.name, cashierName))) {
+      const match = usersList.find((u) => matchesCashier(u.name, cashierName));
+      effectiveName = match ? match.name : cashierName;
+    } else {
+      // Buscar usuario asignado a esta sucursal en usersList
+      const branchUser = usersList.find((u) => (bId ? u.assignedBranchId === bId : false) && u.status !== "inactivo");
+      if (branchUser) {
+        effectiveName = branchUser.name;
+      } else if (currentBranch?.assignedUserId) {
+        const u = usersList.find((usr) => usr.id === currentBranch.assignedUserId && usr.status !== "inactivo");
+        effectiveName = u ? u.name : (user?.name || "Don Toño Brito");
+      } else {
+        effectiveName = user?.name || "Don Toño Brito";
+      }
+    }
+
     setOutgoingCashier(effectiveName);
 
-    // Seleccionar inteligentemente a la persona que recibe (nunca duplicar la que entrega)
-    const bId = currentBranch?.id;
+    // 2. Seleccionar a la persona que recibe (nunca duplicar la que entrega)
     const sameBranchCandidates = usersList.filter(
       (u) =>
         u.status !== "inactivo" &&
@@ -346,7 +363,7 @@ export default function CashDrawerShiftModal({
       }
       setNextShiftName(currentBranch?.currentShift?.name || "Turno Siguiente");
     }
-  }, [cashierName, currentBranch?.id, currentBranch?.currentShift?.cashier, currentBranch?.currentShift?.name, usersList, user?.name]);
+  }, [cashierName, currentBranch?.id, currentBranch?.assignedUserId, currentBranch?.currentShift?.cashier, currentBranch?.currentShift?.name, usersList, user?.name]);
 
   useEffect(() => {
     if (isOpen) {
@@ -765,9 +782,9 @@ export default function CashDrawerShiftModal({
       senderName: `🏁 Cierre de Turno (${outgoingCashier})`,
       senderAvatar: isSquare ? "💰" : "⚠️",
       badgeIcon: "dinero",
-      title: `Cierre a las ${currentTime} hrs: ${squareStatusTitle}`,
-      highlightText: `Cambio de Turno: ${outgoingCashier} ➔ ${incomingCashier}`,
-      description: `Folio ${newFolio} archivado en historial. Horario de turno: ${shiftStartTime} a ${currentTime} hrs. Efectivo en caja: ${formatCurrency(parsedCountedCash)} (${isSquare ? "Cuadró exacta sin faltantes" : `Diferencia: ${formatCurrency(cashDifference)}`}). Fondo para nuevo turno: ${formatCurrency(parsedNextFund)}. Efectivo retirado/entregado: ${formatCurrency(cashToWithdraw)}.`,
+      title: `Cierre de Turno (${currentTime} hrs)`,
+      highlightText: `${outgoingCashier} ➔ ${incomingCashier}`,
+      description: `Corte ${newFolio} • En caja: ${formatCurrency(parsedCountedCash)} • Fondo: ${formatCurrency(parsedNextFund)} • A entregar: ${formatCurrency(cashToWithdraw)} (${isSquare ? "Cuadrado $0.00" : `Diferencia: ${formatCurrency(cashDifference)}`}).`,
       category: "caja",
       actionLabel: "Ver Ticket de Corte",
       actionLink: `/caja?tab=historial&corteId=${cutRecord.id}`,
@@ -1285,12 +1302,6 @@ export default function CashDrawerShiftModal({
                                     </option>
                                   ))}
                                 </optgroup>
-                                {!usersList.some((u) => matchesCashier(u.name, outgoingCashier)) && outgoingCashier && (
-                                  <option value={outgoingCashier}>
-                                    👤 {outgoingCashier} (Actual)
-                                  </option>
-                                )}
-                                <option value="__custom__">✏️ Escribir otro nombre...</option>
                               </select>
                             </div>
                           ) : (
@@ -1368,12 +1379,6 @@ export default function CashDrawerShiftModal({
                                     </option>
                                   ))}
                                 </optgroup>
-                                {!usersList.some((u) => matchesCashier(u.name, incomingCashier)) && incomingCashier && (
-                                  <option value={incomingCashier}>
-                                    👤 {incomingCashier} (Personalizado)
-                                  </option>
-                                )}
-                                <option value="__custom__">✏️ Escribir otro nombre...</option>
                               </select>
                             </div>
                           ) : (

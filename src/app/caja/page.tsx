@@ -350,7 +350,8 @@ export default function CajaPage() {
   const handleOpenCorteModal = () => {
     const auto = getShiftSuggestionByCurrentTime();
     setNextShiftName(auto.nextShift);
-    setIncomingCashier(auto.suggestedRecipient);
+    const candidate = usersList.find((u) => u.status !== "inactivo" && !matchesCashier(u.name, currentShiftResponsible)) || usersList[0];
+    setIncomingCashier(candidate ? candidate.name : "Don Toño Brito");
     setPasswordError(null);
     setDeliveryPassword("");
     setCountedCash(expectedCashInDrawer > 0 ? expectedCashInDrawer.toString() : "0");
@@ -1095,8 +1096,31 @@ export default function CajaPage() {
   const liveCashDifference = liveCountedValue - expectedCashInDrawer;
   const liveDeliveredToOwner = Math.max(0, liveCountedValue - (Number(nextFundAmount) || 0));
 
-  // Active shift responsible name
-  const currentShiftResponsible = (user && user.role !== "admin" ? user.name : null) || currentBranch?.currentShift?.cashier || currentBranch?.manager || user?.name || "Cajero";
+  // Active shift responsible name dynamically resolved from usersList (el perfil del administrador)
+  const assignedBranchUser = useMemo(() => {
+    if (!currentBranch?.id || !usersList || usersList.length === 0) return null;
+    return (
+      usersList.find((u) => currentBranch.assignedUserId && u.id === currentBranch.assignedUserId && u.status !== "inactivo") ||
+      usersList.find((u) => u.assignedBranchId === currentBranch.id && u.status !== "inactivo") ||
+      null
+    );
+  }, [currentBranch?.id, currentBranch?.assignedUserId, usersList]);
+
+  const currentShiftResponsible = useMemo(() => {
+    if (user && user.role === "cajero" && (user.assignedBranchId === currentBranch?.id || !user.assignedBranchId)) {
+      return user.name;
+    }
+    if (assignedBranchUser) {
+      return assignedBranchUser.name;
+    }
+    if (currentBranch?.currentShift?.cashier && usersList.some((u) => u.name === currentBranch.currentShift.cashier)) {
+      return currentBranch.currentShift.cashier;
+    }
+    if (currentBranch?.manager && usersList.some((u) => u.name === currentBranch.manager)) {
+      return currentBranch.manager;
+    }
+    return user?.name || "Don Toño Brito";
+  }, [user, currentBranch, assignedBranchUser, usersList]);
 
   // Cuts filtered primarily by Period (Día, Mes, Año, Todos)
   const periodCuts = useMemo(() => {
@@ -3472,11 +3496,6 @@ export default function CajaPage() {
                           {u.avatar || "👤"} {u.name} — {u.jobTitle || u.roleLabel || u.role}
                         </option>
                       ))}
-                      {!usersList.some((u) => matchesCashier(u.name, incomingCashier)) && incomingCashier && (
-                        <option value={incomingCashier}>
-                          👤 {incomingCashier} (Personalizado)
-                        </option>
-                      )}
                     </select>
                   </div>
                 </div>

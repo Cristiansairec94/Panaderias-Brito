@@ -905,7 +905,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               sessionStorage.setItem("brito_user", JSON.stringify(parsedUser));
             }
           }
-          setUser(parsedUser);
+          let freshUser = parsedUser;
+          try {
+            const rawCustom = localStorage.getItem("brito_custom_users");
+            if (rawCustom) {
+              const customList: User[] = JSON.parse(rawCustom);
+              const match = customList.find((u) => u.id === parsedUser.id || u.username === parsedUser.username);
+              if (match) {
+                freshUser = {
+                  ...parsedUser,
+                  ...match,
+                };
+                sessionStorage.setItem("brito_user", JSON.stringify(freshUser));
+              }
+            }
+          } catch (e) {}
+          setUser(freshUser);
 
           // Restaurar o generar token de sesión
           const savedToken = sessionStorage.getItem("brito_session_token");
@@ -1315,6 +1330,38 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } catch (e) {
         console.warn("Storage quota warning updating user:", e);
       }
+
+      // Sincronizar inmediatamente cualquier sucursal vinculada con los nuevos datos del usuario
+      try {
+        const rawBranches = localStorage.getItem("brito_branches_data");
+        if (rawBranches) {
+          const branches = JSON.parse(rawBranches);
+          if (Array.isArray(branches)) {
+            let bChanged = false;
+            const updatedBranches = branches.map((b: any) => {
+              if (b.assignedUserId === userId || (updatedData.assignedBranchId && b.id === updatedData.assignedBranchId)) {
+                bChanged = true;
+                return {
+                  ...b,
+                  assignedUserId: userId,
+                  assignedUserName: updatedData.name || b.assignedUserName,
+                  manager: updatedData.name || b.manager,
+                  currentShift: b.currentShift ? {
+                    ...b.currentShift,
+                    cashier: updatedData.name || b.currentShift.cashier,
+                  } : b.currentShift,
+                };
+              }
+              return b;
+            });
+            if (bChanged) {
+              localStorage.setItem("brito_branches_data", JSON.stringify(updatedBranches));
+              window.dispatchEvent(new Event("brito_branches_updated"));
+            }
+          }
+        }
+      } catch {}
+
       return updated;
     });
 

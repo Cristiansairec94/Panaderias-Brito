@@ -1053,10 +1053,10 @@ function resolveBranchParam(param: string | null): string | null {
                     code: serverB.code || existing.code,
                     address: serverB.address || existing.address,
                     phone: serverB.phone || existing.phone,
-                    manager: serverB.manager || existing.manager,
-                    assignedUserId: serverB.assignedUserId || existing.assignedUserId,
-                    assignedUserName: serverB.assignedUserName || existing.assignedUserName,
-                    assignedUserEmail: serverB.assignedUserEmail || existing.assignedUserEmail,
+                    manager: existing.manager || serverB.manager,
+                    assignedUserId: existing.assignedUserId || serverB.assignedUserId,
+                    assignedUserName: existing.assignedUserName || serverB.assignedUserName,
+                    assignedUserEmail: existing.assignedUserEmail || serverB.assignedUserEmail,
                     dailyGoal: serverB.dailyGoal || existing.dailyGoal,
                     color: serverB.color || existing.color,
                     status: serverB.status || existing.status,
@@ -1080,7 +1080,8 @@ function resolveBranchParam(param: string | null): string | null {
               }
             });
 
-            const updated = Array.from(branchMap.values()).map((b) => {
+            const updated = Array.from(branchMap.values()).map((rawB) => {
+              const b = syncBranchWithUsers(rawB, usersList);
               const agg = branchAgg.get(b.id);
               if (!agg) return b;
 

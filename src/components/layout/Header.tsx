@@ -40,19 +40,12 @@ export default function Header() {
     consolidatedMetrics
   } = useBranch();
   const { isOnline, isSyncing, isSynced, pendingCount } = useSync();
+  const isAdmin = Boolean(user && (user.role === "admin" || user.role === "auxiliar_admin"));
   const isBranchProfile = Boolean(
     !user ||
-    user.role === "cajero" ||
-    user.role === "panadero" ||
-    user.role === "supervisor" ||
-    user.username === "andres" ||
-    user.username === "carlos" ||
-    user.username === "carlos.bueno" ||
-    user.name?.toLowerCase().includes("andres") ||
-    user.name?.toLowerCase().includes("carlos") ||
+    !isAdmin ||
     Boolean(user.assignedBranchId && user.role !== "admin" && user.role !== "auxiliar_admin")
   );
-  const isAdmin = !isBranchProfile && Boolean(user && (user.role === "admin" || user.role === "auxiliar_admin"));
 
   const [time, setTime] = useState<string>("");
   const [showUserMenu, setShowUserMenu] = useState(false);

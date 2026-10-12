@@ -28,74 +28,92 @@ import {
 } from "@/context/NotificationContext";
 import { NotificationItem, getBadgeIcon } from "./NotificationsDropdown";
 
+const normalizeStr = (s?: string) => (s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+
 export default function MobileBottomNav() {
   const pathname = usePathname();
   const { user } = useAuth();
   const { isMobileOpen, toggleMobile, setMobileOpen } = useSidebar();
   const { currentBranch } = useBranch();
   
+  const userNorm = normalizeStr(user?.name);
+  const usernameNorm = normalizeStr(user?.username);
+  const emailNorm = normalizeStr(user?.email);
+
+  // Identificación estricta de Andrés Sánchez (o cualquier alias de Sucursal Los Ángeles)
+  const isAndresSanchez = Boolean(
+    user?.id === "usr-andres" ||
+    user?.id === "usr-angeles" ||
+    usernameNorm === "andres" ||
+    usernameNorm === "angeles" ||
+    userNorm.includes("andres") ||
+    userNorm.includes("sanchez") ||
+    emailNorm.includes("andres") ||
+    user?.assignedBranchId === "branch-angeles" ||
+    normalizeStr(user?.assignedBranchName).includes("angeles")
+  );
+
   // Perfiles de cajero / mostrador / sucursales:
   // Andrés Sánchez, Carlos Mendoza, Carlos Bueno, Silvia, Noé, Sofía, Elena, Juan, etc.,
   // o cualquier usuario operando en el mostrador / punto de venta (/pos).
   const isCashierProfile = Boolean(
+    isAndresSanchez ||
     pathname?.startsWith("/pos") ||
     !user ||
     user.role === "cajero" ||
     user.role === "panadero" ||
     user.role === "supervisor" ||
-    user.username === "andres" ||
-    user.username === "carlos" ||
-    user.username === "carlos.bueno" ||
-    user.username === "silvia" ||
-    user.username === "noe" ||
-    user.username === "sanjuan" ||
-    user.username === "angeles" ||
-    user.username === "sofia" ||
-    user.username === "elena" ||
-    user.name?.toLowerCase().includes("andres") ||
-    user.name?.toLowerCase().includes("carlos") ||
-    user.name?.toLowerCase().includes("mendoza") ||
-    user.name?.toLowerCase().includes("bueno") ||
-    user.name?.toLowerCase().includes("sanchez") ||
-    user.name?.toLowerCase().includes("silvia") ||
-    user.name?.toLowerCase().includes("noe") ||
-    user.name?.toLowerCase().includes("cajero") ||
-    user.roleLabel?.toLowerCase().includes("cajer") ||
-    user.roleLabel?.toLowerCase().includes("mostrador") ||
-    user.roleLabel?.toLowerCase().includes("supervisor") ||
-    user.jobTitle?.toLowerCase().includes("cajer") ||
-    user.jobTitle?.toLowerCase().includes("mostrador") ||
-    user.jobTitle?.toLowerCase().includes("ayudante") ||
-    Boolean(user.assignedBranchId && user.role !== "admin" && user.role !== "auxiliar_admin") ||
-    (user.role !== "admin" && user.role !== "auxiliar_admin")
+    usernameNorm === "carlos" ||
+    usernameNorm === "carlos.bueno" ||
+    usernameNorm === "silvia" ||
+    usernameNorm === "noe" ||
+    usernameNorm === "sanjuan" ||
+    usernameNorm === "angeles" ||
+    usernameNorm === "sofia" ||
+    usernameNorm === "elena" ||
+    userNorm.includes("carlos") ||
+    userNorm.includes("mendoza") ||
+    userNorm.includes("bueno") ||
+    userNorm.includes("silvia") ||
+    userNorm.includes("noe") ||
+    userNorm.includes("cajero") ||
+    user?.roleLabel?.toLowerCase().includes("cajer") ||
+    user?.roleLabel?.toLowerCase().includes("mostrador") ||
+    user?.roleLabel?.toLowerCase().includes("supervisor") ||
+    user?.jobTitle?.toLowerCase().includes("cajer") ||
+    user?.jobTitle?.toLowerCase().includes("mostrador") ||
+    user?.jobTitle?.toLowerCase().includes("ayudante") ||
+    Boolean(user?.assignedBranchId && user?.role !== "admin" && user?.role !== "auxiliar_admin") ||
+    (user?.role !== "admin" && user?.role !== "auxiliar_admin")
   );
 
-  const isAdmin = !isCashierProfile && Boolean(
+  const isAdmin = !isAndresSanchez && !isCashierProfile && Boolean(
     user && 
     (user.role === "admin" || user.role === "auxiliar_admin") &&
-    (user.username === "admin" || user.username === "paulina" || user.username === "roberto" || user.name?.toLowerCase().includes("toño") || user.name?.toLowerCase().includes("paulina") || user.name?.toLowerCase().includes("morales"))
+    (usernameNorm === "admin" || usernameNorm === "paulina" || usernameNorm === "roberto" || userNorm.includes("tono") || userNorm.includes("paulina") || userNorm.includes("morales"))
   );
 
   // Identificar el código canónico de la sucursal del cajero o sucursal activa
   const activeBranchCode = getCanonicalBranchCode(
+    (isAndresSanchez ? "branch-angeles" : "") ||
     (!currentBranch || currentBranch.id !== "all" ? currentBranch?.id : "") ||
     user?.assignedBranchId ||
     user?.assignedBranchName ||
-    (user?.username === "andres" || user?.name?.toLowerCase().includes("andres") ? "branch-angeles" : "") ||
-    (user?.username === "carlos" || user?.name?.toLowerCase().includes("mendoza") ? "branch-benito" : "") ||
-    (user?.username === "carlos.bueno" || user?.name?.toLowerCase().includes("bueno") ? "branch-matriz" : "") ||
+    (usernameNorm === "carlos" || userNorm.includes("mendoza") ? "branch-benito" : "") ||
+    (usernameNorm === "carlos.bueno" || userNorm.includes("bueno") ? "branch-matriz" : "") ||
     (currentBranch?.id && currentBranch.id !== "all" ? currentBranch.id : "")
   );
 
   // En la sucursal (Los Ángeles, etc.) o con perfil de cajero/mostrador:
   // "en la sucursal de los angeles se sigue viendo asi, limitalo solo al boton de pedidos, lo demas eliminalo"
   const isBranchView = Boolean(
+    isAndresSanchez ||
     (currentBranch?.id && currentBranch.id !== "all") ||
     activeBranchCode === "branch-angeles" ||
     isCashierProfile
   );
 
-  const showOnlyPedidos = isBranchView || !isAdmin;
+  const showOnlyPedidos = isAndresSanchez || isBranchView || !isAdmin;
 
   const [showNotifications, setShowNotifications] = useState(false);
   const [activeTab, setActiveTab] = useState<"all" | "cortes" | "pedidos" | "unread">(
@@ -198,7 +216,7 @@ export default function MobileBottomNav() {
   const unreadVisibleCount = visibleNotifications.filter((n) => !n.read && (n.category === "pedidos" || Boolean(n.orderId))).length;
 
   const filtered = visibleNotifications.filter((n) => {
-    if (!isAdmin) {
+    if (!isAdmin || showOnlyPedidos) {
       return n.category === "pedidos" || Boolean(n.orderId);
     }
     if (activeTab === "unread") return !n.read;

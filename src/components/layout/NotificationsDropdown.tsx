@@ -25,7 +25,8 @@ import {
   Receipt,
   ShieldCheck,
   PackageCheck,
-  XCircle
+  XCircle,
+  User
 } from "lucide-react";
 import { 
   useNotifications, 
@@ -39,6 +40,8 @@ import {
 import { useAuth } from "@/context/AuthContext";
 import { useBranch } from "@/context/BranchContext";
 import { formatCurrency, formatOrderCreation } from "@/lib/utils";
+
+const normalizeStr = (s?: string) => (s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
 
 // Graphic illustration for Flour Sack matching user mockup
 function FlourSackGraphic({ className = "w-10 h-10" }: { className?: string }) {
@@ -120,6 +123,23 @@ export default function NotificationsDropdown() {
   const pathname = usePathname();
   const { currentBranch, isAllBranches } = useBranch();
   
+  const userNorm = normalizeStr(user?.name);
+  const usernameNorm = normalizeStr(user?.username);
+  const emailNorm = normalizeStr(user?.email);
+
+  // Identificación estricta de Andrés Sánchez (o cualquier alias de Sucursal Los Ángeles)
+  const isAndresSanchez = Boolean(
+    user?.id === "usr-andres" ||
+    user?.id === "usr-angeles" ||
+    usernameNorm === "andres" ||
+    usernameNorm === "angeles" ||
+    userNorm.includes("andres") ||
+    userNorm.includes("sanchez") ||
+    emailNorm.includes("andres") ||
+    user?.assignedBranchId === "branch-angeles" ||
+    normalizeStr(user?.assignedBranchName).includes("angeles")
+  );
+
   // Perfiles de cajero / mostrador / sucursales:
   // Andrés Sánchez, Carlos Mendoza, Carlos Bueno, Silvia, Noé, Sofía, Elena, Juan, etc.,
   // o cualquier usuario operando en el mostrador / punto de venta (/pos).
@@ -131,64 +151,63 @@ export default function NotificationsDropdown() {
   // - El cuadro/botón "🎂 Pedidos (XX)"
   // - El enlace "Marcar leídas"
   const isCashierProfile = Boolean(
+    isAndresSanchez ||
     pathname?.startsWith("/pos") ||
     !user ||
     user.role === "cajero" ||
     user.role === "panadero" ||
     user.role === "supervisor" ||
-    user.username === "andres" ||
-    user.username === "carlos" ||
-    user.username === "carlos.bueno" ||
-    user.username === "silvia" ||
-    user.username === "noe" ||
-    user.username === "sanjuan" ||
-    user.username === "angeles" ||
-    user.username === "sofia" ||
-    user.username === "elena" ||
-    user.name?.toLowerCase().includes("andres") ||
-    user.name?.toLowerCase().includes("carlos") ||
-    user.name?.toLowerCase().includes("mendoza") ||
-    user.name?.toLowerCase().includes("bueno") ||
-    user.name?.toLowerCase().includes("sanchez") ||
-    user.name?.toLowerCase().includes("silvia") ||
-    user.name?.toLowerCase().includes("noe") ||
-    user.name?.toLowerCase().includes("cajero") ||
-    user.roleLabel?.toLowerCase().includes("cajer") ||
-    user.roleLabel?.toLowerCase().includes("mostrador") ||
-    user.roleLabel?.toLowerCase().includes("supervisor") ||
-    user.jobTitle?.toLowerCase().includes("cajer") ||
-    user.jobTitle?.toLowerCase().includes("mostrador") ||
-    user.jobTitle?.toLowerCase().includes("ayudante") ||
-    Boolean(user.assignedBranchId && user.role !== "admin" && user.role !== "auxiliar_admin") ||
-    (user.role !== "admin" && user.role !== "auxiliar_admin")
+    usernameNorm === "carlos" ||
+    usernameNorm === "carlos.bueno" ||
+    usernameNorm === "silvia" ||
+    usernameNorm === "noe" ||
+    usernameNorm === "sanjuan" ||
+    usernameNorm === "angeles" ||
+    usernameNorm === "sofia" ||
+    usernameNorm === "elena" ||
+    userNorm.includes("carlos") ||
+    userNorm.includes("mendoza") ||
+    userNorm.includes("bueno") ||
+    userNorm.includes("silvia") ||
+    userNorm.includes("noe") ||
+    userNorm.includes("cajero") ||
+    user?.roleLabel?.toLowerCase().includes("cajer") ||
+    user?.roleLabel?.toLowerCase().includes("mostrador") ||
+    user?.roleLabel?.toLowerCase().includes("supervisor") ||
+    user?.jobTitle?.toLowerCase().includes("cajer") ||
+    user?.jobTitle?.toLowerCase().includes("mostrador") ||
+    user?.jobTitle?.toLowerCase().includes("ayudante") ||
+    Boolean(user?.assignedBranchId && user?.role !== "admin" && user?.role !== "auxiliar_admin") ||
+    (user?.role !== "admin" && user?.role !== "auxiliar_admin")
   );
 
-  const isAdmin = !isCashierProfile && Boolean(
+  const isAdmin = !isAndresSanchez && !isCashierProfile && Boolean(
     user && 
     (user.role === "admin" || user.role === "auxiliar_admin") &&
-    (user.username === "admin" || user.username === "paulina" || user.username === "roberto" || user.name?.toLowerCase().includes("toño") || user.name?.toLowerCase().includes("paulina") || user.name?.toLowerCase().includes("morales"))
+    (usernameNorm === "admin" || usernameNorm === "paulina" || usernameNorm === "roberto" || userNorm.includes("tono") || userNorm.includes("paulina") || userNorm.includes("morales"))
   );
 
   // Determinar el código canónico de la sucursal activa o asignada
   const activeBranchCode = getCanonicalBranchCode(
+    (isAndresSanchez ? "branch-angeles" : "") ||
     (!isAllBranches && currentBranch?.id && currentBranch.id !== "all" ? currentBranch.id : "") ||
     user?.assignedBranchId ||
     user?.assignedBranchName ||
-    (user?.username === "andres" || user?.name?.toLowerCase().includes("andres") ? "branch-angeles" : "") ||
-    (user?.username === "carlos" || user?.name?.toLowerCase().includes("mendoza") ? "branch-benito" : "") ||
-    (user?.username === "carlos.bueno" || user?.name?.toLowerCase().includes("bueno") ? "branch-matriz" : "") ||
+    (usernameNorm === "carlos" || userNorm.includes("mendoza") ? "branch-benito" : "") ||
+    (usernameNorm === "carlos.bueno" || userNorm.includes("bueno") ? "branch-matriz" : "") ||
     (currentBranch?.id && currentBranch.id !== "all" ? currentBranch.id : "")
   );
 
   // En la sucursal (Los Ángeles, etc.) o con perfil de cajero/mostrador:
   // "en la sucursal de los angeles se sigue viendo asi, limitalo solo al boton de pedidos, lo demas eliminalo"
   const isBranchView = Boolean(
+    isAndresSanchez ||
     (!isAllBranches && currentBranch?.id && currentBranch.id !== "all") ||
     activeBranchCode === "branch-angeles" ||
     isCashierProfile
   );
 
-  const showOnlyPedidos = isBranchView || !isAdmin;
+  const showOnlyPedidos = isAndresSanchez || isBranchView || !isAdmin;
 
   const [activeTab, setActiveTab] = useState<"all" | "cortes" | "pedidos" | "unread">(
     showOnlyPedidos ? "pedidos" : "all"
@@ -281,7 +300,7 @@ export default function NotificationsDropdown() {
   const effectiveUnreadCount = isAdmin ? unreadCount : unreadVisibleCount;
 
   const filtered = visibleNotifications.filter((n) => {
-    if (!isAdmin) {
+    if (!isAdmin || showOnlyPedidos) {
       return n.category === "pedidos" || Boolean(n.orderId);
     }
     if (activeTab === "unread") return !n.read;
@@ -823,6 +842,11 @@ function NotificationCardItem({
                   🏁 CIERRE DE TURNO
                 </span>
               )}
+              {(notif.branchName || cutData?.branchName) && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-stone-100 text-stone-700 border border-stone-200 shadow-2xs">
+                  🏬 {notif.branchName || cutData?.branchName}
+                </span>
+              )}
             </>
           )}
 
@@ -1047,6 +1071,38 @@ function NotificationCardItem({
                 </div>
               )}
             </>
+          ) : isShiftCut ? (
+            <div className="space-y-1">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {cutData?.id && (
+                  <span className="text-[10px] font-mono font-black text-amber-900 bg-amber-100/90 border border-amber-300 px-1.5 py-0.2 rounded-md">
+                    {cutData.id}
+                  </span>
+                )}
+                <h5 className="text-xs sm:text-[13px] font-black text-stone-900 leading-snug">
+                  Cierre de Turno
+                </h5>
+              </div>
+
+              {/* Responsable de caja y Horario en formato breve y elegante */}
+              <div className="flex items-center gap-2 text-[11px] text-stone-600 font-semibold flex-wrap">
+                <span className="flex items-center gap-1 text-stone-900 font-bold">
+                  <User className="w-3.5 h-3.5 text-stone-400 shrink-0" />
+                  <span>{cutData?.outgoingCashier || "Cajero"}</span>
+                  {cutData?.incomingCashier && cutData.incomingCashier !== cutData.outgoingCashier && (
+                    <>
+                      <span className="text-stone-400 font-normal">➔</span>
+                      <span className="text-stone-700 font-medium">{cutData.incomingCashier}</span>
+                    </>
+                  )}
+                </span>
+                <span className="text-stone-300 font-bold">•</span>
+                <span className="flex items-center gap-1 text-stone-600">
+                  <Clock className="w-3.5 h-3.5 text-stone-400 shrink-0" />
+                  <span>{cutData?.shiftRange || timeInfo.exactTime}</span>
+                </span>
+              </div>
+            </div>
           ) : (
             <>
               {/* Default non-order layout with optional "Leer más" */}
@@ -1158,112 +1214,76 @@ function NotificationCardItem({
         </div>
       </div>
 
-      {/* Shift Cut Detailed Card: Horario, Con cuánto dinero se quedó en caja, Dictamen de cuadre / Faltante / Sobrante */}
+      {/* Resumen Ejecutivo Breve del Corte */}
       {isShiftCut && cutData && (
-        <div className="bg-[#fcfaf7] border border-[#ebe1d5] rounded-2xl p-3 sm:p-3.5 space-y-2.5 text-xs shadow-2xs">
-          {/* 1. HORARIO DEL TURNO & RELEVO */}
-          <div className="flex items-center justify-between gap-2 border-b border-stone-200/80 pb-2">
-            <div className="flex items-center gap-1.5 font-bold text-stone-800">
-              <span className="w-5 h-5 rounded-md bg-amber-100 text-amber-800 flex items-center justify-center text-xs shrink-0">
-                ⏰
+        <div className="bg-[#fcfaf7] border border-[#ebe1d5] rounded-xl p-2.5 sm:p-3 space-y-2 text-xs shadow-2xs">
+          {/* Cifras Principales: 3 Columnas Uniformes y Claras */}
+          <div className="grid grid-cols-3 gap-1.5 sm:gap-2 text-center divide-x divide-stone-200/90 bg-white border border-stone-200/80 rounded-xl py-2 px-1">
+            <div className="px-1">
+              <span className="text-[10px] text-stone-500 font-bold uppercase tracking-wider block">
+                Total en Caja
               </span>
-              <span>
-                Horario de Turno:{" "}
-                <span className="text-amber-950 font-black">{cutData.shiftRange}</span>
+              <span className="text-xs sm:text-sm font-black text-stone-900 tabular-nums">
+                {formatCurrency(cutData.countedCash)}
               </span>
             </div>
-            <div className="text-[11px] font-semibold text-stone-500 truncate" title={`${cutData.outgoingCashier} ➔ ${cutData.incomingCashier}`}>
-              {cutData.outgoingCashier} ➔ {cutData.incomingCashier}
+
+            <div className="px-1">
+              <span className="text-[10px] text-amber-800 font-bold uppercase tracking-wider block">
+                Se Queda (Fondo)
+              </span>
+              <span className="text-xs sm:text-sm font-black text-amber-950 tabular-nums">
+                {formatCurrency(cutData.nextFund ?? 0)}
+              </span>
+            </div>
+
+            <div className="px-1">
+              <span className="text-[10px] text-emerald-800 font-bold uppercase tracking-wider block">
+                A Entregar
+              </span>
+              <span className="text-xs sm:text-sm font-black text-emerald-900 tabular-nums">
+                {formatCurrency(Math.max(0, cutData.countedCash - (cutData.nextFund ?? 0)))}
+              </span>
             </div>
           </div>
 
-          {/* 2. CON CUÁNTO DINERO SE QUEDÓ EN LA CAJA */}
-          <div className="flex items-center justify-between gap-2 bg-gradient-to-r from-amber-50 to-orange-50/60 border border-amber-200/80 rounded-xl px-3 py-2">
-            <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-lg bg-amber-500/20 text-amber-900 flex items-center justify-center font-bold shrink-0">
-                <Wallet className="w-4 h-4 text-amber-700" />
-              </div>
-              <div>
-                <span className="text-[10px] text-amber-800 font-bold uppercase tracking-wider block leading-tight">
-                  Dinero que se quedó en caja
-                </span>
-                <span className="text-xs font-bold text-stone-700">
-                  Fondo para el siguiente turno
-                </span>
-              </div>
-            </div>
-            <span className="text-sm sm:text-base font-black text-amber-950 tabular-nums">
-              {formatCurrency(cutData.nextFund ?? 0)}
-            </span>
-          </div>
-
-          {/* 3. DICTAMEN DE CUADRE: EXACTO, FALTANTE O SOBRANTE */}
+          {/* Estado de Cuadre: 1 Fila Limpia y Sin Redundancia */}
           <div
-            className={`p-2.5 sm:p-3 rounded-xl border flex flex-col gap-1.5 transition-all ${
+            className={`px-3 py-1.5 rounded-xl border flex items-center justify-between text-xs font-black transition-colors ${
               cutData.difference === 0
-                ? "bg-emerald-50/90 border-emerald-300 text-emerald-950"
+                ? "bg-emerald-50/90 border-emerald-200 text-emerald-900"
                 : cutData.difference < 0
-                ? "bg-rose-50 border-rose-300 text-rose-950"
-                : "bg-amber-50 border-amber-300 text-amber-950"
+                ? "bg-rose-50 border-rose-200 text-rose-950"
+                : "bg-amber-50 border-amber-200 text-amber-950"
             }`}
           >
-            <div className="flex items-center justify-between font-black gap-2">
-              <span className="flex items-center gap-1.5 text-xs sm:text-[13px]">
-                {cutData.difference === 0 ? (
-                  <>
-                    <CheckCheck className="w-4 h-4 text-emerald-600 stroke-[2.5] shrink-0" />
-                    <span className="text-emerald-800">✓ CAJA CUADRADA EXACTA</span>
-                  </>
-                ) : cutData.difference < 0 ? (
-                  <>
-                    <AlertTriangle className="w-4 h-4 text-rose-600 stroke-[2.5] shrink-0" />
-                    <span className="text-rose-700">🚨 NO CUADRÓ • FALTÓ DINERO EN CAJA</span>
-                  </>
-                ) : (
-                  <>
-                    <AlertTriangle className="w-4 h-4 text-amber-600 stroke-[2.5] shrink-0" />
-                    <span className="text-amber-800">⚠️ NO CUADRÓ • SOBRÓ DINERO EN CAJA</span>
-                  </>
-                )}
-              </span>
+            <span className="flex items-center gap-1.5">
+              {cutData.difference === 0 ? (
+                <>
+                  <CheckCheck className="w-4 h-4 text-emerald-600 shrink-0 stroke-[2.5]" />
+                  <span>Caja cuadrada exacta</span>
+                </>
+              ) : cutData.difference < 0 ? (
+                <>
+                  <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0 stroke-[2.5]" />
+                  <span>Faltante en caja</span>
+                </>
+              ) : (
+                <>
+                  <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 stroke-[2.5]" />
+                  <span>Sobrante en caja</span>
+                </>
+              )}
+            </span>
 
-              <span
-                className={`text-xs sm:text-sm font-black tabular-nums px-2 py-0.5 rounded-lg shrink-0 ${
-                  cutData.difference === 0
-                    ? "bg-emerald-100 text-emerald-900 border border-emerald-300"
-                    : cutData.difference < 0
-                    ? "bg-rose-100 text-rose-900 border border-rose-300"
-                    : "bg-amber-100 text-amber-900 border border-amber-300"
-                }`}
-              >
-                {cutData.difference === 0
-                  ? "$0.00 MXN"
-                  : cutData.difference < 0
-                  ? `Faltante: ${formatCurrency(cutData.difference)}`
-                  : `Sobrante: +${formatCurrency(cutData.difference)}`}
-              </span>
-            </div>
-
-            {/* Comparativa: Esperado vs Físico Contado */}
-            <div className="flex items-center justify-between text-[11px] pt-1 border-t border-current/15 opacity-90 font-medium">
-              <span>
-                Efectivo esperado: <strong className="font-bold">{formatCurrency(cutData.expectedCash)}</strong>
-              </span>
-              <span>
-                Físico contado: <strong className="font-bold">{formatCurrency(cutData.countedCash)}</strong>
-              </span>
-            </div>
+            <span className="font-mono text-xs font-black tabular-nums">
+              {cutData.difference === 0
+                ? "$0.00 MXN"
+                : cutData.difference < 0
+                ? formatCurrency(cutData.difference)
+                : `+${formatCurrency(cutData.difference)}`}
+            </span>
           </div>
-
-          {/* 4. EFECTIVO RETIRADO / ENTREGADO */}
-          {cutData.countedCash > (cutData.nextFund ?? 0) && (
-            <div className="flex items-center justify-between text-[11px] text-stone-600 px-1 pt-0.5">
-              <span>Efectivo entregado a Don Toño / Saliente:</span>
-              <strong className="text-stone-900 font-bold tabular-nums">
-                {formatCurrency(Math.max(0, cutData.countedCash - (cutData.nextFund ?? 0)))}
-              </strong>
-            </div>
-          )}
         </div>
       )}
 
@@ -1278,9 +1298,11 @@ function NotificationCardItem({
             openShiftCutDetail(notif);
           }}
           className="w-full bg-gradient-to-r from-amber-700 via-orange-700 to-amber-800 hover:from-amber-600 hover:to-orange-600 text-white font-black text-xs sm:text-[13px] py-2.5 px-4 rounded-xl flex items-center justify-center gap-2 shadow-xs transition-all cursor-pointer active:scale-98"
+          title="Ver ticket digital y comprobante completo del corte"
         >
-          <span>Ver Corte de Caja</span>
-          <span className="text-sm font-bold leading-none">➔</span>
+          <Receipt className="w-4 h-4 shrink-0" />
+          <span>Ver Ticket de Corte Completo</span>
+          <span className="text-sm font-bold leading-none ml-0.5">➔</span>
         </button>
       ) : isOrder && (isOrderDelivered || isOrderCancelled) ? (
         /* Full-width status action button for Delivered or Cancelled orders */
