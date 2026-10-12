@@ -12,7 +12,24 @@ const TMP_DELETED_USERS_FILE = path.join("/tmp", "brito_deleted_users.json");
 
 let inMemoryUsersCache: AppUser[] | null = null;
 let lastFileMtime = 0;
-const deletedUserIdsSet = new Set<string>(["usr-3", "roberto"]);
+const RETIRED_USER_IDS = [
+  "usr-3",
+  "roberto",
+  "usr-carlos-b",
+  "carlos.bueno",
+  "usr-benito-tarde",
+  "cajero.benito",
+  "usr-sanjuan",
+  "usr-sofia",
+  "sofia",
+  "usr-ildefonso-tarde",
+  "cajero.ildefonso",
+  "usr-angeles",
+  "usr-4",
+  "juan",
+];
+
+const deletedUserIdsSet = new Set<string>(RETIRED_USER_IDS);
 
 function ensureDataDirectory() {
   try {
@@ -48,8 +65,7 @@ function readDeletedUserIds(): Set<string> {
     }
   } catch {}
 
-  deletedUserIdsSet.add("usr-3");
-  deletedUserIdsSet.add("roberto");
+  RETIRED_USER_IDS.forEach((id) => deletedUserIdsSet.add(id));
   return deletedUserIdsSet;
 }
 

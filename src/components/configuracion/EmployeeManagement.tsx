@@ -386,9 +386,10 @@ export default function EmployeeManagement({ onGoToUsersTab }: EmployeeManagemen
 
   // Stats
   const stats = useMemo(() => {
-    const total = usersList.length;
-    const activos = usersList.filter((u) => u.status !== "inactivo").length;
-    const atencion = usersList.filter((u) => 
+    const trabajadores = usersList.filter((u) => u.role !== "admin");
+    const total = trabajadores.length;
+    const activos = trabajadores.filter((u) => u.status !== "inactivo").length;
+    const atencion = trabajadores.filter((u) => 
       (u.jobTitle?.toLowerCase().includes("caj") || u.role === "cajero")
     ).length;
     return { total, activos, atencion };

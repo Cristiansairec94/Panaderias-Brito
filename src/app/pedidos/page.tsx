@@ -43,7 +43,7 @@ import {
   XCircle
 } from "lucide-react";
 import { CustomOrder } from "@/types";
-import { formatCurrency, playScanBeep, formatOrderCreation, resolveBranchId } from "@/lib/utils";
+import { formatCurrency, playScanBeep, formatOrderCreation, formatDeliveryDateDisplay, resolveBranchId } from "@/lib/utils";
 import { useBranch } from "@/context/BranchContext";
 import { useAuth } from "@/context/AuthContext";
 import { useNotifications } from "@/context/NotificationContext";
@@ -2464,6 +2464,7 @@ export default function PedidosPage() {
                   ? order.items.reduce((sum, item) => sum + (item.quantity || 0), 0)
                   : 1;
                 const creationInfo = formatOrderCreation(order);
+                const deliveryInfo = formatDeliveryDateDisplay(order.deliveryDate);
 
                 return (
                   <div
@@ -2485,9 +2486,9 @@ export default function PedidosPage() {
                         : "bg-white border-l-stone-300 hover:bg-stone-50 border-stone-200"
                     }`}
                   >
-                    {/* Cuadrícula Maestra de 4 Columnas Alineadas (Desktop xl:grid-cols-12) */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-12 gap-3.5 items-stretch">
-                      {/* COLUMNA 1: Identificación, Folio, Sucursal, Título y Total (xl:col-span-3) */}
+                    {/* Cuadrícula Maestra de 4 Columnas Perfectamente Niveladas y Cuadradas (xl:grid-cols-12) */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-12 gap-3 sm:gap-3.5 items-stretch">
+                      {/* COLUMNA 1: Identificación, Folio, Sucursal, Título, Registro y Total (xl:col-span-3) */}
                       <div className="md:col-span-1 xl:col-span-3 min-w-0 flex flex-col justify-between gap-1.5 h-full">
                         <div>
                           <div className="flex items-center gap-1.5 flex-wrap">
@@ -2496,9 +2497,9 @@ export default function PedidosPage() {
                             </span>
                             {order.operatingBranchName && order.branchName && order.operatingBranchName !== order.branchName ? (
                               <span className="text-[10px] font-bold text-amber-950 bg-amber-100/90 border border-amber-300 px-2 py-0.5 rounded-md flex items-center gap-1 shadow-2xs">
-                                <span>🏬 Levantado: {order.operatingBranchName.replace("Sucursal ", "")}</span>
+                                <span>🏬 {order.operatingBranchName.replace("Sucursal ", "")}</span>
                                 <span className="text-amber-600">➔</span>
-                                <span className="text-emerald-800">Entrega: {order.branchName.replace("Sucursal ", "")}</span>
+                                <span className="text-emerald-800">{order.branchName.replace("Sucursal ", "")}</span>
                               </span>
                             ) : (
                               <span className="text-[10px] font-bold text-stone-600 bg-stone-100 border border-stone-200 px-1.5 py-0.5 rounded-md">
@@ -2539,30 +2540,28 @@ export default function PedidosPage() {
                             </p>
                           )}
 
-                          {/* ── CUADRO EXACTO: FECHA Y HORA EN QUE SE ALZÓ EL PEDIDO ── */}
+                          {/* Registro exacto: cuándo se alzó el pedido (Limpio, 1 línea, sin cajas gigantes) */}
                           <div
-                            className="mt-2 mb-1 p-2 px-2.5 rounded-xl bg-gradient-to-r from-amber-50 to-orange-50/80 border-2 border-amber-300 text-amber-950 shadow-2xs"
+                            className="mt-1.5 inline-flex items-center gap-1.5 text-xs text-stone-600 bg-amber-50/70 border border-amber-200/80 px-2 py-0.5 rounded-lg"
                             title={`Pedido registrado el: ${creationInfo.fullDateStr}`}
                           >
-                            <div className="flex items-center gap-1.5 text-amber-900 font-black text-[10px] uppercase tracking-wider mb-1">
-                              <Clock className="w-3.5 h-3.5 text-amber-700 shrink-0" />
-                              <span>Pedido Alzado El:</span>
-                            </div>
-                            <div className="flex items-center justify-between gap-1 text-xs">
-                              <div className="flex items-center gap-1 font-extrabold text-stone-800">
-                                <Calendar className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-                                <span>{creationInfo.shortDateStr}</span>
-                              </div>
-                              <span className="font-mono tabular-nums font-black text-amber-950 bg-white/95 border border-amber-300 px-2 py-0.5 rounded-md text-[11px] shadow-2xs">
-                                {creationInfo.exactTimeStr}
-                              </span>
-                            </div>
+                            <span className="inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-wider text-amber-900">
+                              <Clock className="w-3 h-3 text-amber-600 shrink-0" />
+                              <span>Alzado:</span>
+                            </span>
+                            <span className="font-extrabold text-stone-800 text-[11px]">
+                              {creationInfo.shortDateStr}
+                            </span>
+                            <span className="text-amber-300">•</span>
+                            <span className="font-mono tabular-nums font-black text-amber-950 text-[11px]">
+                              {creationInfo.exactTimeStr}
+                            </span>
                           </div>
                         </div>
 
                         {/* Piezas y Total del Pedido perfectamente alineados */}
-                        <div className="flex items-center gap-2 pt-1.5 border-t border-stone-100 mt-1">
-                          <span className="font-mono tabular-nums font-black text-xs px-2 py-0.5 rounded-md bg-amber-100 text-amber-950 border border-amber-300 shrink-0">
+                        <div className="flex items-center gap-2 pt-2 border-t border-stone-100 mt-1.5">
+                          <span className="font-mono tabular-nums font-black text-xs px-2 py-0.5 rounded-md bg-amber-100 text-amber-950 border border-amber-300 shrink-0 shadow-2xs">
                             📦 {totalPieces} {totalPieces === 1 ? "pza" : "pzas"}
                           </span>
                           <div className="flex items-baseline gap-1 min-w-0">
@@ -2574,8 +2573,8 @@ export default function PedidosPage() {
                         </div>
                       </div>
 
-                      {/* COLUMNA 2: Comanda y Desglose de Productos Cuadrado (xl:col-span-4) */}
-                      <div className="md:col-span-1 xl:col-span-4 min-w-0 h-full flex flex-col justify-between">
+                      {/* COLUMNA 2: Comanda y Desglose de Productos Cuadrado (xl:col-span-3) */}
+                      <div className="md:col-span-1 xl:col-span-3 min-w-0 h-full">
                         {(() => {
                           const isExpanded = Boolean(expandedProductsOrderIds[order.id]);
                           const orderItems = order.items || [];
@@ -2584,13 +2583,13 @@ export default function PedidosPage() {
                           const itemsToShow = isExpanded ? orderItems : orderItems.slice(0, 2);
 
                           return (
-                            <div className="bg-amber-50/50 border border-amber-200/90 rounded-xl p-2.5 flex flex-col justify-between h-full transition-all shadow-2xs">
+                            <div className="bg-amber-50/40 border border-amber-200/80 rounded-xl p-2.5 flex flex-col justify-between h-full transition-all shadow-2xs">
                               <div>
                                 {/* Cabecera de Comanda */}
-                                <div className="flex items-center justify-between gap-1 mb-1.5 pb-1 border-b border-amber-200/60">
+                                <div className="flex items-center justify-between gap-1 mb-1.5 pb-1 border-b border-amber-200/70">
                                   <div className="flex items-center gap-1.5 font-black text-[10px] text-amber-950 uppercase tracking-wider">
-                                    <Cake className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-                                    <span>Comanda ({orderItems.length} {orderItems.length === 1 ? "producto" : "productos"})</span>
+                                    <Receipt className="w-3.5 h-3.5 text-amber-700 shrink-0" />
+                                    <span>Comanda ({orderItems.length} {orderItems.length === 1 ? "prod" : "prods"})</span>
                                   </div>
                                   {hasMoreThanTwo && (
                                     <button
@@ -2603,7 +2602,7 @@ export default function PedidosPage() {
                                       }`}
                                       title={isExpanded ? "Mostrar menos productos" : "Desplegar todos los productos y detalles"}
                                     >
-                                      <span>{isExpanded ? "Ver menos" : "Ver más"}</span>
+                                      <span>{isExpanded ? "Menos" : "Ver más"}</span>
                                       <ChevronDown className={`w-3 h-3 transition-transform duration-200 ${isExpanded ? "rotate-180" : ""}`} />
                                     </button>
                                   )}
@@ -2613,9 +2612,9 @@ export default function PedidosPage() {
                                 {hasItems ? (
                                   <div className="space-y-1">
                                     {itemsToShow.map((it, idx) => (
-                                      <div key={idx} className="flex items-center justify-between text-xs gap-2 leading-tight">
+                                      <div key={idx} className="flex items-center justify-between text-xs gap-1.5 leading-tight bg-white/70 px-1.5 py-0.5 rounded-md border border-amber-100/80">
                                         {/* 1. Cantidad fija centrada */}
-                                        <span className="font-mono tabular-nums font-black text-[11px] text-amber-950 bg-amber-100 border border-amber-300 px-1 py-0.2 rounded w-10 text-center shrink-0">
+                                        <span className="font-mono tabular-nums font-black text-[11px] text-amber-950 bg-amber-100 border border-amber-300 px-1 py-0.2 rounded w-8 text-center shrink-0">
                                           {it.quantity}x
                                         </span>
                                         {/* 2. Nombre de producto */}
@@ -2624,7 +2623,7 @@ export default function PedidosPage() {
                                           {it.notes && <span className="text-stone-500 font-normal italic ml-1">({it.notes})</span>}
                                         </span>
                                         {/* 3. Subtotal alineado a la derecha en ancho fijo */}
-                                        <span className="font-mono tabular-nums font-bold text-[11px] text-stone-700 w-20 text-right shrink-0">
+                                        <span className="font-mono tabular-nums font-bold text-[11px] text-stone-700 shrink-0">
                                           {it.subtotal ? formatCurrency(it.subtotal) : ""}
                                         </span>
                                       </div>
@@ -2642,32 +2641,32 @@ export default function PedidosPage() {
                                 <button
                                   type="button"
                                   onClick={(e) => toggleOrderProductsExpanded(order.id, e)}
-                                  className="w-full mt-1.5 pt-1 border-t border-amber-200/80 text-[10px] font-black text-amber-800 hover:text-amber-950 flex items-center justify-center gap-1 cursor-pointer transition-colors"
+                                  className="w-full mt-1.5 pt-1 border-t border-amber-200/60 text-[10px] font-bold text-amber-800 hover:text-amber-950 flex items-center justify-center gap-1 cursor-pointer transition-colors"
                                 >
-                                  <span>... y {orderItems.length - 2} producto{orderItems.length - 2 > 1 ? "s" : ""} más (Toca &quot;Ver más&quot;)</span>
+                                  <span>+ {orderItems.length - 2} prod{orderItems.length - 2 > 1 ? "s" : ""} más (Toca para ver)</span>
                                   <ChevronDown className="w-3 h-3 text-amber-700" />
                                 </button>
                               )}
 
                               {/* Desplegable con observaciones si está expandido */}
                               {isExpanded && (
-                                <div className="mt-2 pt-1.5 border-t border-amber-200/80 space-y-1.5 text-[11px] animate-in fade-in duration-150">
+                                <div className="mt-1.5 pt-1.5 border-t border-amber-200/80 space-y-1 text-[11px] animate-in fade-in duration-150">
                                   {order.description && (
-                                    <p className="text-stone-700 bg-white/80 p-1.5 rounded border border-amber-200/70">
-                                      <strong className="text-amber-950 font-bold">📝 Observaciones:</strong> {order.description}
+                                    <p className="text-stone-700 bg-white/90 p-1 rounded border border-amber-200/70">
+                                      <strong className="text-amber-950 font-bold">Obs:</strong> {order.description}
                                     </p>
                                   )}
                                   {order.dedication && (
-                                    <p className="text-rose-900 font-bold italic bg-rose-50 border border-rose-200 px-2 py-1 rounded-md">
-                                      ✨ Dedicatoria: &quot;{order.dedication}&quot;
+                                    <p className="text-rose-900 font-bold italic bg-rose-50 border border-rose-200 px-1.5 py-0.5 rounded">
+                                      ✨ &quot;{order.dedication}&quot;
                                     </p>
                                   )}
                                   <button
                                     type="button"
                                     onClick={(e) => toggleOrderProductsExpanded(order.id, e)}
-                                    className="w-full pt-1 text-[10px] font-black text-amber-800 hover:text-amber-950 flex items-center justify-center gap-1 cursor-pointer"
+                                    className="w-full pt-0.5 text-[10px] font-black text-amber-800 hover:text-amber-950 flex items-center justify-center gap-1 cursor-pointer"
                                   >
-                                    <span>▲ Ocultar y mostrar solo 2</span>
+                                    <span>▲ Ocultar</span>
                                   </button>
                                 </div>
                               )}
@@ -2676,87 +2675,75 @@ export default function PedidosPage() {
                         })()}
                       </div>
 
-                      {/* COLUMNA 3: Entrega, Cliente y Saldo Cuadrado (xl:col-span-2) */}
-                      <div className="md:col-span-1 xl:col-span-2 min-w-0 flex flex-col justify-between gap-1.5 h-full py-0.5">
-                        {/* Fecha y Hora de Levantamiento (Cuándo se hizo el pedido) */}
-                        <div>
-                          <span className="text-[10px] font-extrabold uppercase tracking-wider text-amber-800 flex items-center gap-1 mb-0.5">
-                            <Clock className="w-3 h-3 text-amber-600 shrink-0" />
-                            <span>Levantado</span>
-                          </span>
-                          <div
-                            className="flex items-center gap-1.5 flex-wrap"
-                            title={`Pedido levantado el: ${creationInfo.fullDateStr}`}
-                          >
-                            <div className="flex items-center gap-1 text-amber-950 font-bold text-xs bg-amber-50 border border-amber-300 px-1.5 py-0.5 rounded-md">
+                      {/* COLUMNA 3: Entrega, Cliente y Saldo Cuadrados (xl:col-span-3) */}
+                      <div className="md:col-span-1 xl:col-span-3 min-w-0 h-full">
+                        <div className="bg-stone-50/80 border border-stone-200/80 rounded-xl p-2.5 flex flex-col justify-between h-full shadow-2xs">
+                          {/* 1. Fecha y Hora de Entrega Destacada */}
+                          <div>
+                            <span className="text-[10px] font-black uppercase tracking-wider text-stone-500 flex items-center gap-1 mb-1">
                               <Calendar className="w-3 h-3 text-amber-600 shrink-0" />
-                              <span>{creationInfo.shortDateStr}</span>
-                            </div>
-                            <span className="font-mono tabular-nums font-black text-amber-950 text-xs sm:text-sm bg-amber-100 border border-amber-300 px-1.5 py-0.5 rounded-md">
-                              {creationInfo.exactTimeStr}
+                              <span>Entrega Programada</span>
                             </span>
-                          </div>
-                        </div>
-
-                        {/* Fecha y Hora de Entrega */}
-                        <div>
-                          <span className="text-[10px] font-extrabold uppercase tracking-wider text-stone-400 block mb-0.5">Entrega</span>
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            {normalizeDateStr(order.deliveryDate) === todayStr ? (
-                              <span className="text-[10px] font-black bg-rose-600 text-white px-2 py-0.5 rounded-md shadow-2xs animate-pulse">
-                                ¡HOY!
-                              </span>
-                            ) : (
-                              <div className="flex items-center gap-1 text-stone-700 font-bold text-xs bg-stone-100 border border-stone-200 px-1.5 py-0.5 rounded-md">
-                                <Calendar className="w-3 h-3 text-stone-400 shrink-0" />
-                                <span>{order.deliveryDate}</span>
-                              </div>
-                            )}
-                            <span className="font-mono tabular-nums font-black text-stone-900 text-xs sm:text-sm bg-stone-50 border border-stone-200 px-1.5 py-0.5 rounded-md">
-                              {order.deliveryTime || "16:00"} hrs
-                            </span>
-                          </div>
-                        </div>
-
-                        {/* Cliente & Teléfono */}
-                        <div className="min-w-0">
-                          <span className="text-[10px] font-extrabold uppercase tracking-wider text-stone-400 block mb-0.5">Cliente</span>
-                          <p className="font-black text-xs text-stone-900 truncate" title={order.customerName}>
-                            👤 {order.customerName}
-                          </p>
-                          {order.phone && (
-                            <p className="font-mono tabular-nums text-[11px] font-bold text-stone-500 truncate flex items-center gap-1 mt-0.5">
-                              <Phone className="w-3 h-3 text-stone-400 shrink-0" />
-                              {order.phone}
-                            </p>
-                          )}
-                        </div>
-
-                        {/* Estado Financiero / Saldo */}
-                        <div className="pt-1 border-t border-stone-100">
-                          {order.remainingBalance === 0 ? (
-                            <span className="text-xs font-black text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-lg border border-emerald-300 shadow-2xs inline-flex items-center gap-1">
-                              <Check className="w-3 h-3 text-emerald-700" />
-                              Liquidado
-                            </span>
-                          ) : (
-                            <div className="flex flex-col gap-0.5">
-                              <span className="text-xs font-mono tabular-nums font-black text-rose-950 bg-rose-100 border-2 border-rose-300 px-2 py-0.5 rounded-lg shadow-2xs inline-flex items-center gap-1">
-                                Falta: {formatCurrency(order.remainingBalance)}
-                              </span>
-                              {order.deposit && order.deposit > 0 ? (
-                                <span className="text-[10px] font-mono tabular-nums font-medium text-stone-500">
-                                  Anticipo: {formatCurrency(order.deposit)}
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              {deliveryInfo.isToday ? (
+                                <span className="text-[10px] font-black bg-rose-600 text-white px-2 py-0.5 rounded-md shadow-2xs animate-pulse">
+                                  ¡HOY!
+                                </span>
+                              ) : deliveryInfo.isTomorrow ? (
+                                <span className="text-[10px] font-black bg-amber-500 text-stone-950 px-2 py-0.5 rounded-md shadow-2xs">
+                                  Mañana
                                 </span>
                               ) : null}
+                              <span className="font-extrabold text-stone-900 text-xs bg-white border border-stone-200 px-2 py-0.5 rounded-md shadow-2xs">
+                                {deliveryInfo.formattedDate}
+                              </span>
+                              <span className="font-mono tabular-nums font-black text-amber-950 text-xs bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded-md shadow-2xs flex items-center gap-1">
+                                <Clock className="w-2.5 h-2.5 text-amber-600 shrink-0" />
+                                <span>{order.deliveryTime || "16:00"} hrs</span>
+                              </span>
                             </div>
-                          )}
+                          </div>
+
+                          {/* 2. Cliente y Teléfono */}
+                          <div className="pt-1.5 border-t border-stone-200/60 min-w-0">
+                            <span className="text-[10px] font-extrabold uppercase tracking-wider text-stone-400 block mb-0.5">Cliente</span>
+                            <p className="font-black text-xs text-stone-900 truncate" title={order.customerName}>
+                              👤 {order.customerName}
+                            </p>
+                            {order.phone && (
+                              <p className="font-mono tabular-nums text-[11px] font-bold text-stone-500 truncate flex items-center gap-1 mt-0.5">
+                                <Phone className="w-3 h-3 text-stone-400 shrink-0" />
+                                <span>{order.phone}</span>
+                              </p>
+                            )}
+                          </div>
+
+                          {/* 3. Saldo / Estado Financiero */}
+                          <div className="pt-1.5 border-t border-stone-200/60">
+                            {order.remainingBalance === 0 ? (
+                              <span className="text-xs font-black text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-lg border border-emerald-300 shadow-2xs inline-flex items-center gap-1">
+                                <Check className="w-3 h-3 text-emerald-700 shrink-0" />
+                                <span>✓ Liquidado</span>
+                              </span>
+                            ) : (
+                              <div className="flex flex-col gap-0.5">
+                                <span className="text-xs font-mono tabular-nums font-black text-rose-950 bg-rose-100 border-2 border-rose-300 px-2 py-0.5 rounded-lg shadow-2xs inline-flex items-center gap-1">
+                                  <span>Falta: {formatCurrency(order.remainingBalance)}</span>
+                                </span>
+                                {order.deposit && order.deposit > 0 ? (
+                                  <span className="text-[10px] font-mono tabular-nums font-medium text-stone-500 pl-0.5">
+                                    Anticipo: {formatCurrency(order.deposit)}
+                                  </span>
+                                ) : null}
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </div>
 
                       {/* COLUMNA 4: Botonera Cuadrada, Fija y Alineada (xl:col-span-3) */}
                       <div
-                        className="md:col-span-1 xl:col-span-3 min-w-0 flex flex-col justify-center gap-2 h-full py-0.5"
+                        className="md:col-span-1 xl:col-span-3 min-w-0 flex flex-col justify-between gap-2 h-full py-0.5"
                         onClick={(e) => e.stopPropagation()}
                       >
                         {/* Fila 1: Botón Principal de Flujo Operativo */}
@@ -2767,18 +2754,18 @@ export default function PedidosPage() {
                               <button
                                 type="button"
                                 onClick={() => setSelectedOrderForPayment(order)}
-                                className="flex-1 py-2 px-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 active:scale-95 text-white font-black text-xs rounded-xl shadow-xs transition-all flex items-center justify-center gap-1 cursor-pointer whitespace-nowrap"
+                                className="flex-1 py-2 px-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 active:scale-95 text-white font-black text-xs rounded-xl shadow-xs transition-all flex items-center justify-center gap-1 cursor-pointer truncate"
                                 title={`Abonar a cuenta o liquidar saldo de ${formatCurrency(order.remainingBalance)}`}
                               >
                                 <DollarSign className="w-3.5 h-3.5 shrink-0" />
-                                <span className="font-mono tabular-nums">Abonar / Liquidar {formatCurrency(order.remainingBalance)}</span>
+                                <span className="font-mono tabular-nums truncate">Abonar {formatCurrency(order.remainingBalance)}</span>
                               </button>
 
                               {order.status !== "listo" ? (
                                 <button
                                   type="button"
                                   onClick={() => handleMarkAsReady(order)}
-                                  className="py-2 px-2.5 bg-amber-100 hover:bg-emerald-100 active:scale-95 text-amber-900 hover:text-emerald-950 border border-amber-300 hover:border-emerald-300 font-extrabold text-xs rounded-xl transition-all flex items-center gap-1 cursor-pointer whitespace-nowrap shadow-2xs"
+                                  className="py-2 px-2.5 bg-amber-100 hover:bg-emerald-100 active:scale-95 text-amber-900 hover:text-emerald-950 border border-amber-300 hover:border-emerald-300 font-extrabold text-xs rounded-xl transition-all flex items-center gap-1 cursor-pointer whitespace-nowrap shadow-2xs shrink-0"
                                   title="Marcar que el pedido ya llegó y está listo en sucursal"
                                 >
                                   <CheckCircle2 className="w-3.5 h-3.5 text-amber-600 shrink-0" />
@@ -2788,16 +2775,16 @@ export default function PedidosPage() {
                                 <button
                                   type="button"
                                   onClick={() => handleToggleReady(order)}
-                                  className="py-2 px-2.5 bg-emerald-100 hover:bg-emerald-200 active:scale-95 text-emerald-900 border border-emerald-300 font-black text-xs rounded-xl transition-all flex items-center gap-1 cursor-pointer whitespace-nowrap shadow-2xs"
+                                  className="py-2 px-2.5 bg-emerald-100 hover:bg-emerald-200 active:scale-95 text-emerald-900 border border-emerald-300 font-black text-xs rounded-xl transition-all flex items-center gap-1 cursor-pointer whitespace-nowrap shadow-2xs shrink-0"
                                   title="El pedido ya está en sucursal. Haz clic si deseas regresarlo a 'En preparación'."
                                 >
                                   <Check className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
-                                  <span>En Sucursal</span>
+                                  <span>En Tienda</span>
                                 </button>
                               )}
                             </div>
                           ) : (
-                            /* 100% Liquidado -> Botón 'Entregar Pedido' (Requerimiento Prompt 6) */
+                            /* 100% Liquidado -> Botón 'Entregar Pedido' */
                             <div className="flex items-center gap-1.5">
                               <button
                                 type="button"
@@ -2813,16 +2800,16 @@ export default function PedidosPage() {
                                 <button
                                   type="button"
                                   onClick={() => handleMarkAsReady(order)}
-                                  className="py-2 px-2 bg-amber-100 hover:bg-emerald-100 active:scale-95 text-amber-900 hover:text-emerald-950 border border-amber-300 font-bold text-xs rounded-xl transition-all flex items-center gap-1 cursor-pointer shadow-2xs"
+                                  className="py-2 px-2.5 bg-amber-100 hover:bg-emerald-100 active:scale-95 text-amber-900 hover:text-emerald-950 border border-amber-300 font-bold text-xs rounded-xl transition-all flex items-center gap-1 cursor-pointer shadow-2xs shrink-0"
                                   title="Marcar que ya llegó a la sucursal"
                                 >
-                                  <CheckCircle2 className="w-3.5 h-3.5 text-amber-600" />
+                                  <CheckCircle2 className="w-3.5 h-3.5 text-amber-600 shrink-0" />
                                   <span>Listo</span>
                                 </button>
                               ) : (
-                                <span className="py-2 px-2.5 bg-emerald-50 text-emerald-800 border border-emerald-200 font-black text-[11px] rounded-xl flex items-center gap-1 shrink-0">
-                                  <Check className="w-3.5 h-3.5 text-emerald-600" />
-                                  <span>En Sucursal</span>
+                                <span className="py-2 px-2 bg-emerald-50 text-emerald-800 border border-emerald-200 font-black text-[11px] rounded-xl flex items-center gap-1 shrink-0">
+                                  <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                                  <span>En Tienda</span>
                                 </span>
                               )}
                             </div>
@@ -2909,6 +2896,7 @@ export default function PedidosPage() {
                   ? order.items.reduce((sum, item) => sum + (item.quantity || 0), 0)
                   : 1;
                 const creationInfo = formatOrderCreation(order);
+                const deliveryInfo = formatDeliveryDateDisplay(order.deliveryDate);
 
                 return (
                   <div
@@ -2968,22 +2956,17 @@ export default function PedidosPage() {
 
                       {/* Día y Hora exacta en que se alzó el pedido */}
                       <div
-                        className="p-2 px-2.5 rounded-xl bg-gradient-to-r from-amber-50 to-orange-50/80 border-2 border-amber-300 text-amber-950 shadow-2xs"
+                        className="p-1.5 px-2.5 rounded-xl bg-gradient-to-r from-amber-50 to-orange-50/70 border border-amber-200/80 text-amber-950 shadow-2xs flex items-center justify-between gap-2"
                         title={`Pedido registrado el: ${creationInfo.fullDateStr}`}
                       >
-                        <div className="flex items-center gap-1.5 text-amber-900 font-black text-[10px] uppercase tracking-wider mb-1">
-                          <Clock className="w-3.5 h-3.5 text-amber-700 shrink-0" />
-                          <span>Pedido Alzado El:</span>
+                        <div className="flex items-center gap-1.5 text-amber-900 font-extrabold text-[11px]">
+                          <Clock className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                          <span>Alzado:</span>
+                          <span className="font-bold text-stone-800">{creationInfo.shortDateStr}</span>
                         </div>
-                        <div className="flex items-center justify-between gap-1 text-xs">
-                          <div className="flex items-center gap-1 font-extrabold text-stone-800">
-                            <Calendar className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-                            <span>{creationInfo.shortDateStr}</span>
-                          </div>
-                          <span className="font-mono tabular-nums font-black text-amber-950 bg-white/95 border border-amber-300 px-2 py-0.5 rounded-md text-[11px] shadow-2xs">
-                            {creationInfo.exactTimeStr}
-                          </span>
-                        </div>
+                        <span className="font-mono tabular-nums font-black text-amber-950 bg-white/95 border border-amber-300 px-2 py-0.5 rounded-md text-[11px] shadow-2xs">
+                          {creationInfo.exactTimeStr}
+                        </span>
                       </div>
 
                       {/* 2. Resumen: Piezas y Total del Pedido */}
@@ -3127,26 +3110,23 @@ export default function PedidosPage() {
 
                       {/* 4. Datos de Entrega, Cliente y Cobro */}
                       <div className="bg-stone-50/90 rounded-2xl p-3 border border-stone-200/80 space-y-2">
-                        {/* Fecha y Hora de Pedido (Cuándo se hizo) */}
-                        <div className="flex items-center justify-between gap-2 border-b border-stone-200/60 pb-1.5 text-[11px]">
-                          <span className="font-extrabold text-amber-800 flex items-center gap-1">
-                            <Clock className="w-3.5 h-3.5 text-amber-600" />
-                            <span>Pedido Realizado:</span>
-                          </span>
-                          <span
-                            className="font-mono font-black text-amber-950 bg-amber-100/90 border border-amber-300 px-2 py-0.5 rounded-lg shadow-2xs"
-                            title={`Registrado: ${creationInfo.fullDateStr}`}
-                          >
-                            {creationInfo.fullBadgeStr}
-                          </span>
-                        </div>
-
+                        {/* Fecha y Hora de Entrega Programada */}
                         <div className="flex items-center justify-between gap-2 border-b border-stone-200/60 pb-1.5 text-xs">
                           <div className="flex items-center gap-1.5">
                             <Calendar className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-                            <span className={`font-black ${normalizeDateStr(order.deliveryDate) === todayStr ? "text-rose-700 font-extrabold" : "text-stone-800"}`}>
-                              {normalizeDateStr(order.deliveryDate) === todayStr ? "¡ENTREGA HOY!" : order.deliveryDate}
-                            </span>
+                            {deliveryInfo.isToday ? (
+                              <span className="font-extrabold text-rose-700 bg-rose-50 px-2 py-0.5 rounded-md border border-rose-200 shadow-2xs animate-pulse">
+                                ¡ENTREGA HOY!
+                              </span>
+                            ) : deliveryInfo.isTomorrow ? (
+                              <span className="font-extrabold text-amber-900 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
+                                Mañana ({deliveryInfo.formattedDate})
+                              </span>
+                            ) : (
+                              <span className="font-extrabold text-stone-800">
+                                {deliveryInfo.formattedDate}
+                              </span>
+                            )}
                           </div>
                           <div className="flex items-center gap-1 font-bold text-stone-600">
                             <Clock className="w-3.5 h-3.5 text-amber-600 shrink-0" />
@@ -3316,6 +3296,7 @@ export default function PedidosPage() {
                   const isUnpaid = checkIsUnpaid(order);
                   const isConcludedOrHistory = classificationFilter === "historial" || order.status === "entregado" || order.status === "cancelado";
                   const creationInfo = formatOrderCreation(order);
+                  const deliveryInfo = formatDeliveryDateDisplay(order.deliveryDate);
 
                   return (
                     <React.Fragment key={order.id}>
@@ -3381,7 +3362,7 @@ export default function PedidosPage() {
                                   ? "text-amber-800 font-black"
                                   : "text-stone-900"
                               }`}>
-                                {isToday ? "¡HOY!" : isTomorrow ? "Mañana" : order.deliveryDate}
+                                {isToday ? "¡HOY!" : isTomorrow ? "Mañana" : deliveryInfo.formattedDate}
                               </span>
                             </div>
                             <div className="flex items-center gap-1.5 text-[11px] text-stone-500 pl-5">

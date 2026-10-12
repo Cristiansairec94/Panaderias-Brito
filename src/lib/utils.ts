@@ -326,6 +326,118 @@ export function formatOrderCreation(
   };
 }
 
+export interface DeliveryDateInfo {
+  dayName: string;          // e.g. "Dom"
+  dayNameFull: string;      // e.g. "Domingo"
+  dayNum: number;           // e.g. 11
+  monthName: string;        // e.g. "Oct"
+  year: number;             // e.g. 2026
+  formattedDate: string;    // e.g. "Dom 11 Oct"
+  formattedFull: string;    // e.g. "Domingo, 11 de octubre de 2026"
+  isToday: boolean;
+  isTomorrow: boolean;
+  isPast: boolean;
+  rawDate: string;
+}
+
+/**
+ * Formatea de forma segura cualquier string de fecha de entrega (ej. '2026-10-11')
+ * a una presentación legible en español ('Dom 11 Oct') sin desfases de zona horaria.
+ */
+export function formatDeliveryDateDisplay(dateStr?: string | null): DeliveryDateInfo {
+  if (!dateStr || typeof dateStr !== "string") {
+    return {
+      dayName: "",
+      dayNameFull: "",
+      dayNum: 0,
+      monthName: "",
+      year: 0,
+      formattedDate: "Sin fecha",
+      formattedFull: "Sin fecha",
+      isToday: false,
+      isTomorrow: false,
+      isPast: false,
+      rawDate: "",
+    };
+  }
+
+  const trimmed = dateStr.trim();
+  const match = trimmed.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+
+  let d: Date;
+  let year = 0;
+  let month = 0;
+  let dayNum = 0;
+
+  if (match) {
+    year = parseInt(match[1], 10);
+    month = parseInt(match[2], 10) - 1;
+    dayNum = parseInt(match[3], 10);
+    d = new Date(year, month, dayNum);
+  } else {
+    const ts = parseDateTimeSafe(trimmed);
+    if (ts > 0) {
+      d = new Date(ts);
+      year = d.getFullYear();
+      month = d.getMonth();
+      dayNum = d.getDate();
+    } else {
+      return {
+        dayName: "",
+        dayNameFull: "",
+        dayNum: 0,
+        monthName: "",
+        year: 0,
+        formattedDate: trimmed,
+        formattedFull: trimmed,
+        isToday: false,
+        isTomorrow: false,
+        isPast: false,
+        rawDate: trimmed,
+      };
+    }
+  }
+
+  const daysShort = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
+  const daysFull = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
+  const monthsShort = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
+  const monthsFull = [
+    "enero", "febrero", "marzo", "abril", "mayo", "junio",
+    "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"
+  ];
+
+  const dayOfWeekIndex = d.getDay();
+  const dayName = daysShort[dayOfWeekIndex] || "";
+  const dayNameFull = daysFull[dayOfWeekIndex] || "";
+  const monthName = monthsShort[month] || "";
+  const monthNameFull = monthsFull[month] || "";
+
+  const formattedDate = `${dayName} ${dayNum} ${monthName}`;
+  const formattedFull = `${dayNameFull}, ${dayNum} de ${monthNameFull} de ${year}`;
+
+  const now = new Date();
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const targetStart = new Date(year, month, dayNum).getTime();
+  const diffDays = Math.round((targetStart - todayStart) / (1000 * 60 * 60 * 24));
+
+  const isToday = diffDays === 0;
+  const isTomorrow = diffDays === 1;
+  const isPast = diffDays < 0;
+
+  return {
+    dayName,
+    dayNameFull,
+    dayNum,
+    monthName,
+    year,
+    formattedDate,
+    formattedFull,
+    isToday,
+    isTomorrow,
+    isPast,
+    rawDate: trimmed,
+  };
+}
 
 /**
  * Extrae la clave de ordenamiento (timestamp numérico y secuencia de ID) de cualquier movimiento.
