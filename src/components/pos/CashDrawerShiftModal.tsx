@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { 
   X, 
   Wallet, 
@@ -36,6 +36,7 @@ import { formatCurrency, onlyNumbersKeyDown, cleanDecimalNumbers, formatDateTime
 import { getStoredOrders } from "@/lib/orders";
 import { useNotifications, FBNotification } from "@/context/NotificationContext";
 import { useBranch } from "@/context/BranchContext";
+import { useAuth } from "@/context/AuthContext";
 import { realtimeHub } from "@/lib/realtime/realtimeHub";
 import { createClient } from "@/lib/supabase/client";
 
@@ -88,6 +89,7 @@ export default function CashDrawerShiftModal({
 }: CashDrawerShiftModalProps) {
   const { addNotification } = useNotifications();
   const { currentBranch, branches, updateBranch } = useBranch();
+  const { user, usersList } = useAuth();
 
   // Fondo Inicial Sincronizado en tiempo real
   const targetBranchId = resolveBranchId(branchId || currentBranch?.id, cashierName);
@@ -233,6 +235,8 @@ export default function CashDrawerShiftModal({
     }
   }, [currentBranch?.id, currentBranch?.currentShift?.cashier, cashierName]);
   const [incomingCashier, setIncomingCashier] = useState("Siguiente Cajero(a)");
+  const [isCustomOutgoing, setIsCustomOutgoing] = useState(false);
+  const [isCustomIncoming, setIsCustomIncoming] = useState(false);
   const [nextShiftName, setNextShiftName] = useState("Turno Vespertino (14:00 - 22:00)");
   const [countedCash, setCountedCash] = useState<string>("");
   const [nextInitialFund, setNextInitialFund] = useState("");
@@ -285,20 +289,64 @@ export default function CashDrawerShiftModal({
     }
   }, [initialTab, isOpen]);
 
+  const findProfile = useCallback((nameOrUsername: string) => {
+    if (!nameOrUsername) return null;
+    const clean = nameOrUsername.toLowerCase().trim();
+    return (
+      usersList.find((u) => {
+        const uName = (u.name || "").toLowerCase().trim();
+        const uUser = (u.username || "").toLowerCase().trim();
+        return uName === clean || uUser === clean || uName.includes(clean) || clean.includes(uName);
+      }) || null
+    );
+  }, [usersList]);
+
+  const outgoingProfile = useMemo(() => findProfile(outgoingCashier), [outgoingCashier, findProfile]);
+  const incomingProfile = useMemo(() => findProfile(incomingCashier), [incomingCashier, findProfile]);
+
+  const branchUsers = useMemo(() => {
+    const bId = currentBranch?.id;
+    return usersList.filter((u) => u.status !== "inactivo" && (bId ? u.assignedBranchId === bId : true));
+  }, [usersList, currentBranch?.id]);
+
+  const otherUsers = useMemo(() => {
+    const bId = currentBranch?.id;
+    return usersList.filter((u) => u.status !== "inactivo" && (bId ? u.assignedBranchId !== bId : false));
+  }, [usersList, currentBranch?.id]);
+
   useEffect(() => {
-    const effectiveName = cashierName || currentBranch?.currentShift?.cashier || "Cajero";
+    const effectiveName = cashierName || currentBranch?.currentShift?.cashier || user?.name || "Cajero";
     setOutgoingCashier(effectiveName);
-    if (effectiveName.toLowerCase().includes("matutino") || effectiveName.includes("1")) {
-      setIncomingCashier("Cajero(a) Turno Vespertino");
-      setNextShiftName("Turno Vespertino (14:00 - 22:00)");
-    } else if (effectiveName.toLowerCase().includes("vespertino") || effectiveName.includes("2")) {
-      setIncomingCashier("Cajero(a) Turno Matutino");
-      setNextShiftName("Turno Matutino (06:00 - 14:00)");
+
+    // Seleccionar inteligentemente a la persona que recibe (nunca duplicar la que entrega)
+    const bId = currentBranch?.id;
+    const sameBranchCandidates = usersList.filter(
+      (u) =>
+        u.status !== "inactivo" &&
+        !matchesCashier(u.name, effectiveName) &&
+        !matchesCashier(u.username, effectiveName) &&
+        (bId ? u.assignedBranchId === bId : false)
+    );
+
+    if (sameBranchCandidates.length > 0) {
+      setIncomingCashier(sameBranchCandidates[0].name);
+      setNextShiftName(effectiveName.toLowerCase().includes("matutino") ? "Turno Vespertino (14:00 - 22:00)" : "Turno Matutino (06:00 - 14:00)");
     } else {
-      setIncomingCashier(effectiveName);
-      setNextShiftName(currentBranch?.currentShift?.name || "Turno General");
+      const otherCandidates = usersList.filter(
+        (u) =>
+          u.status !== "inactivo" &&
+          !matchesCashier(u.name, effectiveName) &&
+          !matchesCashier(u.username, effectiveName)
+      );
+      if (otherCandidates.length > 0) {
+        const preferred = otherCandidates.find((u) => u.role === "cajero") || otherCandidates[0];
+        setIncomingCashier(preferred.name);
+      } else {
+        setIncomingCashier("Don Toño Brito");
+      }
+      setNextShiftName(currentBranch?.currentShift?.name || "Turno Siguiente");
     }
-  }, [cashierName, currentBranch?.currentShift?.cashier, currentBranch?.currentShift?.name]);
+  }, [cashierName, currentBranch?.id, currentBranch?.currentShift?.cashier, currentBranch?.currentShift?.name, usersList, user?.name]);
 
   useEffect(() => {
     if (isOpen) {
@@ -836,11 +884,17 @@ export default function CashDrawerShiftModal({
             </div>
             <div className="flex justify-between items-center pt-1">
               <span className="text-rose-700 font-bold">ENTREGÓ (Saliente):</span>
-              <span className="font-black text-stone-900">{cut.outgoingCashier}</span>
+              <span className="font-black text-stone-900 flex items-center gap-1.5">
+                <span>{findProfile(cut.outgoingCashier)?.avatar || "👨‍🍳"}</span>
+                <span>{cut.outgoingCashier}</span>
+              </span>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-emerald-700 font-bold">RECIBIÓ (Entrante):</span>
-              <span className="font-black text-stone-900">{cut.incomingCashier}</span>
+              <span className="font-black text-stone-900 flex items-center gap-1.5">
+                <span>{findProfile(cut.incomingCashier)?.avatar || "👩‍💼"}</span>
+                <span>{cut.incomingCashier}</span>
+              </span>
             </div>
             <div className="flex justify-between">
               <span className="text-stone-500">TURNO SIGUIENTE:</span>
@@ -1180,25 +1234,172 @@ export default function CashDrawerShiftModal({
                     </button>
                   </div>
 
-                  {/* 2. Relevo Directo Estático: Quién Entrega y Quién Recibe (Sin opciones de selección) */}
+                  {/* 2. Relevo de Turno: Perfiles Correspondientes de Quién Entrega y Quién Recibe */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 bg-stone-50 rounded-3xl border-2 border-stone-200">
-                    <div className="flex items-center justify-between gap-3 bg-white p-3 sm:p-3.5 rounded-2xl border border-stone-200/90 shadow-xs">
-                      <span className="font-black text-rose-700 uppercase shrink-0 text-xs sm:text-sm flex items-center gap-1.5">
-                        <span className="text-base">👤</span> Entrega:
-                      </span>
-                      <div className="font-black text-stone-900 text-xs sm:text-sm truncate flex-1 text-right flex items-center justify-end gap-1.5">
-                        <span className="text-base">👩‍🍳</span>
-                        <span className="truncate">{outgoingCashier}</span>
+                    
+                    {/* Tarjeta: QUIÉN ENTREGA */}
+                    <div className="bg-white p-3 sm:p-3.5 rounded-2xl border border-stone-200/90 shadow-xs flex flex-col justify-between gap-1.5 transition-all">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-black text-rose-700 uppercase shrink-0 text-xs sm:text-sm flex items-center gap-1.5">
+                          <span className="text-base">👤</span> ENTREGA:
+                        </span>
+                        {outgoingProfile?.assignedBranchName && (
+                          <span className="text-[10px] text-stone-500 font-bold bg-stone-100 px-2 py-0.5 rounded-md truncate max-w-[150px]">
+                            📍 {outgoingProfile.assignedBranchName.replace("Sucursal ", "")}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-2.5 mt-1">
+                        <div className="w-10 h-10 rounded-2xl bg-rose-50 border border-rose-200 flex items-center justify-center text-xl shrink-0 shadow-2xs">
+                          {outgoingProfile?.avatar || "👩‍🍳"}
+                        </div>
+
+                        <div className="flex-1 min-w-0">
+                          {!isCustomOutgoing ? (
+                            <div className="relative">
+                              <select
+                                value={outgoingCashier}
+                                onChange={(e) => {
+                                  if (e.target.value === "__custom__") {
+                                    setIsCustomOutgoing(true);
+                                  } else {
+                                    setOutgoingCashier(e.target.value);
+                                  }
+                                }}
+                                className="w-full font-black text-stone-900 text-xs sm:text-sm bg-transparent border-b-2 border-dashed border-stone-300 hover:border-rose-400 focus:outline-none focus:border-rose-500 cursor-pointer truncate py-0.5 transition-colors pr-4"
+                              >
+                                {branchUsers.length > 0 && (
+                                  <optgroup label={`Personal de ${currentBranch?.shortName || currentBranch?.name || "esta Sucursal"}`}>
+                                    {branchUsers.map((u) => (
+                                      <option key={u.id} value={u.name}>
+                                        {u.avatar || "👤"} {u.name} — {u.jobTitle || u.roleLabel || u.role}
+                                      </option>
+                                    ))}
+                                  </optgroup>
+                                )}
+                                <optgroup label="Todos los Perfiles & Administración">
+                                  {otherUsers.map((u) => (
+                                    <option key={u.id} value={u.name}>
+                                      {u.avatar || "👤"} {u.name} — {u.jobTitle || u.roleLabel || u.role}
+                                    </option>
+                                  ))}
+                                </optgroup>
+                                {!usersList.some((u) => matchesCashier(u.name, outgoingCashier)) && outgoingCashier && (
+                                  <option value={outgoingCashier}>
+                                    👤 {outgoingCashier} (Actual)
+                                  </option>
+                                )}
+                                <option value="__custom__">✏️ Escribir otro nombre...</option>
+                              </select>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-1.5">
+                              <input
+                                type="text"
+                                value={outgoingCashier}
+                                onChange={(e) => setOutgoingCashier(e.target.value)}
+                                placeholder="Nombre de quien entrega"
+                                className="w-full text-xs font-black px-2 py-1 border-2 border-rose-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-400"
+                                autoFocus
+                              />
+                              <button
+                                type="button"
+                                onClick={() => setIsCustomOutgoing(false)}
+                                className="text-[10px] text-stone-600 hover:text-stone-900 px-2 py-1 bg-stone-100 hover:bg-stone-200 rounded-lg font-bold shrink-0 transition-colors cursor-pointer"
+                                title="Volver a lista de perfiles"
+                              >
+                                Perfiles
+                              </button>
+                            </div>
+                          )}
+                          <span className="text-[10.5px] text-stone-500 font-bold block truncate mt-0.5">
+                            {outgoingProfile?.jobTitle || outgoingProfile?.roleLabel || "Cajero(a) en turno saliente"}
+                          </span>
+                        </div>
                       </div>
                     </div>
 
-                    <div className="flex items-center justify-between gap-3 bg-white p-3 sm:p-3.5 rounded-2xl border border-emerald-200 shadow-xs">
-                      <span className="font-black text-emerald-700 uppercase shrink-0 text-xs sm:text-sm flex items-center gap-1.5">
-                        <span className="text-base">👤</span> Recibe:
-                      </span>
-                      <div className="font-black text-emerald-950 text-xs sm:text-sm truncate flex-1 text-right flex items-center justify-end gap-1.5">
-                        <span className="text-base">👩‍🍳</span>
-                        <span className="truncate">{incomingCashier}</span>
+                    {/* Tarjeta: QUIÉN RECIBE */}
+                    <div className="bg-white p-3 sm:p-3.5 rounded-2xl border-2 border-emerald-300 shadow-xs flex flex-col justify-between gap-1.5 ring-2 ring-emerald-500/10 transition-all">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-black text-emerald-700 uppercase shrink-0 text-xs sm:text-sm flex items-center gap-1.5">
+                          <span className="text-base">👤</span> RECIBE:
+                        </span>
+                        {incomingProfile?.assignedBranchName && (
+                          <span className="text-[10px] text-emerald-800 font-bold bg-emerald-100/80 border border-emerald-200 px-2 py-0.5 rounded-md truncate max-w-[150px]">
+                            📍 {incomingProfile.assignedBranchName.replace("Sucursal ", "")}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-2.5 mt-1">
+                        <div className="w-10 h-10 rounded-2xl bg-emerald-50 border border-emerald-300 flex items-center justify-center text-xl shrink-0 shadow-2xs">
+                          {incomingProfile?.avatar || "👩‍💼"}
+                        </div>
+
+                        <div className="flex-1 min-w-0">
+                          {!isCustomIncoming ? (
+                            <div className="relative">
+                              <select
+                                value={incomingCashier}
+                                onChange={(e) => {
+                                  if (e.target.value === "__custom__") {
+                                    setIsCustomIncoming(true);
+                                  } else {
+                                    setIncomingCashier(e.target.value);
+                                  }
+                                }}
+                                className="w-full font-black text-emerald-950 text-xs sm:text-sm bg-transparent border-b-2 border-dashed border-emerald-300 hover:border-emerald-500 focus:outline-none focus:border-emerald-600 cursor-pointer truncate py-0.5 transition-colors pr-4"
+                              >
+                                {branchUsers.length > 0 && (
+                                  <optgroup label={`Personal de ${currentBranch?.shortName || currentBranch?.name || "esta Sucursal"}`}>
+                                    {branchUsers.map((u) => (
+                                      <option key={u.id} value={u.name}>
+                                        {u.avatar || "👤"} {u.name} — {u.jobTitle || u.roleLabel || u.role}
+                                      </option>
+                                    ))}
+                                  </optgroup>
+                                )}
+                                <optgroup label="Todos los Perfiles & Administración">
+                                  {otherUsers.map((u) => (
+                                    <option key={u.id} value={u.name}>
+                                      {u.avatar || "👤"} {u.name} — {u.jobTitle || u.roleLabel || u.role}
+                                    </option>
+                                  ))}
+                                </optgroup>
+                                {!usersList.some((u) => matchesCashier(u.name, incomingCashier)) && incomingCashier && (
+                                  <option value={incomingCashier}>
+                                    👤 {incomingCashier} (Personalizado)
+                                  </option>
+                                )}
+                                <option value="__custom__">✏️ Escribir otro nombre...</option>
+                              </select>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-1.5">
+                              <input
+                                type="text"
+                                value={incomingCashier}
+                                onChange={(e) => setIncomingCashier(e.target.value)}
+                                placeholder="Nombre de quien recibe"
+                                className="w-full text-xs font-black px-2 py-1 border-2 border-emerald-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                                autoFocus
+                              />
+                              <button
+                                type="button"
+                                onClick={() => setIsCustomIncoming(false)}
+                                className="text-[10px] text-stone-600 hover:text-stone-900 px-2 py-1 bg-stone-100 hover:bg-stone-200 rounded-lg font-bold shrink-0 transition-colors cursor-pointer"
+                                title="Volver a lista de perfiles"
+                              >
+                                Perfiles
+                              </button>
+                            </div>
+                          )}
+                          <span className="text-[10.5px] text-emerald-800 font-bold block truncate mt-0.5">
+                            {incomingProfile?.jobTitle || incomingProfile?.roleLabel || "Cajero(a) entrante / Relevo de caja"}
+                          </span>
+                        </div>
                       </div>
                     </div>
                   </div>

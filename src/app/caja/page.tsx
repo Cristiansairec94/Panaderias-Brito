@@ -42,7 +42,7 @@ import {
   Radio
 } from "lucide-react";
 import { CashMovement, ShiftCutRecord } from "@/types";
-import { formatCurrency, onlyNumbersKeyDown, cleanDecimalNumbers, formatDateTimeSafe, parseDateTimeSafe, getStoredShiftStartBoundary } from "@/lib/utils";
+import { formatCurrency, onlyNumbersKeyDown, cleanDecimalNumbers, formatDateTimeSafe, parseDateTimeSafe, getStoredShiftStartBoundary, matchesCashier } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
 import { useBranch } from "@/context/BranchContext";
 import { useNotifications, FBNotification } from "@/context/NotificationContext";
@@ -3450,8 +3450,12 @@ export default function CajaPage() {
                   {/* Saliente */}
                   <div className="bg-white p-2.5 rounded-xl border border-amber-200/70 shadow-2xs">
                     <span className="text-[10px] font-bold text-amber-900 uppercase block">👩‍🍳 Quién Entrega:</span>
-                    <span className="text-xs font-black text-stone-950 block mt-0.5 truncate">
-                      {currentShiftResponsible}
+                    <span className="text-xs font-black text-stone-950 block mt-0.5 truncate flex items-center gap-1.5">
+                      <span>{usersList.find((u) => matchesCashier(u.name, currentShiftResponsible) || matchesCashier(u.username, currentShiftResponsible))?.avatar || "👩‍🍳"}</span>
+                      <span>{currentShiftResponsible}</span>
+                    </span>
+                    <span className="text-[10px] text-stone-500 font-medium block truncate">
+                      {usersList.find((u) => matchesCashier(u.name, currentShiftResponsible) || matchesCashier(u.username, currentShiftResponsible))?.jobTitle || "Cajero(a) saliente"}
                     </span>
                   </div>
 
@@ -3463,16 +3467,16 @@ export default function CajaPage() {
                       onChange={(e) => setIncomingCashier(e.target.value)}
                       className="w-full mt-1 bg-stone-50 border border-stone-300 rounded-lg px-2 py-1 text-xs font-bold text-stone-900 focus:ring-2 focus:ring-amber-500 focus:outline-none cursor-pointer"
                     >
-                      <option value="Cajera 2 - Turno Vespertino">Cajera 2 - Turno Vespertino</option>
-                      <option value="Lupita Brito (Cajera 1)">Lupita Brito (Cajera 1)</option>
-                      <option value="Don Toño Brito (Dueño)">Don Toño Brito (Dueño / Admin)</option>
-                      <option value="Carlos Mendoza (Supervisor)">Carlos Mendoza (Supervisor)</option>
-                      <option value="Lic. Roberto Morales (Auxiliar)">Lic. Roberto Morales (Auxiliar)</option>
                       {usersList && usersList.map((u) => (
-                        <option key={u.id} value={`${u.name} (${u.roleLabel || u.role})`}>
-                          {u.name} ({u.roleLabel || u.role})
+                        <option key={u.id} value={u.name}>
+                          {u.avatar || "👤"} {u.name} — {u.jobTitle || u.roleLabel || u.role}
                         </option>
                       ))}
+                      {!usersList.some((u) => matchesCashier(u.name, incomingCashier)) && incomingCashier && (
+                        <option value={incomingCashier}>
+                          👤 {incomingCashier} (Personalizado)
+                        </option>
+                      )}
                     </select>
                   </div>
                 </div>

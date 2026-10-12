@@ -114,9 +114,11 @@ export default function PedidosPage() {
     user.role === "panadero" ||
     user.role === "supervisor" ||
     user.username === "andres" ||
+    user.username === "angeles" ||
     user.username === "carlos" ||
     user.username === "carlos.bueno" ||
     user.name?.toLowerCase().includes("andres") ||
+    user.name?.toLowerCase().includes("angeles") ||
     user.name?.toLowerCase().includes("carlos") ||
     Boolean(user.assignedBranchId && user.role !== "admin" && user.role !== "auxiliar_admin")
   );
@@ -124,7 +126,7 @@ export default function PedidosPage() {
   const canFilterBranches = isAdmin;
   const userBranchId = (
     user?.assignedBranchId ||
-    (user?.username === "andres" || user?.name?.toLowerCase().includes("andres") ? "branch-angeles" : "") ||
+    (user?.username === "andres" || user?.username === "angeles" || user?.name?.toLowerCase().includes("andres") || user?.name?.toLowerCase().includes("angeles") ? "branch-angeles" : "") ||
     (user?.username === "carlos" || user?.name?.toLowerCase().includes("mendoza") ? "branch-benito" : "") ||
     (user?.username === "carlos.bueno" || user?.name?.toLowerCase().includes("bueno") ? "branch-matriz" : "") ||
     currentBranch?.id ||
@@ -506,7 +508,15 @@ export default function PedidosPage() {
         (opName && (opName === targetName || opName.includes(targetName) || targetName.includes(opName))) ||
         (targetKeywords.length > 0 && operatingKeywords.some((k) => targetKeywords.includes(k)));
 
-      // 3. Coincidencia con el cajero que lo levantó
+      if (matchesPickup || matchesOperating) return true;
+
+      // Si el pedido tiene sucursales asignadas y ninguna coincide con esta sucursal,
+      // NO debe meterse aquí solo por el nombre del cajero
+      if (pId && opId && !matchesPickup && !matchesOperating) {
+        return false;
+      }
+
+      // 3. Coincidencia con el cajero que lo levantó (fallback solo si el pedido no tiene asignación clara)
       const cashierText = stripAccents(order.cashier);
       const cashierMatches =
         (targetKeywords.includes("angeles") && (cashierText.includes("andres") || cashierText.includes("angeles"))) ||
@@ -518,7 +528,7 @@ export default function PedidosPage() {
       const orderNotesText = `${stripAccents(order.notes)} ${stripAccents(order.description)}`;
       const textMatches = targetKeywords.some((k) => orderNotesText.includes(k));
 
-      return matchesPickup || matchesOperating || cashierMatches || textMatches;
+      return cashierMatches || textMatches;
     },
     [branches, getBranchKeywords, stripAccents]
   );
@@ -957,7 +967,7 @@ export default function PedidosPage() {
     scrollToCatalog();
   };
 
-  // Handler que activa la clasificación y lleva directamente a la lista de pedidos
+  // Handler que activa la clasificación y filtra en su lugar sin sacudidas de pantalla
   const handleSelectClassificationCard = (key: OrderClassificationKey) => {
     setPagadosSubFilter("todos");
     if (key === "all") {
@@ -965,7 +975,6 @@ export default function PedidosPage() {
       setStatusFilter("all");
       setPaymentFilter("all");
       setDateFilter("all");
-      scrollToCatalog();
       return;
     }
     if (key === "hoy") {
@@ -977,13 +986,7 @@ export default function PedidosPage() {
       setIsHistoryDashboardOpen(true);
       return;
     }
-    setClassificationFilter((prev) => {
-      const next = prev === key ? "all" : key;
-      if (next !== "all") {
-        scrollToCatalog();
-      }
-      return next;
-    });
+    setClassificationFilter((prev) => (prev === key ? "all" : key));
   };
 
   // Handlers for quick actions
@@ -1644,50 +1647,80 @@ export default function PedidosPage() {
       </div>
 
       {/* Barra Destacada de Historial con 2 Apartados: Pedidos entregados con éxito y Pedidos dados de baja */}
-      <div className="bg-gradient-to-r from-stone-900 via-stone-850 to-stone-900 text-white p-2.5 sm:p-3 px-4 sm:px-5 rounded-2xl shadow-md border border-stone-800 flex flex-col md:flex-row md:items-center justify-between gap-3 animate-in fade-in duration-200">
-        <div className="flex items-center gap-3">
+      <div className="bg-gradient-to-r from-stone-900 via-stone-850 to-stone-900 text-white p-3 sm:p-3.5 px-4 sm:px-5 rounded-2xl shadow-md border border-stone-800 flex flex-col lg:flex-row lg:items-center justify-between gap-3 animate-in fade-in duration-200">
+        <div className="flex items-center gap-3 min-w-0">
           <div className="p-2.5 bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded-xl shadow-inner shrink-0">
             <History className="w-5 h-5 text-amber-400" />
           </div>
-          <div>
-            <div className="text-[11px] font-black uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
+          <div className="min-w-0">
+            <div className="text-[11px] font-black uppercase tracking-wider text-amber-400 flex items-center gap-1.5 flex-wrap">
               <span>📜 Historial de Pedidos</span>
               <span className="text-[10px] font-mono font-bold px-2 py-0.2 rounded-full bg-stone-800 text-stone-300 border border-stone-700">
                 {classificationCounts.historial} registros
               </span>
+              {classificationFilter === "historial" && (
+                <span className="text-[10px] font-black px-2 py-0.2 rounded-full bg-amber-500/20 text-amber-300 border border-amber-400/40">
+                  {historialSubFilter === "cancelados" ? "Filtrando: Dados de baja" : "Filtrando: Entregados"}
+                </span>
+              )}
             </div>
-            <div className="text-xs sm:text-sm font-black text-stone-100">
-              Consulta de pedidos finalizados
+            <div className="flex items-center gap-2 flex-wrap mt-0.5">
+              <span className="text-xs sm:text-sm font-black text-stone-100 truncate">
+                Consulta de pedidos finalizados
+              </span>
+              {classificationFilter === "historial" && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setClassificationFilter("all");
+                    setHistorialSubFilter("todos");
+                  }}
+                  className="text-[11px] font-bold text-amber-300 hover:text-white bg-white/10 hover:bg-white/20 px-2 py-0.5 rounded-lg border border-amber-400/30 transition-all cursor-pointer inline-flex items-center gap-1"
+                  title="Volver a ver todos los pedidos activos"
+                >
+                  <span>✕ Quitar filtro (Ver Activos)</span>
+                </button>
+              )}
             </div>
           </div>
         </div>
 
-        {/* Los 2 Apartados Llamativos y Grandes */}
-        <div className="flex items-center gap-2 sm:gap-3 flex-wrap sm:flex-nowrap">
+        {/* Los 2 Apartados con Ancho Fijo, Cuadrados y Sin Movimiento */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-2.5 w-full lg:w-auto shrink-0">
           {/* Apartado 1: Pedidos entregados con éxito */}
           <button
             type="button"
             onClick={() => {
               if (classificationFilter === "historial" && historialSubFilter === "entregados") {
                 setClassificationFilter("all");
+                setHistorialSubFilter("todos");
               } else {
                 setHistorialSubFilter("entregados");
                 setClassificationFilter("historial");
-                scrollToCatalog();
               }
             }}
-            className={`flex-1 sm:flex-initial px-4 py-2.5 rounded-xl font-black text-xs sm:text-sm flex items-center justify-center gap-2.5 transition-all cursor-pointer select-none border ${
+            className={`w-full sm:w-[245px] xl:w-[265px] px-3.5 py-2.5 rounded-xl font-black text-xs sm:text-sm flex items-center justify-between gap-2 transition-colors cursor-pointer select-none border active:scale-98 ${
               classificationFilter === "historial" && historialSubFilter === "entregados"
-                ? "bg-teal-600 hover:bg-teal-500 text-white border-teal-300 ring-4 ring-teal-400/40 shadow-lg shadow-teal-900/50 scale-[1.02]"
+                ? "bg-teal-600 text-white border-teal-300 ring-2 ring-teal-400/50 shadow-md"
                 : "bg-stone-800/90 hover:bg-stone-800 text-teal-300 border-teal-700/60 hover:border-teal-400 hover:text-white"
             }`}
-            title="Ver pedidos que se entregaron con éxito al cliente"
+            title="Ver pedidos que se entregaron con éxito al cliente (Haz clic para activar o desactivar)"
           >
-            <div className="p-1 rounded-md bg-teal-500/20 text-teal-300 shrink-0">
-              <Check className="w-4 h-4 text-teal-400 font-black" />
+            <div className="flex items-center gap-2 min-w-0">
+              <div className={`p-1 rounded-md shrink-0 ${
+                classificationFilter === "historial" && historialSubFilter === "entregados" ? "bg-teal-800 text-white" : "bg-teal-500/20 text-teal-300"
+              }`}>
+                <Check className="w-4 h-4 text-teal-400 font-black" />
+              </div>
+              <span className="truncate whitespace-nowrap text-left text-xs sm:text-[13px]">
+                {classificationFilter === "historial" && historialSubFilter === "entregados" ? "✓ Entregados con éxito" : "Pedidos entregados con éxito"}
+              </span>
             </div>
-            <span className="truncate">Pedidos entregados con éxito</span>
-            <span className="font-mono font-black text-xs px-2.5 py-0.5 rounded-lg bg-teal-950 text-teal-200 border border-teal-600 shrink-0">
+            <span className={`font-mono font-black text-xs px-2 py-0.5 rounded-lg border shrink-0 ${
+              classificationFilter === "historial" && historialSubFilter === "entregados"
+                ? "bg-teal-950 text-teal-100 border-teal-400"
+                : "bg-teal-950 text-teal-200 border-teal-600"
+            }`}>
               {classificationCounts.entregados}
             </span>
           </button>
@@ -1698,38 +1731,37 @@ export default function PedidosPage() {
             onClick={() => {
               if (classificationFilter === "historial" && historialSubFilter === "cancelados") {
                 setClassificationFilter("all");
+                setHistorialSubFilter("todos");
               } else {
                 setHistorialSubFilter("cancelados");
                 setClassificationFilter("historial");
-                scrollToCatalog();
               }
             }}
-            className={`flex-1 sm:flex-initial px-4 py-2.5 rounded-xl font-black text-xs sm:text-sm flex items-center justify-center gap-2.5 transition-all cursor-pointer select-none border ${
+            className={`w-full sm:w-[245px] xl:w-[265px] px-3.5 py-2.5 rounded-xl font-black text-xs sm:text-sm flex items-center justify-between gap-2 transition-colors cursor-pointer select-none border active:scale-98 ${
               classificationFilter === "historial" && historialSubFilter === "cancelados"
-                ? "bg-rose-600 hover:bg-rose-500 text-white border-rose-300 ring-4 ring-rose-400/40 shadow-lg shadow-rose-900/50 scale-[1.02]"
+                ? "bg-rose-600 text-white border-rose-300 ring-2 ring-rose-400/50 shadow-md"
                 : "bg-stone-800/90 hover:bg-stone-800 text-rose-300 border-rose-700/60 hover:border-rose-400 hover:text-white"
             }`}
-            title="Ver productos y pedidos que se dieron de baja o cancelaron"
+            title="Ver productos y pedidos que se dieron de baja o cancelaron (Haz clic para activar o desactivar)"
           >
-            <div className="p-1 rounded-md bg-rose-500/20 text-rose-300 shrink-0">
-              <Trash2 className="w-4 h-4 text-rose-400 font-black" />
+            <div className="flex items-center gap-2 min-w-0">
+              <div className={`p-1 rounded-md shrink-0 ${
+                classificationFilter === "historial" && historialSubFilter === "cancelados" ? "bg-rose-800 text-white" : "bg-rose-500/20 text-rose-300"
+              }`}>
+                <Trash2 className="w-4 h-4 text-rose-400 font-black" />
+              </div>
+              <span className="truncate whitespace-nowrap text-left text-xs sm:text-[13px]">
+                {classificationFilter === "historial" && historialSubFilter === "cancelados" ? "✕ Dados de baja" : "Productos que se dieron de baja"}
+              </span>
             </div>
-            <span className="truncate">Productos que se dieron de baja</span>
-            <span className="font-mono font-black text-xs px-2.5 py-0.5 rounded-lg bg-rose-950 text-rose-200 border border-rose-600 shrink-0">
+            <span className={`font-mono font-black text-xs px-2 py-0.5 rounded-lg border shrink-0 ${
+              classificationFilter === "historial" && historialSubFilter === "cancelados"
+                ? "bg-rose-950 text-rose-100 border-rose-400"
+                : "bg-rose-950 text-rose-200 border-rose-600"
+            }`}>
               {classificationCounts.cancelados}
             </span>
           </button>
-
-          {classificationFilter === "historial" && (
-            <button
-              type="button"
-              onClick={() => setClassificationFilter("all")}
-              className="px-3 py-2 rounded-xl text-xs font-black bg-stone-800 hover:bg-stone-700 text-stone-300 hover:text-white border border-stone-700 transition-all cursor-pointer shrink-0"
-              title="Volver a ver todos los pedidos activos"
-            >
-              ✕ Ver Activos
-            </button>
-          )}
         </div>
       </div>
 
