@@ -86,28 +86,6 @@ const SYSTEM_ROLES: SystemRoleOption[] = [
     activeBg: "bg-blue-50",
   },
   {
-    id: "supervisor",
-    label: "Supervisor de Sucursal",
-    shortLabel: "Supervisor",
-    badge: "Auditoría & Turnos",
-    icon: "🛡️",
-    description: "Supervisión de tienda, auditoría de turnos y control de inventarios.",
-    badgeBg: "bg-purple-100 text-purple-900 border-purple-300",
-    activeBorder: "border-purple-500 ring-2 ring-purple-400/40",
-    activeBg: "bg-purple-50",
-  },
-  {
-    id: "panadero",
-    label: "Maestro Panadero / Hornero",
-    shortLabel: "Panadero",
-    badge: "Producción & Horno",
-    icon: "🥖",
-    description: "Control de horneado, producción de pan y pastelería, insumos y pedidos.",
-    badgeBg: "bg-orange-100 text-orange-900 border-orange-300",
-    activeBorder: "border-orange-500 ring-2 ring-orange-400/40",
-    activeBg: "bg-orange-50",
-  },
-  {
     id: "admin",
     label: "Administrador General",
     shortLabel: "Administrador",
@@ -140,10 +118,8 @@ function generateRandomPin(): string {
 
 function suggestRoleFromJobTitle(jobTitle: string): UserRole {
   const lower = jobTitle.toLowerCase();
-  if (lower.includes("panader") || lower.includes("horn") || lower.includes("pastel") || lower.includes("amasad")) return "panadero";
-  if (lower.includes("caj") || lower.includes("mostrador") || lower.includes("tienda")) return "cajero";
-  if (lower.includes("admin") || lower.includes("auxiliar")) return "auxiliar_admin";
-  if (lower.includes("superv") || lower.includes("encargad") || lower.includes("gerent")) return "supervisor";
+  if (lower.includes("admin") || lower.includes("dueño") || lower.includes("general")) return "admin";
+  if (lower.includes("auxiliar") || lower.includes("contab") || lower.includes("superv") || lower.includes("encargad") || lower.includes("gerent")) return "auxiliar_admin";
   return "cajero";
 }
 
@@ -1158,7 +1134,7 @@ export default function EmployeeManagement({ onGoToUsersTab }: EmployeeManagemen
                         <span className="text-[10px] font-medium text-stone-500">Define qué módulos podrá ver este usuario</span>
                       </label>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                         {SYSTEM_ROLES.map((role) => {
                           const isSelected = formRole === role.id;
                           return (
