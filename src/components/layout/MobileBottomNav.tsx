@@ -87,10 +87,26 @@ export default function MobileBottomNav() {
     (user?.role !== "admin" && user?.role !== "auxiliar_admin")
   );
 
+  // Perfiles administrativos reales (Don Toño Brito, Paulina Brito, Lic. Roberto Morales):
+  // "en los perfiles administrativos como el de paulina y toño, en esos debo tener todos los botones que son administrastivos y deben ver corte de cajas, pedidos etc, pero solo los perfiles administrativos"
   const isAdmin = !isAndresSanchez && !isCashierProfile && Boolean(
     user && 
     (user.role === "admin" || user.role === "auxiliar_admin") &&
-    (usernameNorm === "admin" || usernameNorm === "paulina" || usernameNorm === "roberto" || userNorm.includes("tono") || userNorm.includes("paulina") || userNorm.includes("morales"))
+    (
+      user.id === "usr-1" ||
+      user.id === "usr-2" ||
+      user.id === "usr-3" ||
+      usernameNorm === "admin" ||
+      usernameNorm === "paulina" ||
+      usernameNorm === "roberto" ||
+      userNorm.includes("tono") ||
+      userNorm.includes("toño") ||
+      userNorm.includes("paulina") ||
+      userNorm.includes("morales") ||
+      userNorm.includes("dueno") ||
+      userNorm.includes("dueño") ||
+      user?.jobTitle?.toLowerCase().includes("administrad")
+    )
   );
 
   // Identificar el código canónico de la sucursal del cajero o sucursal activa
@@ -104,16 +120,9 @@ export default function MobileBottomNav() {
     (currentBranch?.id && currentBranch.id !== "all" ? currentBranch.id : "")
   );
 
-  // En la sucursal (Los Ángeles, etc.) o con perfil de cajero/mostrador:
-  // "en la sucursal de los angeles se sigue viendo asi, limitalo solo al boton de pedidos, lo demas eliminalo"
-  const isBranchView = Boolean(
-    isAndresSanchez ||
-    (currentBranch?.id && currentBranch.id !== "all") ||
-    activeBranchCode === "branch-angeles" ||
-    isCashierProfile
-  );
-
-  const showOnlyPedidos = isAndresSanchez || isBranchView || !isAdmin;
+  // Para perfiles administrativos (Paulina y Toño): TIENEN TODOS LOS BOTONES ("Todas", "🏁 Cierres", "🎂 Pedidos", "No leídas" y "Marcar leídas").
+  // Para perfiles operativos / no administrativos (Andrés Sánchez, cajeros, sucursales): ÚNICAMENTE ven el botón de "Pedidos".
+  const showOnlyPedidos = !isAdmin;
 
   const [showNotifications, setShowNotifications] = useState(false);
   const [activeTab, setActiveTab] = useState<"all" | "cortes" | "pedidos" | "unread">(

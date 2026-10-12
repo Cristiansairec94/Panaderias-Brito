@@ -364,20 +364,34 @@ export function isNotificationVisibleForUser(
     (user.role !== "admin" && user.role !== "auxiliar_admin")
   );
 
-  // 1. Administrador real (Don Toño, Paulina, Roberto Morales):
+  // 1. Administrador real (Don Toño Brito, Paulina Brito, Lic. Roberto Morales):
+  // "en los perfiles administrativos como el de paulina y toño, en esos debo tener todos los botones que son administrastivos y deben ver corte de cajas, pedidos etc, pero solo los perfiles administrativos"
   const isAdmin = !isBranchPersonnel && Boolean(
     user && 
     (user.role === "admin" || user.role === "auxiliar_admin") &&
-    (normUsername === "admin" || normUsername === "paulina" || normUsername === "roberto" || normUser.includes("tono") || normUser.includes("paulina") || normUser.includes("morales"))
+    (
+      user.id === "usr-1" ||
+      user.id === "usr-2" ||
+      user.id === "usr-3" ||
+      normUsername === "admin" ||
+      normUsername === "paulina" ||
+      normUsername === "roberto" ||
+      normUser.includes("tono") ||
+      normUser.includes("toño") ||
+      normUser.includes("paulina") ||
+      normUser.includes("morales") ||
+      normUser.includes("dueno") ||
+      normUser.includes("dueño") ||
+      user.jobTitle?.toLowerCase().includes("administrad")
+    )
   );
 
-  const isSpecificBranchActive = Boolean(
-    activeBranch && activeBranch.id && activeBranch.id !== "all"
-  );
-
-  // Administrador viendo todas las sucursales (Consolidado General): acceso total a cortes y pedidos
-  if (isAdmin && !isSpecificBranchActive) {
-    return true;
+  // Administrador: acceso completo garantizado a cortes de caja y pedidos
+  if (isAdmin) {
+    if (!activeBranch || !activeBranch.id || activeBranch.id === "all") {
+      return true;
+    }
+    return checkBranchMatchesTargetCode(notif, getCanonicalBranchCode(activeBranch.id));
   }
 
   // 2. Perfiles Operativos de Sucursal (Andrés Sánchez, etc.) o filtro de Sucursal específica:
@@ -430,6 +444,14 @@ function checkBranchMatchesTargetCode(notif: Partial<FBNotification>, targetCode
   const notifOriginCode = getCanonicalBranchCode(notif.operatingBranchId || notif.operatingBranchName);
   if (notifOriginCode && notifOriginCode === targetCode) {
     return true;
+  }
+
+  // 3. Datos del corte de turno (corte de caja)
+  if (notif.shiftCutData) {
+    const cutBranchCode = getCanonicalBranchCode(notif.shiftCutData.branchId || notif.shiftCutData.branchName);
+    if (cutBranchCode && cutBranchCode === targetCode) {
+      return true;
+    }
   }
 
   // 3. Contrastar con los datos reales del pedido almacenado
