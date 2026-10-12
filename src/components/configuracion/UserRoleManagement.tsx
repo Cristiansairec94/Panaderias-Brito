@@ -898,7 +898,7 @@ export default function UserRoleManagement() {
               <div className="pt-3 border-t border-stone-100 flex items-center justify-between text-xs">
                 <button
                   onClick={() => toggleUserStatus(usr.id)}
-                  disabled={isCurrentUser || usr.id === "usr-1"}
+                  disabled={isCurrentUser || usr.id === "usr-1" || usr.id === "usr-2"}
                   className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl font-bold text-[11px] transition-all disabled:opacity-40 cursor-pointer ${
                     isInactive
                       ? "bg-rose-100 text-rose-800 hover:bg-rose-200"
@@ -919,7 +919,7 @@ export default function UserRoleManagement() {
                     <span>Editar Empleado</span>
                   </button>
 
-                  {!isCurrentUser && usr.id !== "usr-1" && (
+                  {!isCurrentUser && usr.id !== "usr-1" && usr.id !== "usr-2" && (
                     <button
                       onClick={() => handleDelete(usr)}
                       className="p-1.5 text-stone-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all cursor-pointer"

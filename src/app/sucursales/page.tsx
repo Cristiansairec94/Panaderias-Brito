@@ -54,11 +54,21 @@ import EditShiftModal from "@/components/sucursales/EditShiftModal";
 
 export default function SucursalesPage() {
   const { user } = useAuth();
-  const isAdmin = Boolean(user && (user.role === "admin" || user.role === "auxiliar_admin"));
-  const isBranchProfile = Boolean(
+  const isAdmin = Boolean(
+    user && (
+      user.role === "admin" ||
+      user.role === "auxiliar_admin" ||
+      user.id === "usr-1" ||
+      user.id === "usr-2" ||
+      user.username === "admin" ||
+      user.username === "paulina" ||
+      (user.name && user.name.toLowerCase().includes("paulina")) ||
+      (user.name && (user.name.toLowerCase().includes("toño") || user.name.toLowerCase().includes("tono")))
+    )
+  );
+  const isBranchProfile = !isAdmin && Boolean(
     !user ||
-    !isAdmin ||
-    Boolean(user.assignedBranchId && user.role !== "admin" && user.role !== "auxiliar_admin")
+    Boolean(user.assignedBranchId)
   );
 
   const { 

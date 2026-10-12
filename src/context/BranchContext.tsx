@@ -22,6 +22,15 @@ export interface SimulatedSale {
 
 export const DELETED_BRANCHES_STORAGE_KEY = "brito_deleted_branch_ids";
 
+export const CANONICAL_BRANCH_IDS = new Set<string>([
+  "branch-matriz",
+  "branch-benito",
+  "branch-sanjuan",
+  "branch-flores",
+  "branch-1790889237862",
+  "branch-angeles",
+]);
+
 export function getDeletedBranchIds(): Set<string> {
   if (typeof window === "undefined") return new Set();
   try {
@@ -29,7 +38,11 @@ export function getDeletedBranchIds(): Set<string> {
     if (raw) {
       const arr = JSON.parse(raw);
       if (Array.isArray(arr)) {
-        return new Set(arr.filter((id) => typeof id === "string" && id.trim().length > 0));
+        const filtered = arr.filter((id) => typeof id === "string" && id.trim().length > 0 && !CANONICAL_BRANCH_IDS.has(id));
+        if (filtered.length !== arr.length) {
+          localStorage.setItem(DELETED_BRANCHES_STORAGE_KEY, JSON.stringify(filtered));
+        }
+        return new Set(filtered);
       }
     }
   } catch {}
@@ -441,26 +454,37 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
       } catch {}
     }
 
+    const deletedIds = typeof window !== "undefined" ? getDeletedBranchIds() : new Set<string>();
+    const branchMap = new Map<string, Branch>();
+
+    // 1. Sembrar siempre con las 6 sucursales canónicas base
+    DEFAULT_BRANCHES.forEach((b) => {
+      if (!deletedIds.has(b.id)) {
+        branchMap.set(b.id, b);
+      }
+    });
+
+    // 2. Si hay datos guardados localmente, combinar/actualizar sobre las sucursales base (y añadir sucursales adicionales no eliminadas)
     if (typeof window !== "undefined") {
       try {
-        const deletedIds = getDeletedBranchIds();
         const savedBranches = localStorage.getItem("brito_branches_data");
         if (savedBranches) {
           const parsed = JSON.parse(savedBranches);
           if (Array.isArray(parsed) && parsed.length > 0) {
-            // Filtrar estrictamente cualquier sucursal eliminada por un administrador
-            const filtered = parsed.filter((b: Branch) => b && b.id && !deletedIds.has(b.id));
-            if (filtered.length > 0) {
-              return filtered.map((b) => syncBranchWithUsers(b, initialUsers));
-            }
+            parsed.forEach((b: Branch) => {
+              if (b && b.id && !deletedIds.has(b.id)) {
+                const existing = branchMap.get(b.id);
+                branchMap.set(b.id, existing ? { ...existing, ...b } : b);
+              }
+            });
           }
         }
       } catch {}
     }
-    const deletedIds = typeof window !== "undefined" ? getDeletedBranchIds() : new Set<string>();
-    const initialDefault = DEFAULT_BRANCHES.filter((b) => !deletedIds.has(b.id));
-    const base = initialDefault.length > 0 ? initialDefault : [DEFAULT_BRANCHES[0]];
-    return base.map((b) => syncBranchWithUsers(b, initialUsers));
+
+    const base = Array.from(branchMap.values());
+    const finalBranches = base.length > 0 ? base : DEFAULT_BRANCHES;
+    return finalBranches.map((b) => syncBranchWithUsers(b, initialUsers));
   });
 
 function resolveBranchParam(param: string | null): string | null {
@@ -1035,24 +1059,21 @@ function resolveBranchParam(param: string | null): string | null {
             const currentDeletedIds = getDeletedBranchIds();
             const branchMap = new Map<string, Branch>();
 
-            // 1. Sembrar EXCLUSIVAMENTE con el estado previo actual, filtrando sucursales eliminadas
+            // 1. Sembrar con el estado previo actual, filtrando sucursales eliminadas
             prev.forEach((b) => {
               if (b && b.id && !currentDeletedIds.has(b.id)) {
                 branchMap.set(b.id, b);
               }
             });
 
-            // Si el estado previo quedó vacío por alguna razón, sembrar con DEFAULT_BRANCHES no eliminadas
-            if (branchMap.size === 0) {
-              const availableDefault = DEFAULT_BRANCHES.filter((d) => !currentDeletedIds.has(d.id));
-              if (availableDefault.length > 0) {
-                availableDefault.forEach((d) => branchMap.set(d.id, d));
-              } else if (DEFAULT_BRANCHES[0]) {
-                branchMap.set(DEFAULT_BRANCHES[0].id, DEFAULT_BRANCHES[0]);
+            // 2. Garantizar que todas las 6 sucursales canónicas base existan siempre (si no fueron eliminadas)
+            DEFAULT_BRANCHES.forEach((defB) => {
+              if (!currentDeletedIds.has(defB.id) && !branchMap.has(defB.id)) {
+                branchMap.set(defB.id, defB);
               }
-            }
+            });
 
-            // 2. Incorporar datos de configuración de /api/branches (SOLO para sucursales no eliminadas que ya existan)
+            // 3. Incorporar datos de configuración de /api/branches (servidor central)
             if (serverBranches.length > 0) {
               serverBranches.forEach((serverB: Branch) => {
                 if (!serverB || !serverB.id || currentDeletedIds.has(serverB.id)) return;
@@ -1073,11 +1094,13 @@ function resolveBranchParam(param: string | null): string | null {
                     color: serverB.color || existing.color,
                     status: serverB.status || existing.status,
                   });
+                } else {
+                  branchMap.set(serverB.id, serverB);
                 }
               });
             }
 
-            // 3. Sincronizar datos de Supabase si existen (SOLO para sucursales no eliminadas que ya existan)
+            // 4. Sincronizar datos de Supabase si existen
             dbBranches.forEach((dbB: any) => {
               if (!dbB || !dbB.id || currentDeletedIds.has(dbB.id) || dbB.is_active === false) return;
               const existing = branchMap.get(dbB.id);
@@ -1089,6 +1112,36 @@ function resolveBranchParam(param: string | null): string | null {
                   address: dbB.address || existing.address,
                   phone: dbB.phone || existing.phone,
                 });
+              } else {
+                const newB: Branch = {
+                  id: dbB.id,
+                  name: dbB.name || "Sucursal",
+                  shortName: dbB.short_name || dbB.name || "Sucursal",
+                  code: dbB.code || "SUC-00",
+                  address: dbB.address || "",
+                  phone: dbB.phone || "",
+                  manager: "Encargado",
+                  status: "abierta",
+                  dailyGoal: 8000,
+                  todaySales: 0,
+                  todayTickets: 0,
+                  cashInDrawer: 1000,
+                  color: "orange",
+                  currentShift: {
+                    id: `shift-${dbB.id}`,
+                    name: "Turno General",
+                    cashier: "Cajero",
+                    openedAt: "06:00 AM",
+                    initialFund: 1000,
+                    cashSales: 0,
+                    cardSales: 0,
+                    transferSales: 0,
+                    totalSales: 0,
+                    ticketCount: 0,
+                    status: "abierto",
+                  },
+                };
+                branchMap.set(dbB.id, newB);
               }
             });
 

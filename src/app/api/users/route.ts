@@ -400,9 +400,9 @@ export async function DELETE(req: NextRequest) {
       );
     }
 
-    if (id === "usr-1") {
+    if (id === "usr-1" || id === "usr-2" || id === "admin" || id === "paulina") {
       return NextResponse.json(
-        { success: false, error: "No se puede eliminar la cuenta principal del Administrador" },
+        { success: false, error: "No se puede eliminar una cuenta principal de Administrador" },
         { status: 403 }
       );
     }

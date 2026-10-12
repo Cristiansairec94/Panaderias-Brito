@@ -4286,7 +4286,7 @@ export default function ExpensesModal({
                                           onClick={() => toggleExpandAllOrder(order.id)}
                                           className="text-amber-800 hover:text-amber-950 font-black cursor-pointer flex items-center gap-0.5"
                                         >
-                                          <span>{isExpanded ? "▲ Ver menos" : `▼ Ver más (+${items.length - 2} productos y detalles)`}</span>
+                                          <span>{isExpanded ? "Ver menos" : `Ver más (+${items.length - 2} productos)`}</span>
                                         </button>
                                       )}
                                     </div>
@@ -4319,7 +4319,7 @@ export default function ExpensesModal({
 
                                     {/* Detalles desplegados cuando se expande */}
                                     {isExpanded && (
-                                      <div className="mt-2 pt-2 border-t border-dashed border-stone-200 space-y-1.5 animate-in slide-in-from-top-1 duration-150">
+                                      <div className="mt-2 pt-2 border-t border-stone-200 space-y-1.5 animate-in slide-in-from-top-1 duration-150">
                                         {order.dedication && (
                                           <div className="bg-amber-100/70 border border-amber-300 rounded-xl p-2 px-3 text-xs text-amber-950 font-medium">
                                             ✍️ <span className="font-bold">Dedicatoria:</span> "{order.dedication}"

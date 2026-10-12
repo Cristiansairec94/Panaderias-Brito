@@ -1415,8 +1415,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (user && user.id === userId) {
       return { success: false, message: "No puedes eliminar tu propia cuenta en sesión activa." };
     }
-    if (userId === "usr-1") {
-      return { success: false, message: "No se permite eliminar la cuenta principal del Administrador Don Toño." };
+    if (userId === "usr-1" || userId === "usr-2" || userId === "admin" || userId === "paulina") {
+      return { success: false, message: "No se permite eliminar una cuenta principal de Administrador." };
     }
 
     // 1. Agregar a lista negra de eliminados (tombstone)
@@ -1467,8 +1467,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (user && user.id === userId) {
       return; // Cannot deactivate own account while logged in
     }
-    if (userId === "usr-1") {
-      return; // Protect primary admin
+    if (userId === "usr-1" || userId === "usr-2" || userId === "admin" || userId === "paulina") {
+      return; // Protect primary admins
     }
 
     let nextStatus: "activo" | "inactivo" = "activo";

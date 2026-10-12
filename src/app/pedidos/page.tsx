@@ -108,7 +108,18 @@ export default function PedidosPage() {
   // Control de roles y asignación de sucursal:
   // Administradores: control y visualización total multi-sucursal ("all" y cualquier tienda)
   // Perfiles de sucursal: estrictamente los pedidos de su sucursal asignada
-  const isAdmin = Boolean(user && (user.role === "admin" || user.role === "auxiliar_admin"));
+  const isAdmin = Boolean(
+    user && (
+      user.role === "admin" ||
+      user.role === "auxiliar_admin" ||
+      user.id === "usr-1" ||
+      user.id === "usr-2" ||
+      user.username === "admin" ||
+      user.username === "paulina" ||
+      (user.name && user.name.toLowerCase().includes("paulina")) ||
+      (user.name && (user.name.toLowerCase().includes("toño") || user.name.toLowerCase().includes("tono")))
+    )
+  );
   const canFilterBranches = isAdmin;
   const userBranchId = (
     user?.assignedBranchId ||
@@ -2595,7 +2606,7 @@ export default function PedidosPage() {
                                     <button
                                       type="button"
                                       onClick={(e) => toggleOrderProductsExpanded(order.id, e)}
-                                      className={`text-[10px] font-black px-2 py-0.5 rounded-md border transition-all cursor-pointer flex items-center gap-1 shadow-2xs leading-none ${
+                                      className={`text-[10px] font-black px-2 py-0.5 rounded-md border transition-all cursor-pointer shadow-2xs leading-none ${
                                         isExpanded
                                           ? "bg-amber-600 text-white border-amber-700 hover:bg-amber-700"
                                           : "text-amber-900 hover:text-white bg-amber-100 hover:bg-amber-600 border-amber-300"
@@ -2603,7 +2614,6 @@ export default function PedidosPage() {
                                       title={isExpanded ? "Mostrar menos productos" : "Desplegar todos los productos y detalles"}
                                     >
                                       <span>{isExpanded ? "Menos" : "Ver más"}</span>
-                                      <ChevronDown className={`w-3 h-3 transition-transform duration-200 ${isExpanded ? "rotate-180" : ""}`} />
                                     </button>
                                   )}
                                 </div>
@@ -2641,10 +2651,9 @@ export default function PedidosPage() {
                                 <button
                                   type="button"
                                   onClick={(e) => toggleOrderProductsExpanded(order.id, e)}
-                                  className="w-full mt-1.5 pt-1 border-t border-amber-200/60 text-[10px] font-bold text-amber-800 hover:text-amber-950 flex items-center justify-center gap-1 cursor-pointer transition-colors"
+                                  className="w-full mt-1.5 py-1 px-2 bg-amber-100/70 hover:bg-amber-200/80 rounded-lg text-[10px] font-bold text-amber-900 flex items-center justify-center cursor-pointer transition-colors shadow-2xs"
                                 >
-                                  <span>+ {orderItems.length - 2} prod{orderItems.length - 2 > 1 ? "s" : ""} más (Toca para ver)</span>
-                                  <ChevronDown className="w-3 h-3 text-amber-700" />
+                                  <span>+ {orderItems.length - 2} prod{orderItems.length - 2 > 1 ? "s" : ""} más</span>
                                 </button>
                               )}
 
@@ -2664,9 +2673,9 @@ export default function PedidosPage() {
                                   <button
                                     type="button"
                                     onClick={(e) => toggleOrderProductsExpanded(order.id, e)}
-                                    className="w-full pt-0.5 text-[10px] font-black text-amber-800 hover:text-amber-950 flex items-center justify-center gap-1 cursor-pointer"
+                                    className="w-full pt-0.5 text-[10px] font-black text-amber-800 hover:text-amber-950 flex items-center justify-center cursor-pointer"
                                   >
-                                    <span>▲ Ocultar</span>
+                                    <span>Mostrar solo 2</span>
                                   </button>
                                 </div>
                               )}
@@ -3010,11 +3019,14 @@ export default function PedidosPage() {
                                 <button
                                   type="button"
                                   onClick={(e) => toggleOrderProductsExpanded(order.id, e)}
-                                  className="text-[10px] font-black px-2.5 py-0.5 rounded-lg border transition-all cursor-pointer flex items-center gap-1 shadow-2xs leading-none bg-amber-50 hover:bg-amber-100 text-amber-900 border-amber-300"
+                                  className={`text-[10px] font-black px-2.5 py-0.5 rounded-lg border transition-all cursor-pointer flex items-center gap-1 shadow-2xs leading-none ${
+                                    isExpanded
+                                      ? "bg-amber-600 text-white border-amber-700 hover:bg-amber-700"
+                                      : "bg-amber-50 hover:bg-amber-100 text-amber-900 border-amber-300"
+                                  }`}
                                   title={isExpanded ? "Mostrar menos productos" : "Desplegar todos los productos del pedido"}
                                 >
                                   <span>{isExpanded ? "Ver menos" : "Ver más"}</span>
-                                  <ChevronDown className={`w-3 h-3 transition-transform duration-200 ${isExpanded ? "rotate-180" : ""}`} />
                                 </button>
                               )}
                             </div>
@@ -3039,10 +3051,9 @@ export default function PedidosPage() {
                                   <button
                                     type="button"
                                     onClick={(e) => toggleOrderProductsExpanded(order.id, e)}
-                                    className="w-full py-1.5 px-2 bg-stone-50 hover:bg-amber-50 text-stone-600 hover:text-amber-900 text-[11px] font-bold rounded-xl border border-dashed border-stone-200 hover:border-amber-300 flex items-center justify-center gap-1 transition-all cursor-pointer"
+                                    className="w-full py-1 px-2 bg-amber-50 hover:bg-amber-100 text-amber-900 text-[11px] font-bold rounded-xl border border-amber-200 flex items-center justify-center transition-all cursor-pointer shadow-2xs"
                                   >
-                                    <span>... y {orderItems.length - 2} producto{orderItems.length - 2 > 1 ? "s" : ""} más (Ver más)</span>
-                                    <ChevronDown className="w-3 h-3 text-stone-400" />
+                                    <span>+ {orderItems.length - 2} producto{orderItems.length - 2 > 1 ? "s" : ""} más</span>
                                   </button>
                                 )}
 
@@ -3050,9 +3061,9 @@ export default function PedidosPage() {
                                   <button
                                     type="button"
                                     onClick={(e) => toggleOrderProductsExpanded(order.id, e)}
-                                    className="w-full pt-1 text-[11px] font-bold text-amber-800 hover:text-amber-950 flex items-center justify-center gap-1 cursor-pointer"
+                                    className="w-full pt-1 text-[11px] font-bold text-amber-800 hover:text-amber-950 flex items-center justify-center cursor-pointer transition-colors"
                                   >
-                                    <span>▲ Mostrar solo 2 productos</span>
+                                    <span>Mostrar solo 2</span>
                                   </button>
                                 )}
                               </div>
