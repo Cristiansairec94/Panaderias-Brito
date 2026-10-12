@@ -451,7 +451,7 @@ export default function NotificationsDropdown() {
 
             {/* Filter Buttons & Mark All Read Link */}
             <div className="flex items-center gap-1.5 mt-3 flex-wrap">
-              {!showOnlyPedidos ? (
+              {isAdmin ? (
                 <>
                   {/* Todas Pill */}
                   <button

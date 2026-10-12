@@ -340,7 +340,7 @@ export default function MobileBottomNav() {
 
               {/* Botones de filtro y enlace marcar todo como leído */}
               <div className="flex items-center gap-1.5 mt-3 flex-wrap">
-                {!showOnlyPedidos ? (
+                {isAdmin ? (
                   <>
                     <button
                       type="button"

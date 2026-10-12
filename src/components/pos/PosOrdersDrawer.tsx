@@ -24,6 +24,7 @@ import { CustomOrder } from "@/types";
 import { formatCurrency, formatOrderCreation } from "@/lib/utils";
 import { getStoredOrders, updateOrderStatus, deleteCustomOrder } from "@/lib/orders";
 import { useNotifications } from "@/context/NotificationContext";
+import { useAuth } from "@/context/AuthContext";
 
 interface PosOrdersDrawerProps {
   isOpen: boolean;
@@ -47,6 +48,12 @@ export default function PosOrdersDrawer({
   onSelectOrderForPayment,
 }: PosOrdersDrawerProps) {
   const { openOrderDetail } = useNotifications();
+  const { user } = useAuth();
+  const isAdmin = Boolean(
+    user && 
+    (user.role === "admin" || user.role === "auxiliar_admin") &&
+    (user.username === "admin" || user.username === "paulina" || user.username === "roberto" || user.name?.toLowerCase().includes("toño") || user.name?.toLowerCase().includes("paulina") || user.name?.toLowerCase().includes("morales"))
+  );
   const [orders, setOrders] = useState<CustomOrder[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterMode, setFilterMode] = useState<"todos" | "hoy" | "saldo">("todos");
@@ -61,6 +68,12 @@ export default function PosOrdersDrawer({
       refreshOrders();
     }
   }, [isOpen]);
+
+  useEffect(() => {
+    if (!isAdmin) {
+      setBranchScope("esta");
+    }
+  }, [isAdmin]);
 
   useEffect(() => {
     const handleUpdate = () => refreshOrders();
@@ -257,30 +270,36 @@ export default function PosOrdersDrawer({
         {/* Lista de Pedidos */}
         <div className="flex-1 overflow-y-auto p-4 space-y-3.5">
           <div className="flex items-center justify-between text-xs text-stone-600 font-bold px-1 pb-1 gap-2 flex-wrap">
-            <div className="flex items-center gap-1 bg-stone-100 p-0.5 rounded-xl border border-stone-200">
-              <button
-                type="button"
-                onClick={() => setBranchScope("esta")}
-                className={`px-2.5 py-1 rounded-lg text-[11px] font-black transition-all ${
-                  branchScope === "esta"
-                    ? "bg-white text-stone-900 shadow-xs"
-                    : "text-stone-500 hover:text-stone-800"
-                }`}
-              >
-                Esta Sucursal ({filteredOrders.length})
-              </button>
-              <button
-                type="button"
-                onClick={() => setBranchScope("todas")}
-                className={`px-2.5 py-1 rounded-lg text-[11px] font-black transition-all ${
-                  branchScope === "todas"
-                    ? "bg-white text-stone-900 shadow-xs"
-                    : "text-stone-500 hover:text-stone-800"
-                }`}
-              >
-                Todas ({orders.length})
-              </button>
-            </div>
+            {isAdmin ? (
+              <div className="flex items-center gap-1 bg-stone-100 p-0.5 rounded-xl border border-stone-200">
+                <button
+                  type="button"
+                  onClick={() => setBranchScope("esta")}
+                  className={`px-2.5 py-1 rounded-lg text-[11px] font-black transition-all cursor-pointer ${
+                    branchScope === "esta"
+                      ? "bg-white text-stone-900 shadow-xs"
+                      : "text-stone-500 hover:text-stone-800"
+                  }`}
+                >
+                  Esta Sucursal ({filteredOrders.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setBranchScope("todas")}
+                  className={`px-2.5 py-1 rounded-lg text-[11px] font-black transition-all cursor-pointer ${
+                    branchScope === "todas"
+                      ? "bg-white text-stone-900 shadow-xs"
+                      : "text-stone-500 hover:text-stone-800"
+                  }`}
+                >
+                  Todas ({orders.length})
+                </button>
+              </div>
+            ) : (
+              <span className="text-[11px] font-bold text-stone-600 bg-stone-100 border border-stone-200 px-2.5 py-1 rounded-lg">
+                🏬 {branchName || "Esta Sucursal"} ({filteredOrders.length})
+              </span>
+            )}
 
             <button
               type="button"
