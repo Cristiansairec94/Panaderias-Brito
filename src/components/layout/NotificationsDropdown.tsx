@@ -169,8 +169,29 @@ export default function NotificationsDropdown() {
     (user.username === "admin" || user.username === "paulina" || user.username === "roberto" || user.name?.toLowerCase().includes("toño") || user.name?.toLowerCase().includes("paulina") || user.name?.toLowerCase().includes("morales"))
   );
 
+  // Determinar el código canónico de la sucursal activa o asignada
+  const activeBranchCode = getCanonicalBranchCode(
+    (!isAllBranches && currentBranch?.id && currentBranch.id !== "all" ? currentBranch.id : "") ||
+    user?.assignedBranchId ||
+    user?.assignedBranchName ||
+    (user?.username === "andres" || user?.name?.toLowerCase().includes("andres") ? "branch-angeles" : "") ||
+    (user?.username === "carlos" || user?.name?.toLowerCase().includes("mendoza") ? "branch-benito" : "") ||
+    (user?.username === "carlos.bueno" || user?.name?.toLowerCase().includes("bueno") ? "branch-matriz" : "") ||
+    (currentBranch?.id && currentBranch.id !== "all" ? currentBranch.id : "")
+  );
+
+  // En la sucursal (Los Ángeles, etc.) o con perfil de cajero/mostrador:
+  // "en la sucursal de los angeles se sigue viendo asi, limitalo solo al boton de pedidos, lo demas eliminalo"
+  const isBranchView = Boolean(
+    (!isAllBranches && currentBranch?.id && currentBranch.id !== "all") ||
+    activeBranchCode === "branch-angeles" ||
+    isCashierProfile
+  );
+
+  const showOnlyPedidos = isBranchView || !isAdmin;
+
   const [activeTab, setActiveTab] = useState<"all" | "cortes" | "pedidos" | "unread">(
-    isAdmin ? "all" : "pedidos"
+    showOnlyPedidos ? "pedidos" : "all"
   );
   const [showOptionsMenu, setShowOptionsMenu] = useState(false);
   const [activeItemMenu, setActiveItemMenu] = useState<string | null>(null);
@@ -202,12 +223,12 @@ export default function NotificationsDropdown() {
   }, []);
 
   useEffect(() => {
-    if (!isAdmin) {
+    if (showOnlyPedidos) {
       setActiveTab("pedidos");
     } else {
       setActiveTab("all");
     }
-  }, [isAdmin, user?.id, pathname]);
+  }, [showOnlyPedidos, user?.id, pathname]);
 
   // Temporizador en vivo que se actualiza segundo a segundo mientras el panel está abierto
   const [now, setNow] = useState(Date.now());
@@ -221,44 +242,34 @@ export default function NotificationsDropdown() {
     return () => clearInterval(interval);
   }, [isOpen]);
 
-  // Identificar el código canónico de la sucursal del cajero/perfil de sucursal
-  const userBranchCode = getCanonicalBranchCode(
-    user?.assignedBranchId ||
-    user?.assignedBranchName ||
-    (user?.username === "andres" || user?.name?.toLowerCase().includes("andres") ? "branch-angeles" : "") ||
-    (user?.username === "carlos" || user?.name?.toLowerCase().includes("mendoza") ? "branch-benito" : "") ||
-    (user?.username === "carlos.bueno" || user?.name?.toLowerCase().includes("bueno") ? "branch-matriz" : "") ||
-    (currentBranch?.id && currentBranch.id !== "all" ? currentBranch.id : "")
-  );
-
-  // Para usuarios de sucursal (Andrés Sánchez, Carlos, cajeros):
-  // Únicamente se visualizan las notificaciones de pedidos correspondientes a su sucursal.
-  const visibleNotifications = !isAdmin
+  // Para sucursales (Los Ángeles, etc.) y cajeros:
+  // Únicamente se visualizan las notificaciones de pedidos correspondientes a esa sucursal.
+  const visibleNotifications = showOnlyPedidos
     ? notifications.filter((n) => {
         const isPed = n.category === "pedidos" || Boolean(n.orderId);
         if (!isPed) return false;
-        if (!userBranchCode || userBranchCode === "all") return true;
+        if (!activeBranchCode || activeBranchCode === "all") return true;
 
         const notifDest = getCanonicalBranchCode(n.branchId || n.branchName);
-        if (notifDest && notifDest === userBranchCode) return true;
+        if (notifDest && notifDest === activeBranchCode) return true;
 
         const notifOrigin = getCanonicalBranchCode(n.operatingBranchId || n.operatingBranchName);
-        if (notifOrigin && notifOrigin === userBranchCode) return true;
+        if (notifOrigin && notifOrigin === activeBranchCode) return true;
 
         const order = findOrderForNotification(n);
         if (order) {
           const oDest = getCanonicalBranchCode(order.branchId || order.branchName);
-          if (oDest && oDest === userBranchCode) return true;
+          if (oDest && oDest === activeBranchCode) return true;
           const oOrigin = getCanonicalBranchCode(order.operatingBranchId || order.operatingBranchName);
-          if (oOrigin && oOrigin === userBranchCode) return true;
+          if (oOrigin && oOrigin === activeBranchCode) return true;
         }
 
         const text = `${n.title || ""} ${n.highlightText || ""} ${n.description || ""} ${n.senderName || ""}`.toLowerCase();
-        if (userBranchCode === "branch-matriz" && (text.includes("matriz") || text.includes("centro"))) return true;
-        if (userBranchCode === "branch-angeles" && (text.includes("angeles") || text.includes("ángeles"))) return true;
-        if (userBranchCode === "branch-sanjuan" && text.includes("san juan")) return true;
-        if (userBranchCode === "branch-benito" && text.includes("benito")) return true;
-        if (userBranchCode === "branch-1790889237862" && text.includes("ildefonso")) return true;
+        if (activeBranchCode === "branch-matriz" && (text.includes("matriz") || text.includes("centro"))) return true;
+        if (activeBranchCode === "branch-angeles" && (text.includes("angeles") || text.includes("ángeles"))) return true;
+        if (activeBranchCode === "branch-sanjuan" && text.includes("san juan")) return true;
+        if (activeBranchCode === "branch-benito" && text.includes("benito")) return true;
+        if (activeBranchCode === "branch-1790889237862" && text.includes("ildefonso")) return true;
 
         return false;
       })
@@ -412,7 +423,7 @@ export default function NotificationsDropdown() {
 
             {/* Filter Buttons & Mark All Read Link */}
             <div className="flex items-center gap-1.5 mt-3 flex-wrap">
-              {isAdmin ? (
+              {!showOnlyPedidos ? (
                 <>
                   {/* Todas Pill */}
                   <button
@@ -427,7 +438,7 @@ export default function NotificationsDropdown() {
                     Todas ({notifications.length})
                   </button>
 
-                  {/* Cierres de Turno Pill - Exclusivo Administrador */}
+                  {/* Cierres de Turno Pill - Exclusivo Administrador en vista global */}
                   <button
                     type="button"
                     onClick={() => setActiveTab("cortes")}
@@ -467,7 +478,7 @@ export default function NotificationsDropdown() {
                   </button>
                 </>
               ) : (
-                /* Para perfiles de cajero / sucursales: ÚNICAMENTE el botón de Pedidos (todos los otros botones retirados) */
+                /* En sucursal (Los Ángeles, etc.) y perfiles de cajero: ÚNICAMENTE el botón de Pedidos (todos los otros botones eliminados) */
                 <button
                   type="button"
                   onClick={() => setActiveTab("pedidos")}
@@ -481,7 +492,7 @@ export default function NotificationsDropdown() {
               <button
                 type="button"
                 onClick={markAllAsRead}
-                disabled={(!isAdmin ? unreadVisibleCount : unreadCount) === 0}
+                disabled={(!isAdmin || showOnlyPedidos ? unreadVisibleCount : unreadCount) === 0}
                 className="text-[#c25425] hover:text-[#9e3f18] underline underline-offset-2 font-medium text-xs sm:text-[13px] ml-auto cursor-pointer disabled:opacity-40 disabled:no-underline disabled:cursor-not-allowed transition-colors"
               >
                 Marcar leídas

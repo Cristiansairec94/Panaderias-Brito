@@ -360,12 +360,18 @@ export function isNotificationVisibleForUser(
     (user.role === "admin" || user.role === "auxiliar_admin") &&
     (user.username === "admin" || user.username === "paulina" || user.username === "roberto" || user.name?.toLowerCase().includes("toño") || user.name?.toLowerCase().includes("paulina") || user.name?.toLowerCase().includes("morales"))
   );
-  if (isAdmin) {
+
+  // Si se está visualizando una sucursal específica (como Los Ángeles), incluso el administrador ve estrictamente solo los pedidos de esa sucursal
+  const isSpecificBranchActive = Boolean(
+    activeBranch && activeBranch.id && activeBranch.id !== "all"
+  );
+
+  if (isAdmin && !isSpecificBranchActive) {
     return true;
   }
 
-  // 2. Perfiles Operativos de Sucursal (Andrés Sánchez, Carlos, Cajeros):
-  // "en cada sucursal unicamente tiene que aparecer el boton de pedidos ya que cada sucursal lo ocupara un perfil que seran cajeros, entonces solo deben observar los pedidos que hagan hacia la sucursal que estan trabajando"
+  // 2. Perfiles Operativos de Sucursal y Vistas de Sucursal (Andrés Sánchez, Carlos, Cajeros, o Sucursal Los Ángeles activa):
+  // "en la sucursal de los angeles se sigue viendo asi, limitalo solo al boton de pedidos, lo demas eliminalo"
   const text = `${notif.title || ""} ${notif.highlightText || ""} ${notif.description || ""} ${notif.senderName || ""}`.toLowerCase();
 
   const isPedido =
