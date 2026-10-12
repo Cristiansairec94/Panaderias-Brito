@@ -65,6 +65,14 @@ interface CashDrawerShiftModalProps {
 
 const DEFAULT_SAMPLE_CUTS: ShiftCutRecord[] = [];
 
+const getShiftType = (u: any, fallbackName?: string): "Turno Matutino" | "Turno Vespertino" => {
+  const combined = `${u?.roleLabel || ""} ${u?.jobTitle || ""} ${u?.name || ""} ${fallbackName || ""}`.toLowerCase();
+  if (combined.includes("vespertino") || combined.includes("tarde") || combined.includes("vesp")) {
+    return "Turno Vespertino";
+  }
+  return "Turno Matutino";
+};
+
 export default function CashDrawerShiftModal({
   isOpen,
   onClose,
@@ -318,31 +326,50 @@ export default function CashDrawerShiftModal({
         u.role !== "panadero" &&
         resolveBranchId(u.assignedBranchId, u.name) === effectiveBranchId
     );
+    // Ordenar siempre: primero Turno Matutino, luego Turno Vespertino
+    list.sort((a, b) => {
+      const isVespA = getShiftType(a) === "Turno Vespertino" ? 1 : 0;
+      const isVespB = getShiftType(b) === "Turno Vespertino" ? 1 : 0;
+      return isVespA - isVespB;
+    });
     // Garantizar que no exceda 2 perfiles
     return list.slice(0, 2);
   }, [usersList, effectiveBranchId]);
 
+  const outgoingShiftType = useMemo(() => {
+    return getShiftType(outgoingProfile, outgoingCashier);
+  }, [outgoingProfile, outgoingCashier]);
+
+  const incomingShiftType = useMemo(() => {
+    return getShiftType(incomingProfile, incomingCashier);
+  }, [incomingProfile, incomingCashier]);
+
   useEffect(() => {
     if (branchUsers.length === 0) return;
 
-    // 1. Quien entrega: por defecto el cajero actual si coincide con los de esta sucursal, o el primero
-    let effectiveName = "";
-    const matched = branchUsers.find((u) => cashierName && matchesCashier(u.name, cashierName));
-    if (matched) {
-      effectiveName = matched.name;
+    const morningCashier = branchUsers.find((u) => getShiftType(u) === "Turno Matutino") || branchUsers[0];
+    const afternoonCashier = branchUsers.find((u) => getShiftType(u) === "Turno Vespertino") || branchUsers[1] || branchUsers[0];
+
+    // Verificar si el cajero activo en caja es del turno de la tarde o de la mañana
+    let isAfternoonActive = false;
+    if (cashierName && matchesCashier(afternoonCashier.name, cashierName)) {
+      isAfternoonActive = true;
+    } else if (cashierName && matchesCashier(morningCashier.name, cashierName)) {
+      isAfternoonActive = false;
     } else {
-      effectiveName = branchUsers[0].name;
-    }
-    setOutgoingCashier(effectiveName);
-
-    // 2. Quien recibe: es obligatoriamente el OTRO cajero de la misma sucursal (Mañana <-> Tarde)
-    const partner = branchUsers.find((u) => !matchesCashier(u.name, effectiveName)) || branchUsers[1] || branchUsers[0];
-    if (partner) {
-      setIncomingCashier(partner.name);
+      // Si es administrador o no coincide, usar la hora del día (>= 14:00 turno tarde)
+      isAfternoonActive = new Date().getHours() >= 14;
     }
 
-    const isMorning = effectiveName.toLowerCase().includes("mañana") || effectiveName.toLowerCase().includes("matutino") || (branchUsers[0] && matchesCashier(branchUsers[0].name, effectiveName));
-    setNextShiftName(isMorning ? "Turno Vespertino (14:00 - 22:00)" : "Turno Matutino (06:00 - 14:00)");
+    if (isAfternoonActive) {
+      setOutgoingCashier(afternoonCashier.name);
+      setIncomingCashier(morningCashier.name);
+      setNextShiftName("Turno Matutino (06:00 - 14:00)");
+    } else {
+      setOutgoingCashier(morningCashier.name);
+      setIncomingCashier(afternoonCashier.name);
+      setNextShiftName("Turno Vespertino (14:00 - 22:00)");
+    }
   }, [branchUsers, cashierName]);
 
   useEffect(() => {
@@ -1253,29 +1280,18 @@ export default function CashDrawerShiftModal({
                         </div>
 
                         <div className="flex-1 min-w-0">
-                          <div className="relative">
-                            <select
-                              value={outgoingCashier}
-                              onChange={(e) => {
-                                const val = e.target.value;
-                                setOutgoingCashier(val);
-                                const partner = branchUsers.find((u) => !matchesCashier(u.name, val)) || branchUsers.find((u) => u.name !== val);
-                                if (partner) {
-                                  setIncomingCashier(partner.name);
-                                }
-                              }}
-                              className="w-full font-black text-stone-900 text-xs sm:text-sm bg-transparent border-b-2 border-dashed border-stone-300 hover:border-rose-400 focus:outline-none focus:border-rose-500 cursor-pointer truncate py-0.5 transition-colors pr-4"
-                            >
-                              {branchUsers.map((u) => (
-                                <option key={u.id} value={u.name}>
-                                  {u.avatar || "👤"} {u.name} — {u.jobTitle || u.roleLabel || u.role}
-                                </option>
-                              ))}
-                            </select>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-black text-stone-900 text-xs sm:text-sm capitalize truncate">
+                              {outgoingCashier}
+                            </span>
+                            <span className={`text-[10.5px] font-bold px-2.5 py-0.5 rounded-full inline-flex items-center shrink-0 border shadow-2xs ${
+                              outgoingShiftType === "Turno Matutino"
+                                ? "bg-amber-100 text-amber-900 border-amber-300"
+                                : "bg-indigo-100 text-indigo-900 border-indigo-300"
+                            }`}>
+                              {outgoingShiftType}
+                            </span>
                           </div>
-                          <span className="text-[10.5px] text-stone-500 font-bold block truncate mt-0.5">
-                            {outgoingProfile?.jobTitle || outgoingProfile?.roleLabel || "Cajero(a) en turno saliente"}
-                          </span>
                         </div>
                       </div>
                     </div>
@@ -1299,29 +1315,18 @@ export default function CashDrawerShiftModal({
                         </div>
 
                         <div className="flex-1 min-w-0">
-                          <div className="relative">
-                            <select
-                              value={incomingCashier}
-                              onChange={(e) => {
-                                const val = e.target.value;
-                                setIncomingCashier(val);
-                                const partner = branchUsers.find((u) => !matchesCashier(u.name, val)) || branchUsers.find((u) => u.name !== val);
-                                if (partner) {
-                                  setOutgoingCashier(partner.name);
-                                }
-                              }}
-                              className="w-full font-black text-emerald-950 text-xs sm:text-sm bg-transparent border-b-2 border-dashed border-emerald-300 hover:border-emerald-500 focus:outline-none focus:border-emerald-600 cursor-pointer truncate py-0.5 transition-colors pr-4"
-                            >
-                              {branchUsers.map((u) => (
-                                <option key={u.id} value={u.name}>
-                                  {u.avatar || "👤"} {u.name} — {u.jobTitle || u.roleLabel || u.role}
-                                </option>
-                              ))}
-                            </select>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-black text-emerald-950 text-xs sm:text-sm capitalize truncate">
+                              {incomingCashier}
+                            </span>
+                            <span className={`text-[10.5px] font-bold px-2.5 py-0.5 rounded-full inline-flex items-center shrink-0 border shadow-2xs ${
+                              incomingShiftType === "Turno Matutino"
+                                ? "bg-amber-100 text-amber-900 border-amber-300"
+                                : "bg-indigo-100 text-indigo-900 border-indigo-300"
+                            }`}>
+                              {incomingShiftType}
+                            </span>
                           </div>
-                          <span className="text-[10.5px] text-emerald-800 font-bold block truncate mt-0.5">
-                            {incomingProfile?.jobTitle || incomingProfile?.roleLabel || "Cajero(a) entrante / Relevo de caja"}
-                          </span>
                         </div>
                       </div>
                     </div>
