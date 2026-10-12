@@ -62,6 +62,14 @@ export async function POST(req: NextRequest) {
         );
       }
     }
+    if (type === "user" && payload?.action === "delete") {
+      const delId = payload?.user?.id || payload?.deletedId || payload?.id;
+      if (delId) {
+        eventsToSave = eventsToSave.filter(
+          (e) => !(e.type === "user" && (e.payload?.user?.id === delId || e.payload?.deletedId === delId || e.payload?.id === delId))
+        );
+      }
+    }
 
     eventsToSave.push(eventRecord);
 

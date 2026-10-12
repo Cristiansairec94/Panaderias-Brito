@@ -100,6 +100,14 @@ export interface RealtimeCustomerPayload {
   timestamp: string;
 }
 
+export interface RealtimeUserPayload {
+  action: "create" | "update" | "delete";
+  user: any;
+  deletedId?: string;
+  senderDeviceId: string;
+  timestamp: string;
+}
+
 export type RealtimeStatus = "connected" | "connecting" | "disconnected";
 
 type NotificationListener = (notif: FBNotification) => void;
@@ -113,6 +121,7 @@ type ShiftCutListener = (cut: ShiftCutRecord) => void;
 type SessionRevokedListener = (payload: RealtimeSessionRevokedPayload) => void;
 type ProductListener = (payload: RealtimeProductPayload) => void;
 type CustomerListener = (payload: RealtimeCustomerPayload) => void;
+type UserListener = (payload: RealtimeUserPayload) => void;
 type StatusListener = (status: RealtimeStatus) => void;
 
 const CHANNEL_NAME = "panaderia_brito_realtime";
@@ -140,6 +149,7 @@ class RealtimeHub {
   private sessionRevokedListeners = new Set<SessionRevokedListener>();
   private productListeners = new Set<ProductListener>();
   private customerListeners = new Set<CustomerListener>();
+  private userListeners = new Set<UserListener>();
   private statusListeners = new Set<StatusListener>();
 
   constructor() {
@@ -205,11 +215,11 @@ class RealtimeHub {
 
   public dispatchLocalEvent(type: string, payload: any) {
     if (!payload) return;
-    const rawId = payload.id || (payload.cut && payload.cut.id) || (payload.order && payload.order.id) || (payload.branch && payload.branch.id) || null;
+    const rawId = payload.id || (payload.cut && payload.cut.id) || (payload.order && payload.order.id) || (payload.branch && payload.branch.id) || (payload.user && payload.user.id) || payload.deletedId || null;
     if (rawId && typeof rawId === "string" && (rawId.includes("ING-ING") || rawId.includes("mov-mov-"))) {
       return;
     }
-    const eventId = rawId ? `${type}_${rawId}` : null;
+    const eventId = rawId ? `${type}_${rawId}_${payload.action || ""}` : null;
     if (eventId) {
       if (this.seenEventIds.has(eventId)) return;
       this.seenEventIds.add(eventId);
@@ -242,6 +252,8 @@ class RealtimeHub {
       this.productListeners.forEach((fn) => { try { fn(payload); } catch (err) { console.error(err); } });
     } else if (type === "customer") {
       this.customerListeners.forEach((fn) => { try { fn(payload); } catch (err) { console.error(err); } });
+    } else if (type === "user") {
+      this.userListeners.forEach((fn) => { try { fn(payload); } catch (err) { console.error(err); } });
     }
   }
 
@@ -303,6 +315,10 @@ class RealtimeHub {
         .on("broadcast", { event: "customer" }, ({ payload }: { payload: any }) => {
           if (payload?.senderTabId && payload.senderTabId === this.tabId) return;
           this.dispatchLocalEvent("customer", payload);
+        })
+        .on("broadcast", { event: "user" }, ({ payload }: { payload: any }) => {
+          if (payload?.senderTabId && payload.senderTabId === this.tabId) return;
+          this.dispatchLocalEvent("user", payload);
         })
         .subscribe((channelStatus: string) => {
           if (channelStatus === "SUBSCRIBED") {
@@ -677,6 +693,27 @@ class RealtimeHub {
     this.customerListeners.add(listener);
     return () => {
       this.customerListeners.delete(listener);
+    };
+  }
+
+  public async broadcastUser(action: "create" | "update" | "delete", user: any) {
+    const payload: RealtimeUserPayload = {
+      action,
+      user,
+      deletedId: action === "delete" ? (user?.id || user) : undefined,
+      senderDeviceId: this.getDeviceId(),
+      timestamp: new Date().toISOString(),
+    };
+    (payload as any).senderTabId = this.tabId;
+    this.dispatchLocalEvent("user", payload);
+    this.sendBroadcast("user", payload);
+    this.postToSyncEndpoint("user", payload);
+  }
+
+  public onUser(listener: UserListener) {
+    this.userListeners.add(listener);
+    return () => {
+      this.userListeners.delete(listener);
     };
   }
 

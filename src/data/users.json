@@ -34,23 +34,6 @@
     "createdAt": "01 ene 2024"
   },
   {
-    "id": "usr-3",
-    "name": "Lic. Roberto Morales",
-    "username": "roberto",
-    "email": "auxiliar@panaderiabrito.com",
-    "password": "1234",
-    "role": "auxiliar_admin",
-    "roleLabel": "Auxiliar Administrativo",
-    "jobTitle": "Auxiliar Administrativo",
-    "avatar": "💼",
-    "phone": "55 2233 4455",
-    "status": "activo",
-    "hasSystemAccess": true,
-    "assignedBranchId": "branch-matriz",
-    "assignedBranchName": "Matriz",
-    "createdAt": "15 ene 2024"
-  },
-  {
     "id": "usr-4",
     "name": "Maestro Juan",
     "username": "juan",

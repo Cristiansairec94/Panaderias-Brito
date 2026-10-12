@@ -403,14 +403,26 @@ const BranchContext = createContext<BranchContextType | undefined>(undefined);
 
 export function BranchProvider({ children }: { children: React.ReactNode }) {
   const { user, usersList, permissions } = useAuth();
-  const isBranchProfile = Boolean(
+  const isAdminUser = Boolean(
+    user && (
+      user.role === "admin" ||
+      user.role === "auxiliar_admin" ||
+      user.id === "usr-1" ||
+      user.id === "usr-2" ||
+      user.username === "admin" ||
+      user.username === "paulina" ||
+      (user.name && user.name.toLowerCase().includes("paulina")) ||
+      (user.name && (user.name.toLowerCase().includes("toño") || user.name.toLowerCase().includes("tono")))
+    )
+  );
+  const isBranchProfile = !isAdminUser && Boolean(
     !user ||
     user.role === "cajero" ||
     user.role === "panadero" ||
     user.role === "supervisor" ||
-    Boolean(user.assignedBranchId && user.role !== "admin" && user.role !== "auxiliar_admin")
+    Boolean(user.assignedBranchId)
   );
-  const isAdmin = !isBranchProfile && Boolean(user && (user.role === "admin" || user.role === "auxiliar_admin"));
+  const isAdmin = isAdminUser;
   const canSwitchBranches = isAdmin;
   const userAssignedBranchId = (
     user?.assignedBranchId ||
@@ -2046,6 +2058,11 @@ function resolveBranchParam(param: string | null): string | null {
             } catch {}
             return updated;
           });
+
+          if (typeof window !== "undefined") {
+            window.dispatchEvent(new Event("brito_branches_updated"));
+            window.dispatchEvent(new Event("brito_branches_data_updated"));
+          }
         })
       : undefined;
 

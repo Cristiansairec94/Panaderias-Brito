@@ -7,9 +7,12 @@ import { hashPasswordSync, verifyPasswordSync } from "@/lib/security";
 const DATA_DIR = path.join(process.cwd(), "src", "data");
 const USERS_FILE = path.join(DATA_DIR, "users.json");
 const TMP_USERS_FILE = path.join("/tmp", "brito_users.json");
+const DELETED_USERS_FILE = path.join(DATA_DIR, "deleted_users.json");
+const TMP_DELETED_USERS_FILE = path.join("/tmp", "brito_deleted_users.json");
 
 let inMemoryUsersCache: AppUser[] | null = null;
 let lastFileMtime = 0;
+const deletedUserIdsSet = new Set<string>(["usr-3", "roberto"]);
 
 function ensureDataDirectory() {
   try {
@@ -21,15 +24,58 @@ function ensureDataDirectory() {
   }
 }
 
+function readDeletedUserIds(): Set<string> {
+  // 1. Revisar /tmp primero si estamos en entorno serverless
+  try {
+    if (fs.existsSync(TMP_DELETED_USERS_FILE)) {
+      const content = fs.readFileSync(TMP_DELETED_USERS_FILE, "utf-8");
+      const parsed = JSON.parse(content);
+      if (Array.isArray(parsed)) {
+        parsed.forEach((id: string) => deletedUserIdsSet.add(id));
+      }
+    }
+  } catch {}
+
+  // 2. Leer desde src/data/deleted_users.json
+  try {
+    ensureDataDirectory();
+    if (fs.existsSync(DELETED_USERS_FILE)) {
+      const content = fs.readFileSync(DELETED_USERS_FILE, "utf-8");
+      const parsed = JSON.parse(content);
+      if (Array.isArray(parsed)) {
+        parsed.forEach((id: string) => deletedUserIdsSet.add(id));
+      }
+    }
+  } catch {}
+
+  deletedUserIdsSet.add("usr-3");
+  deletedUserIdsSet.add("roberto");
+  return deletedUserIdsSet;
+}
+
+function writeDeletedUserIds(): void {
+  const list = Array.from(deletedUserIdsSet);
+  try {
+    ensureDataDirectory();
+    fs.writeFileSync(DELETED_USERS_FILE, JSON.stringify(list, null, 2), "utf-8");
+  } catch {}
+  try {
+    fs.writeFileSync(TMP_DELETED_USERS_FILE, JSON.stringify(list, null, 2), "utf-8");
+  } catch {}
+}
+
 function readStoredUsers(): AppUser[] {
+  const deletedSet = readDeletedUserIds();
+
   // 1. Revisar /tmp primero si estamos en entorno serverless (Vercel)
   try {
     if (fs.existsSync(TMP_USERS_FILE)) {
       const content = fs.readFileSync(TMP_USERS_FILE, "utf-8");
       const parsed = JSON.parse(content);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        inMemoryUsersCache = parsed;
-        return parsed;
+        const filtered = parsed.filter((u: AppUser) => !deletedSet.has(u.id) && !deletedSet.has(u.username || ""));
+        inMemoryUsersCache = filtered;
+        return filtered;
       }
     }
   } catch {}
@@ -43,19 +89,20 @@ function readStoredUsers(): AppUser[] {
         const content = fs.readFileSync(USERS_FILE, "utf-8");
         const parsed = JSON.parse(content);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          inMemoryUsersCache = parsed;
+          const filtered = parsed.filter((u: AppUser) => !deletedSet.has(u.id) && !deletedSet.has(u.username || ""));
+          inMemoryUsersCache = filtered;
           lastFileMtime = stats.mtimeMs;
-          return parsed;
+          return filtered;
         }
       } else if (inMemoryUsersCache) {
-        return inMemoryUsersCache;
+        return inMemoryUsersCache.filter((u) => !deletedSet.has(u.id) && !deletedSet.has(u.username || ""));
       }
     }
   } catch (err) {
     console.warn("[API Users] Error al leer users.json, usando memoria:", err);
   }
 
-  return inMemoryUsersCache || [];
+  return (inMemoryUsersCache || []).filter((u) => !deletedSet.has(u.id) && !deletedSet.has(u.username || ""));
 }
 
 function writeStoredUsers(users: AppUser[]): boolean {
@@ -93,10 +140,12 @@ function sanitizeUser(u: AppUser): Omit<AppUser, "password"> {
 export async function GET() {
   try {
     const users = readStoredUsers();
+    const deletedIds = Array.from(readDeletedUserIds());
 
     return NextResponse.json({
       success: true,
       users,
+      deletedIds,
       count: users.length,
       timestamp: Date.now(),
     });
@@ -113,6 +162,15 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     let currentUsers = readStoredUsers();
+    const deletedSet = readDeletedUserIds();
+
+    // Acción especial: Restaurar empleado previamente eliminado
+    if (body.action === "restore" && body.id) {
+      deletedSet.delete(body.id);
+      if (body.username) deletedSet.delete(body.username);
+      writeDeletedUserIds();
+      return NextResponse.json({ success: true, message: "Empleado restaurado" });
+    }
 
     // Acción de seguridad: Verificación de credenciales en servidor
     if (body.action === "verify_credentials") {
@@ -137,7 +195,6 @@ export async function POST(req: NextRequest) {
         if (name.includes(clean)) return true;
         if ((clean === "toño" || clean === "tono" || clean === "admin") && (email.includes("admin") || name.includes("toño") || name.includes("tono"))) return true;
         if ((clean === "lupita" || clean === "caja") && (email.includes("caja") || name.includes("lupita"))) return true;
-        if ((clean === "roberto" || clean === "auxiliar" || clean === "aux") && (email.includes("auxiliar") || name.includes("roberto"))) return true;
         if ((clean === "juan" || clean === "panadero" || clean === "horno") && (email.includes("panadero") || name.includes("juan"))) return true;
         if ((clean === "carlos" || clean === "supervisor" || clean === "super") && (email.includes("supervisor") || name.includes("carlos"))) return true;
 
@@ -183,11 +240,13 @@ export async function POST(req: NextRequest) {
     // Caso 1: Sincronización de lista completa
     if (Array.isArray(body)) {
       const isReplace = req.nextUrl.searchParams.get("replace") === "true";
-      if (body.length > 0) {
+      const cleanBody = body.filter((u: AppUser) => !deletedSet.has(u.id) && !deletedSet.has(u.username || ""));
+
+      if (cleanBody.length > 0 || isReplace) {
         let updated: AppUser[];
         if (isReplace) {
           // Reemplazo autoritativo: respeta eliminaciones de empleados
-          updated = body.map((u) => {
+          updated = cleanBody.map((u) => {
             const existing = currentUsers.find((curr) => curr.id === u.id);
             const finalPass = u.password
               ? (u.password.length === 64 ? u.password : hashPasswordSync(u.password))
@@ -201,8 +260,8 @@ export async function POST(req: NextRequest) {
         } else {
           const mergedMap = new Map<string, AppUser>();
           currentUsers.forEach((u) => mergedMap.set(u.id, u));
-          body.forEach((u) => {
-            if (u && u.id) {
+          cleanBody.forEach((u) => {
+            if (u && u.id && !deletedSet.has(u.id) && !deletedSet.has(u.username || "")) {
               const existing = mergedMap.get(u.id);
               // Hashear contraseña si viene en texto claro nuevo
               const finalPass = u.password
@@ -226,6 +285,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         { success: false, error: "Datos de empleado incompletos (id y nombre requeridos)" },
         { status: 400 }
+      );
+    }
+
+    // Bloqueo: si fue eliminado en otra terminal, no revivirlo a menos que venga force=true
+    if (!body.force && (deletedSet.has(newUser.id) || (newUser.username && deletedSet.has(newUser.username)))) {
+      return NextResponse.json(
+        { success: false, message: "Este empleado fue dado de baja del sistema.", isDeleted: true },
+        { status: 409 }
       );
     }
 
@@ -324,12 +391,22 @@ export async function DELETE(req: NextRequest) {
       );
     }
 
+    const deletedSet = readDeletedUserIds();
+    deletedSet.add(id);
+
     const currentUsers = readStoredUsers();
-    const updatedList = currentUsers.filter((u) => u.id !== id && u.username !== id);
+    const target = currentUsers.find((u) => u.id === id || u.username === id);
+    if (target?.id) deletedSet.add(target.id);
+    if (target?.username) deletedSet.add(target.username);
+    writeDeletedUserIds();
+
+    const updatedList = currentUsers.filter((u) => !deletedSet.has(u.id) && !deletedSet.has(u.username || ""));
     writeStoredUsers(updatedList);
 
     return NextResponse.json({
       success: true,
+      deletedId: id,
+      deletedIds: Array.from(deletedSet),
       users: updatedList.map(sanitizeUser),
       count: updatedList.length,
     });

@@ -162,23 +162,6 @@ export const DEMO_USERS: User[] = [
     createdAt: "01 ene 2024",
   },
   {
-    id: "usr-3",
-    name: "Lic. Roberto Morales",
-    username: "roberto",
-    email: "auxiliar@panaderiabrito.com",
-    password: "1234",
-    role: "auxiliar_admin",
-    roleLabel: "Auxiliar Administrativo",
-    jobTitle: "Auxiliar Administrativo",
-    avatar: "💼",
-    phone: "55 2233 4455",
-    status: "activo",
-    hasSystemAccess: true,
-    assignedBranchId: "branch-matriz",
-    assignedBranchName: "Matriz",
-    createdAt: "15 ene 2024",
-  },
-  {
     id: "usr-4",
     name: "Maestro Juan",
     username: "juan",
@@ -753,6 +736,73 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
+  // Sincronización en tiempo real vía RealtimeHub (Supabase WebSocket + BroadcastChannel)
+  // Garantiza que cuando Paulina o Don Toño editen, eliminen o agreguen un empleado, el otro perfil lo vea al instante
+  useEffect(() => {
+    if (typeof window === "undefined" || !realtimeHub?.onUser) return;
+    const unsub = realtimeHub.onUser((payload) => {
+      const { action, user: incomingUser, deletedId } = payload;
+      const targetId = deletedId || incomingUser?.id;
+      const targetUsername = incomingUser?.username || "";
+      if (!targetId && !targetUsername) return;
+
+      if (action === "delete") {
+        if (targetId) addDeletedUserId(targetId);
+        if (targetUsername) addDeletedUserId(targetUsername);
+
+        setUsersList((prev) => {
+          const updated = prev.filter(
+            (u) => u.id !== targetId && (!targetUsername || u.username !== targetUsername)
+          );
+          try {
+            localStorage.setItem("brito_custom_users", JSON.stringify(updated));
+          } catch {}
+          return updated;
+        });
+
+        if (user && (user.id === targetId || (targetUsername && user.username === targetUsername))) {
+          logout();
+        }
+
+        window.dispatchEvent(new Event("brito_users_updated"));
+      } else if (action === "create") {
+        if (targetId) removeDeletedUserId(targetId);
+        if (targetUsername) removeDeletedUserId(targetUsername);
+
+        setUsersList((prev) => {
+          if (prev.some((u) => u.id === targetId || (targetUsername && u.username === targetUsername))) {
+            return prev.map((u) =>
+              u.id === targetId || (targetUsername && u.username === targetUsername)
+                ? { ...u, ...incomingUser }
+                : u
+            );
+          }
+          const updated = [...prev, incomingUser];
+          try {
+            localStorage.setItem("brito_custom_users", JSON.stringify(updated));
+          } catch {}
+          return updated;
+        });
+        window.dispatchEvent(new Event("brito_users_updated"));
+      } else if (action === "update") {
+        setUsersList((prev) => {
+          const updated = prev.map((u) =>
+            u.id === targetId || (targetUsername && u.username === targetUsername)
+              ? { ...u, ...incomingUser }
+              : u
+          );
+          try {
+            localStorage.setItem("brito_custom_users", JSON.stringify(updated));
+          } catch {}
+          return updated;
+        });
+        window.dispatchEvent(new Event("brito_users_updated"));
+      }
+    });
+
+    return () => unsub();
+  }, [user]);
+
   // Load saved role permissions from localStorage on mount
   useEffect(() => {
     try {
@@ -820,9 +870,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const usersRes = await fetch("/api/users");
         if (usersRes.ok) {
           const usersData = await usersRes.json();
-          if (usersData && Array.isArray(usersData.users) && usersData.users.length > 0 && isMounted) {
-            const serverUsers: User[] = usersData.users;
+          if (usersData && isMounted) {
+            if (Array.isArray(usersData.deletedIds)) {
+              usersData.deletedIds.forEach((delId: string) => addDeletedUserId(delId));
+            }
             const deletedIds = getDeletedUserIds();
+
+            if (Array.isArray(usersData.users) && usersData.users.length > 0) {
+              const serverUsers: User[] = usersData.users;
 
             let localUsers: User[] = [];
             try {
@@ -898,10 +953,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             });
           }
         }
-      } catch (err) {
-        console.warn("[AuthContext] Error consultando /api/users:", err);
       }
-    };
+    } catch (err) {
+      console.warn("[AuthContext] Error consultando /api/users:", err);
+    }
+  };
 
     syncServerData();
 
@@ -1186,7 +1242,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (username === "andres" || u.id === "usr-andres" || email.includes("andres") || name.includes("andres")) return true;
         if (username === "angeles" || u.id === "usr-angeles" || email.includes("angeles") || name.includes("angeles")) return true;
       }
-      if ((clean === "roberto" || clean === "auxiliar" || clean === "aux") && (email.includes("auxiliar") || name.includes("roberto"))) return true;
       if ((clean === "juan" || clean === "panadero" || clean === "horno") && (email.includes("panadero") || name.includes("juan"))) return true;
       if ((clean === "carlos" || clean === "supervisor" || clean === "super") && (email.includes("supervisor") || name.includes("carlos"))) return true;
 
@@ -1269,7 +1324,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (username === "andres" || u.id === "usr-andres" || email.includes("andres") || name.includes("andres")) return true;
         if (username === "angeles" || u.id === "usr-angeles" || email.includes("angeles") || name.includes("angeles")) return true;
       }
-      if ((clean === "roberto" || clean === "auxiliar" || clean === "aux") && (email.includes("auxiliar") || name.includes("roberto"))) return true;
       if ((clean === "juan" || clean === "panadero" || clean === "horno") && (email.includes("panadero") || name.includes("juan"))) return true;
       if ((clean === "carlos" || clean === "supervisor" || clean === "super") && (email.includes("supervisor") || name.includes("carlos"))) return true;
 
@@ -1378,6 +1432,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       window.dispatchEvent(new Event("brito_users_updated"));
     }
 
+    // Transmitir en tiempo real a todos los perfiles conectados (Paulina <-> Don Toño)
+    realtimeHub.broadcastUser("create", newUser);
+
     // Persistir de forma duradera en el servidor
     fetch("/api/users", {
       method: "POST",
@@ -1390,10 +1447,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const updateUser = useCallback((userId: string, updatedData: Partial<User>) => {
     let updated: User[] = [];
+    let updatedTargetUser: User | null = null;
     setUsersList((prevUsers) => {
       updated = prevUsers.map((u) => {
         if (u.id === userId) {
-          return { ...u, ...updatedData };
+          updatedTargetUser = { ...u, ...updatedData };
+          return updatedTargetUser;
         }
         return u;
       });
@@ -1441,6 +1500,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       window.dispatchEvent(new Event("brito_users_updated"));
     }
 
+    // Transmitir en tiempo real a todos los perfiles conectados (Paulina <-> Don Toño)
+    if (updatedTargetUser) {
+      realtimeHub.broadcastUser("update", updatedTargetUser);
+    } else {
+      realtimeHub.broadcastUser("update", { id: userId, ...updatedData } as User);
+    }
+
     setUser((currUser) => {
       if (currUser && currUser.id === userId) {
         const updatedCurrentUser = { ...currUser, ...updatedData };
@@ -1477,10 +1543,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // 2. Actualizar estado y almacenamiento local
     let updatedList: User[] = [];
+    let targetDeletedUser: User | undefined;
     setUsersList((prevUsers) => {
-      const targetUser = prevUsers.find((u) => u.id === userId);
-      if (targetUser?.username) {
-        addDeletedUserId(targetUser.username);
+      targetDeletedUser = prevUsers.find((u) => u.id === userId);
+      if (targetDeletedUser?.username) {
+        addDeletedUserId(targetDeletedUser.username);
       }
       updatedList = prevUsers.filter((u) => u.id !== userId);
       try {
@@ -1494,6 +1561,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (typeof window !== "undefined") {
       window.dispatchEvent(new Event("brito_users_updated"));
     }
+
+    // Transmitir eliminación en tiempo real a todos los perfiles conectados (Paulina <-> Don Toño)
+    realtimeHub.broadcastUser("delete", targetDeletedUser || ({ id: userId } as User));
 
     // 3. Eliminar en el servidor vía DELETE
     fetch(`/api/users?id=${encodeURIComponent(userId)}`, {
@@ -1521,12 +1591,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     let nextStatus: "activo" | "inactivo" = "activo";
+    let toggledUser: User | null = null;
 
     setUsersList((prevUsers) => {
       const updated = prevUsers.map((u) => {
         if (u.id === userId) {
           nextStatus = u.status === "inactivo" ? "activo" : "inactivo";
-          return { ...u, status: nextStatus };
+          toggledUser = { ...u, status: nextStatus };
+          return toggledUser;
         }
         return u;
       });
@@ -1540,6 +1612,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     if (typeof window !== "undefined") {
       window.dispatchEvent(new Event("brito_users_updated"));
+    }
+
+    // Transmitir en tiempo real a todos los perfiles conectados
+    if (toggledUser) {
+      realtimeHub.broadcastUser("update", toggledUser);
     }
 
     // Persistir en servidor
