@@ -55,6 +55,42 @@ export function orderToSupabasePayload(order: CustomOrder): any {
     notes: finalNotes || null,
     cashier: order.cashier || "Don Toño Brito",
     shift_name: order.shiftName || null,
+    created_at: order.createdAt || (order.timestamp ? new Date(order.timestamp).toISOString() : new Date().toISOString()),
+  };
+}
+
+/**
+ * Extrae y separa el nombre de la sucursal de origen y las notas limpias del cliente
+ */
+export function extractOrderOriginAndNotes(order?: Partial<CustomOrder> | { notes?: string | null; operatingBranchId?: string; operatingBranchName?: string; branchId?: string; branchName?: string } | null) {
+  if (!order) {
+    return {
+      originId: undefined,
+      originName: "Sucursal Matriz (Centro)",
+      cleanNotes: "",
+      isCrossBranch: false,
+    };
+  }
+
+  const rawNotes = order.notes || "";
+  const match = rawNotes.match(/\[Origen:\s*([^\|\]]+)(?:\|([^\]]+))?\]/);
+  const cleanNotes = rawNotes.replace(/\[Origen:[^\]]+\]/g, "").trim();
+
+  const originId = order.operatingBranchId || (match ? match[1].trim() : undefined) || order.branchId;
+  const rawOriginName = order.operatingBranchName || (match && match[2] ? match[2].trim() : undefined) || order.branchName || "Sucursal Matriz (Centro)";
+  const originName = rawOriginName.replace(/^branch-[^\s]+\s*/i, "").trim();
+
+  const pickupName = order.branchName || "";
+  const isCrossBranch = Boolean(
+    (originId && order.branchId && originId !== order.branchId) ||
+    (rawOriginName && pickupName && rawOriginName.toLowerCase().trim() !== pickupName.toLowerCase().trim())
+  );
+
+  return {
+    originId,
+    originName,
+    cleanNotes,
+    isCrossBranch,
   };
 }
 
@@ -1030,8 +1066,8 @@ export function addOrderPayment(
   order.payments = [...(order.payments || []), newPayment];
   order.timestamp = Date.now();
 
-  // Solo marcar como entregado si se solicitó explícitamente la entrega inmediata
-  if (params.markAsDelivered) {
+  // Solo marcar como entregado si se solicitó explícitamente la entrega inmediata Y el pedido queda 100% liquidado ($0 restante)
+  if (params.markAsDelivered && isFullLiquidation) {
     order.status = "entregado";
   }
 
@@ -1121,7 +1157,7 @@ export function addOrderPayment(
   // Transmitir abono / liquidación en tiempo real
   if (typeof window !== "undefined" && realtimeHub?.broadcastOrder) {
     realtimeHub.broadcastOrder("payment", order);
-    if (params.markAsDelivered) {
+    if (params.markAsDelivered && isFullLiquidation) {
       realtimeHub.broadcastOrder("status", order);
     }
   }
@@ -1169,6 +1205,12 @@ export function updateOrderStatus(orderId: string, status: CustomOrder["status"]
   const current = getStoredOrders();
   const idx = current.findIndex(o => o.id === orderId || o.orderNumber === orderId);
   if (idx === -1) return null;
+
+  // Bloqueo de seguridad: No permitir marcar como entregado si aún tiene saldo pendiente
+  if (status === "entregado" && (current[idx].remainingBalance || 0) > 0) {
+    console.warn(`[orders] Bloqueado: Pedido #${current[idx].orderNumber} no puede entregarse porque tiene saldo pendiente de $${current[idx].remainingBalance}`);
+    return current[idx];
+  }
 
   current[idx] = {
     ...current[idx],

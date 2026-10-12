@@ -303,6 +303,7 @@ export default function PosOrdersDrawer({
           ) : (
             filteredOrders.map((order) => {
               const isDelivered = order.status === "entregado";
+              const isCancelled = order.status === "cancelado";
               const hasDebt = order.remainingBalance > 0;
 
               return (
@@ -310,7 +311,9 @@ export default function PosOrdersDrawer({
                   key={order.id}
                   className={`p-4 rounded-2xl border-2 transition-all space-y-3 ${
                     isDelivered
-                      ? "bg-stone-50 border-stone-200 opacity-60"
+                      ? "bg-sky-50/90 border-sky-300 ring-2 ring-sky-200/60 shadow-sm"
+                      : isCancelled
+                      ? "bg-rose-50/90 border-rose-300 ring-2 ring-rose-200/60 shadow-sm"
                       : hasDebt
                       ? "bg-white border-amber-300 shadow-sm"
                       : "bg-emerald-50/40 border-emerald-300 shadow-sm"
@@ -324,12 +327,14 @@ export default function PosOrdersDrawer({
                       </span>
                       <span className={`text-[10px] font-black px-2 py-0.5 rounded-full uppercase ${
                         isDelivered
-                          ? "bg-stone-200 text-stone-700"
+                          ? "bg-sky-100 text-sky-900 border border-sky-300"
+                          : isCancelled
+                          ? "bg-rose-100 text-rose-900 border border-rose-300"
                           : hasDebt
                           ? "bg-amber-100 text-amber-900 border border-amber-300"
                           : "bg-emerald-100 text-emerald-900 border border-emerald-300"
                       }`}>
-                        {isDelivered ? "✓ Entregado" : hasDebt ? "Anticipo 50% Cubierto" : "100% Pagado"}
+                        {isDelivered ? "✓ Entregado" : isCancelled ? "✕ Cancelado" : hasDebt ? "Anticipo 50% Cubierto" : "100% Pagado"}
                       </span>
                     </div>
 
@@ -338,6 +343,18 @@ export default function PosOrdersDrawer({
                       <span className="text-base font-black text-stone-900">{formatCurrency(order.total)}</span>
                     </div>
                   </div>
+
+                  {/* Banner Centrado de Estado: ENTREGADO o CANCELADO */}
+                  {isDelivered && (
+                    <div className="py-1 px-3 rounded-xl bg-sky-100/90 border border-sky-300 text-sky-950 flex items-center justify-center gap-1.5 shadow-2xs">
+                      <span className="font-black text-xs tracking-wider uppercase">📦 ENTREGADO</span>
+                    </div>
+                  )}
+                  {isCancelled && (
+                    <div className="py-1 px-3 rounded-xl bg-rose-100/90 border border-rose-300 text-rose-950 flex items-center justify-center gap-1.5 shadow-2xs">
+                      <span className="font-black text-xs tracking-wider uppercase">❌ CANCELADO</span>
+                    </div>
+                  )}
 
                   {/* Fila 2: Cliente y Fecha */}
                   <div>
@@ -435,10 +452,10 @@ export default function PosOrdersDrawer({
                         <button
                           type="button"
                           onClick={() => onSelectOrderForPayment(order)}
-                          className="py-2 px-3.5 bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white rounded-xl text-xs font-black shadow-sm flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer"
+                          className="py-2 px-3.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-xl text-xs font-black shadow-sm flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer"
                         >
                           <DollarSign className="w-4 h-4" />
-                          <span>Cobrar {formatCurrency(order.remainingBalance)} y Entregar</span>
+                          <span>Abonar / Liquidar ({formatCurrency(order.remainingBalance)})</span>
                         </button>
                       ) : (
                         <button

@@ -878,12 +878,19 @@ export default function Home() {
             {filteredOrders.slice(0, 6).map((order) => {
               const isReady = order.status === "listo";
               const isDelivered = order.status === "entregado";
+              const isCancelled = order.status === "cancelado";
               const isInOven = order.status === "en_horno";
 
               return (
                 <div
                   key={order.id}
-                  className="p-4 sm:p-5 rounded-2xl border border-stone-200/90 bg-stone-50/60 hover:bg-white hover:border-orange-300 hover:shadow-md transition-all flex flex-col justify-between space-y-3.5 group"
+                  className={`p-4 sm:p-5 rounded-2xl border transition-all flex flex-col justify-between space-y-3.5 group ${
+                    isDelivered
+                      ? "border-2 border-sky-300 bg-sky-50/80 ring-2 ring-sky-200/60 shadow-sm"
+                      : isCancelled
+                      ? "border-2 border-rose-300 bg-rose-50/80 ring-2 ring-rose-200/60 shadow-sm"
+                      : "border border-stone-200/90 bg-stone-50/60 hover:bg-white hover:border-orange-300 hover:shadow-md"
+                  }`}
                 >
                   {/* Top info: Folio, Status & Cajero */}
                   <div className="space-y-2">
@@ -904,12 +911,26 @@ export default function Home() {
                           : isInOven
                           ? "bg-orange-100 text-orange-800 border-orange-300"
                           : isDelivered
-                          ? "bg-stone-100 text-stone-600 border-stone-200"
+                          ? "bg-sky-100 text-sky-900 border-sky-300"
+                          : isCancelled
+                          ? "bg-rose-100 text-rose-900 border-rose-300"
                           : "bg-amber-100 text-amber-800 border-amber-300"
                       }`}>
-                        {isReady ? "✅ Listo" : isInOven ? "🔥 En Horno" : isDelivered ? "Entregado" : "🕒 Pendiente"}
+                        {isReady ? "✅ Listo" : isInOven ? "🔥 En Horno" : isDelivered ? "📦 Entregado" : isCancelled ? "❌ Cancelado" : "🕒 Pendiente"}
                       </span>
                     </div>
+
+                    {/* Centered Status Banner */}
+                    {isDelivered && (
+                      <div className="py-1 px-2.5 rounded-xl bg-sky-100/90 border border-sky-300 text-sky-950 flex items-center justify-center gap-1.5 shadow-2xs">
+                        <span className="font-black text-xs tracking-wider uppercase">📦 ENTREGADO</span>
+                      </div>
+                    )}
+                    {isCancelled && (
+                      <div className="py-1 px-2.5 rounded-xl bg-rose-100/90 border border-rose-300 text-rose-950 flex items-center justify-center gap-1.5 shadow-2xs">
+                        <span className="font-black text-xs tracking-wider uppercase">❌ CANCELADO</span>
+                      </div>
+                    )}
 
                     {/* Cajero Responsable */}
                     <div className="flex items-center gap-1.5 text-[11px] font-semibold text-stone-600 bg-white/80 px-2.5 py-1 rounded-lg border border-stone-200/70">

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
 import { CustomOrder } from "@/types";
-import { INITIAL_ORDERS } from "@/lib/orders";
+import { INITIAL_ORDERS, normalizeOrder } from "@/lib/orders";
 import { recordServerRealtimeEvent } from "@/lib/realtime/serverEvents";
 
 // Ruta al archivo de almacenamiento persistente en el servidor
@@ -41,8 +41,9 @@ function readStoredOrders(): CustomOrder[] {
       const content = fs.readFileSync(ORDERS_FILE, "utf-8");
       const parsed = JSON.parse(content);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        inMemoryOrdersCache = parsed;
-        return parsed;
+        const normalized = parsed.map(normalizeOrder);
+        inMemoryOrdersCache = normalized;
+        return normalized;
       }
     }
   } catch (err) {

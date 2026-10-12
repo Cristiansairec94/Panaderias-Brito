@@ -41,7 +41,7 @@ import { getStoredProducts, findProductByBarcodeOrCode } from "@/lib/products";
 import { useBranch } from "@/context/BranchContext";
 import { useAuth } from "@/context/AuthContext";
 import { useNotifications } from "@/context/NotificationContext";
-import { formatCurrency, onlyNumbersKeyDown, cleanOnlyNumbers, cleanDecimalNumbers, playScanBeep, resolveBranchId } from "@/lib/utils";
+import { formatCurrency, formatNumberWithDecimals, onlyNumbersKeyDown, cleanOnlyNumbers, cleanDecimalNumbers, playScanBeep, resolveBranchId } from "@/lib/utils";
 import { addCustomOrder } from "@/lib/orders";
 import { DEFAULT_TRANSFER_ACCOUNTS, DEFAULT_CARD_TERMINALS, ExtendedTransferAccount } from "@/lib/paymentAccounts";
 
@@ -1627,14 +1627,14 @@ export default function CreateOrderModal({
                     {totalPieces} {totalPieces === 1 ? "pieza" : "piezas"}
                   </span>
                 )}
-                <div className="relative w-36 sm:w-40">
+                <div className="relative w-36 sm:w-44">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-black text-amber-600 select-none">$</span>
                   <input
                     type="text"
                     readOnly
                     disabled
-                    value={total > 0 ? total.toFixed(2) : "0"}
-                    className="w-full pl-7 pr-3 py-2 bg-amber-50/50 border-2 border-amber-400 rounded-xl text-right text-base font-black text-stone-900 cursor-not-allowed select-none focus:outline-none shadow-2xs"
+                    value={total > 0 ? formatNumberWithDecimals(total) : "0.00"}
+                    className="w-full pl-7 pr-3 py-2 bg-amber-50/50 border-2 border-amber-400 rounded-xl text-right text-base font-black text-stone-900 cursor-not-allowed select-none focus:outline-none shadow-2xs font-mono"
                     title="Total de las piezas a pagar (no editable, en $0 sin piezas)"
                   />
                 </div>

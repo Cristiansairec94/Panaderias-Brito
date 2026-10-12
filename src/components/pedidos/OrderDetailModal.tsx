@@ -31,8 +31,9 @@ import {
   Lock
 } from "lucide-react";
 import { CustomOrder } from "@/types";
-import { formatCurrency } from "@/lib/utils";
-import { updateOrderStatus } from "@/lib/orders";
+import { formatCurrency, formatOrderCreation } from "@/lib/utils";
+import { updateOrderStatus, extractOrderOriginAndNotes } from "@/lib/orders";
+import { useAuth } from "@/context/AuthContext";
 
 interface OrderDetailModalProps {
   isOpen: boolean;
@@ -62,6 +63,9 @@ export default function OrderDetailModal({
   onDarDeBaja,
 }: OrderDetailModalProps) {
   if (!isOpen || !order) return null;
+
+  const { user } = useAuth();
+  const isAdmin = Boolean(user && (user.role === "admin" || user.role === "auxiliar_admin"));
 
   // Formato legible de fecha de registro
   const formatCreatedAt = (dateStr?: string) => {
@@ -120,8 +124,8 @@ export default function OrderDetailModal({
         );
       case "entregado":
         return (
-          <span className="bg-teal-400/20 text-teal-300 border border-teal-400/40 px-2.5 py-0.5 rounded-full font-bold text-xs inline-flex items-center gap-1.5 shadow-2xs">
-            <Check className="w-3.5 h-3.5 text-teal-400" /> Entregado
+          <span className="bg-sky-400/20 text-sky-300 border border-sky-400/40 px-2.5 py-0.5 rounded-full font-bold text-xs inline-flex items-center gap-1.5 shadow-2xs">
+            <Check className="w-3.5 h-3.5 text-sky-400" /> Entregado
           </span>
         );
       case "cancelado":
@@ -136,10 +140,12 @@ export default function OrderDetailModal({
   const isLiquidado = order.remainingBalance <= 0;
   const isHistoryOrder = Boolean(
     isHistoryMode ||
-    order.status === "entregado" ||
     order.status === "cancelado"
   );
   const deliveryFormatted = formatDeliveryDate(order.deliveryDate);
+  const { originName, cleanNotes, isCrossBranch } = extractOrderOriginAndNotes(order);
+  const pickupBranch = order.branchName || "Sucursal Matriz (Centro)";
+  const orderCreation = formatOrderCreation(order);
 
   const handleDeliver = () => {
     if (!order) return;
@@ -164,7 +170,6 @@ export default function OrderDetailModal({
       if (typeof window !== "undefined") {
         window.dispatchEvent(new Event("brito_orders_updated"));
       }
-      onClose();
     }
   };
 
@@ -183,8 +188,12 @@ export default function OrderDetailModal({
                 <span className="text-xs font-mono font-black text-amber-400 bg-amber-400/10 px-2 py-0.5 rounded border border-amber-400/30">
                   {order.orderNumber}
                 </span>
-                <span className="text-[11px] font-medium text-stone-400 truncate">
-                  Registrado: {formatCreatedAt(order.createdAt)}
+                <span
+                  className="text-[11px] font-medium text-stone-300 truncate inline-flex items-center gap-1.5"
+                  title={`Registrado: ${orderCreation.fullDateStr}`}
+                >
+                  <Clock className="w-3 h-3 text-amber-400 shrink-0" />
+                  <span>Pedido: <strong className="text-amber-300 font-mono">{orderCreation.fullBadgeStr}</strong></span>
                 </span>
               </div>
               <h2 className="text-base sm:text-lg font-black text-white tracking-tight leading-tight truncate">
@@ -239,10 +248,51 @@ export default function OrderDetailModal({
         {/* ── Cuerpo del Modal ── */}
         <div className="p-3.5 sm:p-4 overflow-y-auto space-y-3 text-stone-800 flex-1">
           
-          {/* Tarjetas de Información Rápida (Cliente, Entrega, Sucursal) */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+          {/* Tarjetas de Información Rápida (Registro de Pedido, Entrega, Cliente, Sucursal) */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
             
-            {/* Tarjeta 1: Cliente */}
+            {/* Tarjeta 1: Fecha y Hora en que se hizo el Pedido */}
+            <div
+              className="bg-amber-50/70 p-2.5 sm:px-3 sm:py-2.5 rounded-xl border border-amber-200/90 flex flex-col justify-between"
+              title={`Registrado: ${orderCreation.fullDateStr}`}
+            >
+              <div className="flex items-center gap-1.5 text-[11px] font-black text-amber-900 uppercase tracking-wide">
+                <Clock className="w-3.5 h-3.5 text-amber-700 shrink-0" />
+                <span>Pedido Realizado</span>
+              </div>
+              <div className="mt-1">
+                <p className="text-sm font-black text-amber-950 truncate">
+                  {orderCreation.shortDateStr}
+                </p>
+                <div className="flex items-center gap-1 text-xs font-bold text-amber-900 mt-0.5">
+                  <span className="text-stone-500 font-medium">Hora:</span>
+                  <strong className="font-mono font-black text-amber-950 bg-amber-100/90 border border-amber-300 px-1.5 py-0.2 rounded text-[11px]">
+                    {orderCreation.exactTimeStr}
+                  </strong>
+                </div>
+              </div>
+            </div>
+
+            {/* Tarjeta 2: Fecha y Hora de Entrega */}
+            <div className="bg-stone-50/90 p-2.5 sm:px-3 sm:py-2.5 rounded-xl border border-stone-200/90 flex flex-col justify-between">
+              <div className="flex items-center gap-1.5 text-[11px] font-bold text-stone-600 uppercase tracking-wide">
+                <Calendar className="w-3.5 h-3.5 text-stone-500 shrink-0" />
+                <span>Entrega Programada</span>
+              </div>
+              <div className="mt-1">
+                <p className="text-sm font-black text-stone-900 capitalize truncate" title={deliveryFormatted}>
+                  {deliveryFormatted}
+                </p>
+                <div className="flex items-center gap-1 text-xs font-bold text-stone-700 mt-0.5">
+                  <span className="text-stone-500 font-medium">Hora:</span>
+                  <strong className="font-mono font-black text-stone-900 bg-stone-100 border border-stone-200 px-1.5 py-0.2 rounded text-[11px]">
+                    {order.deliveryTime || "16:00"} hrs
+                  </strong>
+                </div>
+              </div>
+            </div>
+
+            {/* Tarjeta 3: Cliente */}
             <div className="bg-stone-50/90 p-2.5 sm:px-3 sm:py-2.5 rounded-xl border border-stone-200/90 flex flex-col justify-between">
               <div className="flex items-center justify-between text-[11px] font-bold text-stone-500 uppercase tracking-wide">
                 <span className="flex items-center gap-1.5">
@@ -263,46 +313,45 @@ export default function OrderDetailModal({
                 <p className="text-sm font-black text-stone-900 truncate" title={order.customerName}>
                   {order.customerName}
                 </p>
-                <p className="text-xs font-mono font-medium text-stone-600">
+                <p className="text-xs font-mono font-medium text-stone-600 mt-0.5">
                   📞 {order.phone || "Sin teléfono"}
                 </p>
               </div>
             </div>
 
-            {/* Tarjeta 2: Fecha y Hora de Entrega */}
-            <div className="bg-amber-50/70 p-2.5 sm:px-3 sm:py-2.5 rounded-xl border border-amber-200/80 flex flex-col justify-between">
-              <div className="flex items-center gap-1.5 text-[11px] font-bold text-amber-800 uppercase tracking-wide">
-                <Calendar className="w-3.5 h-3.5 text-amber-600" />
-                <span>Fecha de Entrega</span>
-              </div>
-              <div className="mt-1">
-                <p className="text-sm font-black text-amber-950 capitalize truncate" title={deliveryFormatted}>
-                  {deliveryFormatted}
-                </p>
-                <div className="flex items-center gap-1 text-xs font-bold text-amber-900">
-                  <Clock className="w-3 h-3 text-amber-700" />
-                  <span>Hora: <strong>{order.deliveryTime || "16:00"} hrs</strong></span>
-                </div>
-              </div>
-            </div>
-
-            {/* Tarjeta 3: Lugar de Entrega y Sucursal */}
+            {/* Tarjeta 4: Lugar de Entrega y Sucursal */}
             <div className="bg-stone-50/90 p-2.5 sm:px-3 sm:py-2.5 rounded-xl border border-stone-200/90 flex flex-col justify-between">
-              <div className="flex items-center gap-1.5 text-[11px] font-bold text-stone-500 uppercase tracking-wide">
-                {order.deliveryType === "domicilio" ? (
-                  <Truck className="w-3.5 h-3.5 text-blue-600" />
-                ) : (
-                  <Store className="w-3.5 h-3.5 text-amber-600" />
+              <div className="flex items-center justify-between text-[11px] font-bold text-stone-500 uppercase tracking-wide">
+                <span className="flex items-center gap-1.5">
+                  {order.deliveryType === "domicilio" ? (
+                    <Truck className="w-3.5 h-3.5 text-blue-600" />
+                  ) : (
+                    <Store className="w-3.5 h-3.5 text-amber-600" />
+                  )}
+                  <span>{order.deliveryType === "domicilio" ? "A Domicilio" : "En Sucursal"}</span>
+                </span>
+                {isCrossBranch && (
+                  <span className="text-[9px] font-black bg-amber-200/80 text-amber-900 px-1.5 py-0.5 rounded shadow-2xs">
+                    Inter-sucursal
+                  </span>
                 )}
-                <span>{order.deliveryType === "domicilio" ? "A Domicilio" : "En Sucursal"}</span>
               </div>
               <div className="mt-1">
-                <p className="text-sm font-black text-stone-900 truncate" title={order.deliveryType === "domicilio" ? order.deliveryAddress : order.branchName}>
-                  {order.deliveryType === "domicilio" ? (order.deliveryAddress || "Dirección pendiente") : order.branchName}
+                <p className="text-sm font-black text-stone-900 truncate" title={order.deliveryType === "domicilio" ? order.deliveryAddress : pickupBranch}>
+                  {order.deliveryType === "domicilio" ? (order.deliveryAddress || "Dirección pendiente") : pickupBranch}
                 </p>
-                <p className="text-xs text-stone-500 truncate" title={order.deliveryType === "domicilio" ? "Entrega a domicilio" : `Sucursal: ${order.branchName}`}>
-                  📍 {order.deliveryType === "domicilio" ? "Entrega a domicilio" : `Sucursal ${order.branchName}`}
-                </p>
+                <div className="mt-1 flex flex-col gap-0.5 text-[11px] text-stone-600">
+                  <div className="flex items-center gap-1 truncate" title={`Origen: ${originName}`}>
+                    <span className="text-stone-400">Origen:</span>
+                    <strong className="text-amber-800">{originName}</strong>
+                  </div>
+                  {isCrossBranch && (
+                    <div className="flex items-center gap-1 truncate" title={`Entrega: ${pickupBranch}`}>
+                      <span className="text-stone-400">Entrega:</span>
+                      <strong className="text-stone-900">{pickupBranch}</strong>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </div>
@@ -366,27 +415,61 @@ export default function OrderDetailModal({
                 </div>
               </div>
 
-              {/* Dedicatoria o Notas si existen */}
-              {(order.dedication || order.notes) && (
-                <div className="space-y-1.5 mt-2.5 pt-2 border-t border-stone-100">
-                  {order.dedication && (
-                    <div className="bg-amber-50/90 border border-amber-200 rounded-lg px-2.5 py-1.5 text-xs">
-                      <span className="font-bold text-amber-900 text-[10px] uppercase block">
-                        🎂 Dedicatoria / Letrero:
+              {/* Origen del Pedido, Dedicatoria y Observaciones */}
+              <div className="space-y-2 mt-2.5 pt-2 border-t border-stone-100">
+                {/* 📍 Sucursal de Origen (Donde se hizo el pedido) */}
+                <div className="bg-amber-50/80 border border-amber-200/90 rounded-xl p-2.5 text-xs shadow-2xs">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-extrabold text-amber-900 text-[11px] uppercase tracking-wide flex items-center gap-1.5">
+                      <Store className="w-3.5 h-3.5 text-amber-700 shrink-0" />
+                      <span>Sucursal de Origen (Donde se hizo el pedido):</span>
+                    </span>
+                    {isCrossBranch && (
+                      <span className="bg-amber-200/90 text-amber-950 text-[10px] font-black px-2 py-0.5 rounded-md shrink-0">
+                        Inter-sucursal
                       </span>
-                      <span className="font-bold text-amber-950 italic">"{order.dedication}"</span>
-                    </div>
-                  )}
-                  {order.notes && (
-                    <div className="bg-stone-50 border border-stone-200 rounded-lg px-2.5 py-1.5 text-xs">
-                      <span className="font-bold text-stone-500 text-[10px] uppercase block">
-                        📝 Observaciones:
+                    )}
+                  </div>
+                  
+                  <div className="mt-1 flex items-center justify-between flex-wrap gap-1 text-xs">
+                    <span className="font-black text-amber-950 text-sm flex items-center gap-1">
+                      🏬 {originName}
+                    </span>
+                    {order.cashier && (
+                      <span className="text-[11px] text-amber-900 font-medium bg-amber-100/70 border border-amber-200 px-2 py-0.5 rounded-lg">
+                        Atendió: <strong className="font-bold text-amber-950">{order.cashier}</strong>
                       </span>
-                      <span className="text-stone-800">{order.notes}</span>
+                    )}
+                  </div>
+
+                  {isCrossBranch && (
+                    <div className="mt-1.5 pt-1.5 border-t border-amber-200/60 flex items-center gap-1.5 text-xs text-amber-900">
+                      <Truck className="w-3.5 h-3.5 text-amber-700 shrink-0" />
+                      <span>Entrega / Recolección en: <strong className="font-black text-amber-950">{pickupBranch}</strong></span>
                     </div>
                   )}
                 </div>
-              )}
+
+                {/* Dedicatoria o Letrero si existe */}
+                {order.dedication && (
+                  <div className="bg-rose-50/80 border border-rose-200/90 rounded-lg px-2.5 py-1.5 text-xs">
+                    <span className="font-bold text-rose-900 text-[10px] uppercase block">
+                      🎂 Dedicatoria / Letrero:
+                    </span>
+                    <span className="font-bold text-rose-950 italic">"{order.dedication}"</span>
+                  </div>
+                )}
+
+                {/* Observaciones limpias del cliente (sin tags de origen) */}
+                {cleanNotes && (
+                  <div className="bg-stone-50 border border-stone-200 rounded-lg px-2.5 py-1.5 text-xs">
+                    <span className="font-bold text-stone-500 text-[10px] uppercase block">
+                      📝 Observaciones:
+                    </span>
+                    <span className="text-stone-800 font-medium">{cleanNotes}</span>
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Columna Derecha: Finanzas, Cobro y Caja */}
@@ -438,6 +521,41 @@ export default function OrderDetailModal({
                       {formatCurrency(order.remainingBalance)}
                     </span>
                   </div>
+
+                  {/* Botón directo de Abonar / Liquidar dentro de Finanzas */}
+                  {!isHistoryOrder && !isLiquidado && onOpenPayment && order.status !== "cancelado" && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onClose();
+                        onOpenPayment(order);
+                      }}
+                      className="w-full mt-2 py-2 px-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 active:scale-95 text-white font-black text-xs rounded-xl shadow transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      <DollarSign className="w-4 h-4" />
+                      <span>Abonar o Liquidar ({formatCurrency(order.remainingBalance)})</span>
+                    </button>
+                  )}
+
+                  {/* Historial de Abonos / Pagos registrados */}
+                  {order.payments && order.payments.length > 0 && (
+                    <div className="mt-2.5 pt-2 border-t border-stone-800 space-y-1">
+                      <span className="text-[10px] font-black text-amber-400 uppercase tracking-wider block">
+                        Abonos Registrados ({order.payments.length}):
+                      </span>
+                      <div className="space-y-1 max-h-24 overflow-y-auto pr-0.5">
+                        {order.payments.map((p, idx) => (
+                          <div key={idx} className="bg-stone-800/80 border border-stone-700/60 rounded-lg p-1.5 px-2 text-[10px] flex items-center justify-between">
+                            <div>
+                              <span className="font-bold text-stone-200">Abono #{idx + 1} ({p.paymentMethod || "efectivo"})</span>
+                              <div className="text-[9px] text-stone-400">{p.date || "Fecha no registrada"} {p.cashier ? `• ${p.cashier}` : ""}</div>
+                            </div>
+                            <span className="font-mono font-bold text-emerald-400">{formatCurrency(p.amount)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -448,9 +566,15 @@ export default function OrderDetailModal({
                   <strong className="text-stone-200">{order.cashier || "Don Toño Brito"}</strong>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span>Sucursal:</span>
-                  <strong className="text-stone-200">{order.branchName}</strong>
+                  <span>Sucursal de Origen:</span>
+                  <strong className="text-amber-300 font-bold">{originName}</strong>
                 </div>
+                {isCrossBranch && (
+                  <div className="flex items-center justify-between">
+                    <span>Sucursal de Entrega:</span>
+                    <strong className="text-stone-200">{pickupBranch}</strong>
+                  </div>
+                )}
                 {order.shiftName && (
                   <div className="flex items-center justify-between">
                     <span>Turno:</span>
@@ -498,7 +622,7 @@ export default function OrderDetailModal({
               </button>
             )}
 
-            {/* Botón Pagar Restante */}
+            {/* Botón Abonar / Liquidar */}
             {!isHistoryOrder && !isLiquidado && onOpenPayment && order.status !== "cancelado" && (
               <button
                 type="button"
@@ -507,10 +631,10 @@ export default function OrderDetailModal({
                   onOpenPayment(order);
                 }}
                 className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-lg shadow-xs transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
-                title="Cobrar saldo restante al cliente para poder entregar"
+                title="Abonar a cuenta o liquidar el saldo total"
               >
                 <DollarSign className="w-3.5 h-3.5" />
-                <span>Pagar ({formatCurrency(order.remainingBalance)})</span>
+                <span>Abonar / Liquidar ({formatCurrency(order.remainingBalance)})</span>
               </button>
             )}
 
@@ -520,7 +644,6 @@ export default function OrderDetailModal({
                 type="button"
                 onClick={() => {
                   onAdvanceStatus(order);
-                  onClose();
                 }}
                 className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-lg shadow-xs transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
                 title="Marcar como listo para entrega en sucursal"
@@ -556,7 +679,7 @@ export default function OrderDetailModal({
             )}
 
             {/* Botón Editar */}
-            {!isHistoryOrder && onOpenEdit && order.status !== "cancelado" && (
+            {isAdmin && !isHistoryOrder && onOpenEdit && order.status !== "cancelado" && (
               <button
                 type="button"
                 onClick={() => {
@@ -571,7 +694,7 @@ export default function OrderDetailModal({
             )}
 
             {/* Botón Eliminar / Dar de Baja */}
-            {onDarDeBaja && (
+            {isAdmin && onDarDeBaja && (
               <button
                 type="button"
                 onClick={() => onDarDeBaja(order)}

@@ -35,6 +35,7 @@ export interface FBNotification {
   operatingBranchId?: string;
   operatingBranchName?: string;
   timestamp?: number;
+  createdAt?: string;
 }
 
 export function isAllowedNotification(notif: Partial<FBNotification>): boolean {
@@ -92,6 +93,22 @@ export function isAllowedNotification(notif: Partial<FBNotification>): boolean {
   return Boolean(isCierreTurno || isPedido);
 }
 
+export function getCanonicalBranchCode(branchIdOrName?: string): string {
+  if (!branchIdOrName) return "";
+  const s = branchIdOrName
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+  if (s.includes("angeles") || s.includes("suc-les")) return "branch-angeles";
+  if (s.includes("ildefonso") || s.includes("1790889237862") || s.includes("ilf-04")) return "branch-1790889237862";
+  if (s.includes("sanjuan") || s.includes("san juan") || s.includes("sju-02")) return "branch-sanjuan";
+  if (s.includes("benito") || s.includes("ben-02")) return "branch-benito";
+  if (s.includes("flores") || s.includes("flo-03")) return "branch-flores";
+  if (s.includes("matriz") || s.includes("centro") || s.includes("mat-01")) return "branch-matriz";
+  return s;
+}
+
 export function checkBranchMatch(
   info: {
     pickupBranchId?: string;
@@ -103,66 +120,14 @@ export function checkBranchMatch(
   userBranchId?: string,
   userBranchName?: string
 ): boolean {
-  const stripAccents = (str?: string): string => {
-    return (str || "")
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .toLowerCase()
-      .trim();
-  };
+  const userCode = getCanonicalBranchCode(userBranchId || userBranchName);
+  if (!userCode) return false;
 
-  const uId = stripAccents(userBranchId);
-  const uName = stripAccents(userBranchName);
+  const destCode = getCanonicalBranchCode(info.pickupBranchId || info.pickupBranchName);
+  if (destCode && destCode === userCode) return true;
 
-  // Helper para identificar palabras clave de sucursal
-  const getBranchKeywords = (str: string): string[] => {
-    const s = stripAccents(str);
-    const keywords: string[] = [];
-    if (s.includes("benito") || s.includes("ben-02")) keywords.push("benito");
-    if (s.includes("flores") || s.includes("flo-03")) keywords.push("flores");
-    if (s.includes("matriz") || s.includes("centro") || s.includes("mat-01")) keywords.push("matriz");
-    if (s.includes("ildefonso") || s.includes("1790889237862") || s.includes("ilf-04")) keywords.push("ildefonso");
-    if (s.includes("angeles") || s.includes("suc-les")) keywords.push("angeles");
-    if (s.includes("sanjuan") || s.includes("san juan") || s.includes("sju-02")) keywords.push("sanjuan");
-    return keywords;
-  };
-
-  const userKeywords = [...getBranchKeywords(uId), ...getBranchKeywords(uName)];
-
-  const checkMatch = (targetId?: string, targetName?: string): boolean => {
-    const tId = stripAccents(targetId);
-    const tName = stripAccents(targetName);
-
-    if (uId && tId && (uId === tId || uId.includes(tId) || tId.includes(uId))) {
-      return true;
-    }
-    if (uName && tName && (uName === tName || uName.includes(tName) || tName.includes(uName))) {
-      return true;
-    }
-    const targetKeywords = [...getBranchKeywords(tId), ...getBranchKeywords(tName)];
-    if (userKeywords.some((k) => targetKeywords.includes(k))) {
-      return true;
-    }
-    return false;
-  };
-
-  // 1. Coincidencia con sucursal de entrega / recogida
-  if (checkMatch(info.pickupBranchId, info.pickupBranchName)) {
-    return true;
-  }
-
-  // 2. Coincidencia con sucursal de origen / realización del pedido
-  if (checkMatch(info.operatingBranchId, info.operatingBranchName)) {
-    return true;
-  }
-
-  // 3. Coincidencia por texto libre si hay palabras clave reconocibles
-  if (info.fullText && userKeywords.length > 0) {
-    const textNorm = stripAccents(info.fullText);
-    if (userKeywords.some((k) => textNorm.includes(k))) {
-      return true;
-    }
-  }
+  const originCode = getCanonicalBranchCode(info.operatingBranchId || info.operatingBranchName);
+  if (originCode && originCode === userCode) return true;
 
   return false;
 }
@@ -356,14 +321,28 @@ export function isNotificationVisibleForUser(
   if (!isAllowedNotification(notif)) return false;
 
   // 1. Administrador (Dueño o Auxiliar Admin):
-  // Lleva el control y visualización de TODO (cortes de todas las sucursales,
-  // dinero que entra/sale, y todos los pedidos de todas las sucursales)
-  const isAdmin = !user || user.role === "admin" || user.role === "auxiliar_admin";
+  // Control total: ve todos los cortes de caja y todos los pedidos de todas las sucursales
+  // Perfiles operativos de sucursal (Andrés Sánchez, Carlos, cajeros, etc.) tienen vista limitada a pedidos de su tienda
+  const isBranchProfile = Boolean(
+    !user ||
+    user.role === "cajero" ||
+    user.role === "panadero" ||
+    user.role === "supervisor" ||
+    user.username === "andres" ||
+    user.username === "carlos" ||
+    user.username === "carlos.bueno" ||
+    user.name?.toLowerCase().includes("andres") ||
+    user.name?.toLowerCase().includes("carlos") ||
+    Boolean(user.assignedBranchId && user.role !== "admin" && user.role !== "auxiliar_admin")
+  );
+
+  const isAdmin = !isBranchProfile && Boolean(user && (user.role === "admin" || user.role === "auxiliar_admin"));
   if (isAdmin) {
     return true;
   }
 
-  // 2. Roles Operativos (Cajeros, Panaderos, etc.):
+  // 2. Perfiles Operativos de Sucursal (Andrés Sánchez, Carlos, Cajeros):
+  // "en cada sucursal unicamente tiene que aparecer el boton de pedidos ya que cada sucursal lo ocupara un perfil que seran cajeros, entonces solo deben observar los pedidos que hagan hacia la sucursal que estan trabajando"
   const text = `${notif.title || ""} ${notif.highlightText || ""} ${notif.description || ""} ${notif.senderName || ""}`.toLowerCase();
 
   const isPedido =
@@ -375,101 +354,74 @@ export function isNotificationVisibleForUser(
     text.includes("abono") ||
     text.includes("pastel");
 
-  const isCajaCategory =
-    notif.category === "caja" ||
-    notif.badgeIcon === "dinero" ||
-    text.includes("corte") ||
-    text.includes("cierre") ||
-    text.includes("turno") ||
-    text.includes("cuadró") ||
-    text.includes("cuadro") ||
-    text.includes("diferencia") ||
-    text.includes("ingreso registrado") ||
-    text.includes("entrada de caja") ||
-    text.includes("gasto") ||
-    text.includes("retiro") ||
-    text.includes("fondo dejado") ||
-    text.includes("ticket cancelado");
-
-  if (isCajaCategory && !isPedido) {
+  // Bloqueo estricto: Cajeros y perfiles de sucursal NO ven notificaciones de cierres ni cortes de caja
+  if (!isPedido) {
     return false;
   }
 
-  // REGLA 2: Notificaciones de PEDIDOS:
-  // Llegan al cajero si el pedido involucra su sucursal:
-  // - Sucursal donde se hizo/alzó el pedido (origen)
-  // - Sucursal donde se entregará/recogerá (destino)
-  // - Sucursal donde se cobró/liquidó el pedido
-  // - O si coincide con el cajero que lo levantó
-  const candidateBranches: Array<{ id: string; name: string }> = [];
-  if (user?.assignedBranchId || user?.assignedBranchName) {
-    candidateBranches.push({
-      id: (user.assignedBranchId || "").trim(),
-      name: (user.assignedBranchName || "").trim(),
-    });
-  }
-  if (activeBranch?.id || activeBranch?.name || activeBranch?.shortName) {
-    candidateBranches.push({
-      id: (activeBranch.id || "").trim(),
-      name: (activeBranch.name || activeBranch.shortName || "").trim(),
-    });
+  // Identificar el código canónico de la sucursal asignada del cajero.
+  let userAssigned = user?.assignedBranchId || user?.assignedBranchName || "";
+  if (!userAssigned && user) {
+    if (user.username === "andres" || user.name?.toLowerCase().includes("andres")) {
+      userAssigned = "branch-angeles";
+    } else if (user.username === "carlos" || user.name?.toLowerCase().includes("mendoza")) {
+      userAssigned = "branch-benito";
+    } else if (user.username === "carlos.bueno" || user.name?.toLowerCase().includes("bueno")) {
+      userAssigned = "branch-matriz";
+    }
   }
 
-  // Si por alguna razón el usuario no tiene ninguna sucursal asignada ni activa
-  if (candidateBranches.length === 0) {
+  const cashierBranchCode = getCanonicalBranchCode(
+    userAssigned || (activeBranch?.id && activeBranch.id !== "all" ? activeBranch.id : "")
+  );
+
+  if (!cashierBranchCode) {
+    if (user?.username === "andres" || user?.name?.toLowerCase().includes("andres")) {
+      return checkBranchMatchesTargetCode(notif, "branch-angeles");
+    }
+    if (user?.username === "carlos" || user?.name?.toLowerCase().includes("mendoza")) {
+      return checkBranchMatchesTargetCode(notif, "branch-benito");
+    }
+    return false;
+  }
+
+  return checkBranchMatchesTargetCode(notif, cashierBranchCode);
+}
+
+function checkBranchMatchesTargetCode(notif: Partial<FBNotification>, targetCode: string): boolean {
+  // 1. Destino (recogida/entrega)
+  const notifDestCode = getCanonicalBranchCode(notif.branchId || notif.branchName);
+  if (notifDestCode && notifDestCode === targetCode) {
     return true;
   }
 
-  // Resolver sucursales directas de la notificación
-  const pickupId = notif.branchId;
-  const pickupName = notif.branchName;
-  const operatingId = notif.operatingBranchId;
-  const operatingName = notif.operatingBranchName;
-
-  // 1. Revisar coincidencia directa con los datos de la notificación
-  for (const cand of candidateBranches) {
-    const matchesNotification = checkBranchMatch(
-      {
-        pickupBranchId: pickupId,
-        pickupBranchName: pickupName,
-        operatingBranchId: operatingId,
-        operatingBranchName: operatingName,
-        fullText: text,
-      },
-      cand.id,
-      cand.name
-    );
-    if (matchesNotification) return true;
+  // 2. Origen (sucursal que levantó o cobró)
+  const notifOriginCode = getCanonicalBranchCode(notif.operatingBranchId || notif.operatingBranchName);
+  if (notifOriginCode && notifOriginCode === targetCode) {
+    return true;
   }
 
-  // 2. Buscar datos reales del pedido almacenado para contrastar origen y destino
+  // 3. Contrastar con los datos reales del pedido almacenado
   const order = findOrderForNotification(notif as FBNotification);
   if (order) {
-    for (const cand of candidateBranches) {
-      const matchesOrder = checkBranchMatch(
-        {
-          pickupBranchId: order.branchId,
-          pickupBranchName: order.branchName,
-          operatingBranchId: order.operatingBranchId,
-          operatingBranchName: order.operatingBranchName,
-          fullText: `${order.orderNumber} ${order.customerName} ${order.cashier || ""} ${order.description || ""}`,
-        },
-        cand.id,
-        cand.name
-      );
-      if (matchesOrder) return true;
+    const orderDestCode = getCanonicalBranchCode(order.branchId || order.branchName);
+    if (orderDestCode && orderDestCode === targetCode) {
+      return true;
     }
 
-    // 3. Revisar si el cajero del pedido es este usuario (ej. Silvia Puga, Andrés Sánchez)
-    if (order.cashier && user?.name && order.cashier.toLowerCase().includes(user.name.toLowerCase().trim())) {
+    const orderOriginCode = getCanonicalBranchCode(order.operatingBranchId || order.operatingBranchName);
+    if (orderOriginCode && orderOriginCode === targetCode) {
       return true;
     }
   }
 
-  // 4. Si el nombre del usuario aparece directamente en el texto de la notificación
-  if (user?.name && user.name.length >= 3 && text.includes(user.name.toLowerCase().trim())) {
-    return true;
-  }
+  // 4. Búsqueda de palabra clave por sucursal en el texto
+  const text = `${notif.title || ""} ${notif.highlightText || ""} ${notif.description || ""} ${notif.senderName || ""}`.toLowerCase();
+  if (targetCode === "branch-matriz" && (text.includes("matriz") || text.includes("centro"))) return true;
+  if (targetCode === "branch-angeles" && (text.includes("angeles") || text.includes("ángeles"))) return true;
+  if (targetCode === "branch-sanjuan" && text.includes("san juan")) return true;
+  if (targetCode === "branch-benito" && text.includes("benito")) return true;
+  if (targetCode === "branch-1790889237862" && text.includes("ildefonso")) return true;
 
   return false;
 }
@@ -1225,7 +1177,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       setNativePermission(perm);
       if (perm === "granted") {
         try {
-          const isAdmin = !user || user.role === "admin" || user.role === "auxiliar_admin";
+          const isAdmin = Boolean(user && (user.role === "admin" || user.role === "auxiliar_admin"));
           triggerNativeNotification({
             id: `welcome-${Date.now()}`,
             senderName: "🥖 Panadería Brito",
@@ -1823,7 +1775,8 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
             return;
           }
           updateOrderStatus(o.id, "entregado");
-          setSelectedOrderForDetail(null);
+          const updated = getStoredOrders().find((item) => item.id === o.id);
+          if (updated) setSelectedOrderForDetail(updated);
           if (typeof window !== "undefined") {
             window.dispatchEvent(new Event("brito_orders_updated"));
           }

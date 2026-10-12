@@ -150,7 +150,19 @@ export default function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const { user, permissions, logout, canAccessRoute } = useAuth();
-  const isAdmin = !user || user.role === "admin" || user.role === "auxiliar_admin";
+  const isBranchProfile = Boolean(
+    !user ||
+    user.role === "cajero" ||
+    user.role === "panadero" ||
+    user.role === "supervisor" ||
+    user.username === "andres" ||
+    user.username === "carlos" ||
+    user.username === "carlos.bueno" ||
+    user.name?.toLowerCase().includes("andres") ||
+    user.name?.toLowerCase().includes("carlos") ||
+    Boolean(user.assignedBranchId && user.role !== "admin" && user.role !== "auxiliar_admin")
+  );
+  const isAdmin = !isBranchProfile && Boolean(user && (user.role === "admin" || user.role === "auxiliar_admin"));
   const { currentBranch, isAllBranches, branches } = useBranch();
   const { 
     isCollapsed, 

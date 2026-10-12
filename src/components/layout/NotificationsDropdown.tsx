@@ -22,7 +22,9 @@ import {
   Clock,
   Wallet,
   Receipt,
-  ShieldCheck
+  ShieldCheck,
+  PackageCheck,
+  XCircle
 } from "lucide-react";
 import { 
   useNotifications, 
@@ -30,10 +32,11 @@ import {
   findShiftCutForNotification, 
   findOrderForNotification,
   formatLiveNotificationTime,
-  resolveNotificationTimestamp 
+  resolveNotificationTimestamp,
+  getCanonicalBranchCode
 } from "@/context/NotificationContext";
 import { useAuth } from "@/context/AuthContext";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, formatOrderCreation } from "@/lib/utils";
 
 // Graphic illustration for Flour Sack matching user mockup
 function FlourSackGraphic({ className = "w-10 h-10" }: { className?: string }) {
@@ -111,12 +114,29 @@ function CakeGraphic({ className = "w-10 h-10" }: { className?: string }) {
 
 export default function NotificationsDropdown() {
   const [isOpen, setIsOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<"all" | "cortes" | "pedidos" | "unread">("all");
+  const { user } = useAuth();
+  
+  // Perfiles como Andrés Sánchez, Carlos (Mendoza / Bueno), Silvia, Noé, cajeros y personal de sucursal
+  // tienen su vista de notificaciones estrictamente limitada a pedidos de su sucursal.
+  const isBranchProfile = Boolean(
+    !user ||
+    user.role === "cajero" ||
+    user.role === "panadero" ||
+    user.role === "supervisor" ||
+    user.username === "andres" ||
+    user.username === "carlos" ||
+    user.username === "carlos.bueno" ||
+    user.name?.toLowerCase().includes("andres") ||
+    user.name?.toLowerCase().includes("carlos") ||
+    Boolean(user.assignedBranchId && user.role !== "admin" && user.role !== "auxiliar_admin")
+  );
+  const isAdmin = !isBranchProfile && Boolean(user && (user.role === "admin" || user.role === "auxiliar_admin"));
+
+  const [activeTab, setActiveTab] = useState<"all" | "cortes" | "pedidos" | "unread">(
+    isAdmin ? "all" : "pedidos"
+  );
   const [showOptionsMenu, setShowOptionsMenu] = useState(false);
   const [activeItemMenu, setActiveItemMenu] = useState<string | null>(null);
-
-  const { user } = useAuth();
-  const isAdmin = !user || user.role === "admin" || user.role === "auxiliar_admin";
 
   const {
     notifications,
@@ -145,10 +165,12 @@ export default function NotificationsDropdown() {
   }, []);
 
   useEffect(() => {
-    if (!isAdmin && activeTab === "cortes") {
+    if (!isAdmin) {
+      setActiveTab("pedidos");
+    } else {
       setActiveTab("all");
     }
-  }, [isAdmin, activeTab]);
+  }, [isAdmin, user?.id]);
 
   // Temporizador en vivo que se actualiza segundo a segundo mientras el panel está abierto
   const [now, setNow] = useState(Date.now());
@@ -162,13 +184,60 @@ export default function NotificationsDropdown() {
     return () => clearInterval(interval);
   }, [isOpen]);
 
-  const cortesCount = notifications.filter((n) => n.category === "caja").length;
-  const pedidosCount = notifications.filter((n) => n.category === "pedidos").length;
+  // Identificar el código canónico de la sucursal del cajero/perfil de sucursal
+  const userBranchCode = getCanonicalBranchCode(
+    user?.assignedBranchId ||
+    user?.assignedBranchName ||
+    (user?.username === "andres" || user?.name?.toLowerCase().includes("andres") ? "branch-angeles" : "") ||
+    (user?.username === "carlos" || user?.name?.toLowerCase().includes("mendoza") ? "branch-benito" : "") ||
+    (user?.username === "carlos.bueno" || user?.name?.toLowerCase().includes("bueno") ? "branch-matriz" : "")
+  );
 
-  const filtered = notifications.filter((n) => {
+  // Para usuarios de sucursal (Andrés Sánchez, Carlos, cajeros):
+  // Únicamente se visualizan las notificaciones de pedidos correspondientes a su sucursal.
+  const visibleNotifications = !isAdmin
+    ? notifications.filter((n) => {
+        const isPed = n.category === "pedidos" || Boolean(n.orderId);
+        if (!isPed) return false;
+        if (!userBranchCode || userBranchCode === "all") return true;
+
+        const notifDest = getCanonicalBranchCode(n.branchId || n.branchName);
+        if (notifDest && notifDest === userBranchCode) return true;
+
+        const notifOrigin = getCanonicalBranchCode(n.operatingBranchId || n.operatingBranchName);
+        if (notifOrigin && notifOrigin === userBranchCode) return true;
+
+        const order = findOrderForNotification(n);
+        if (order) {
+          const oDest = getCanonicalBranchCode(order.branchId || order.branchName);
+          if (oDest && oDest === userBranchCode) return true;
+          const oOrigin = getCanonicalBranchCode(order.operatingBranchId || order.operatingBranchName);
+          if (oOrigin && oOrigin === userBranchCode) return true;
+        }
+
+        const text = `${n.title || ""} ${n.highlightText || ""} ${n.description || ""} ${n.senderName || ""}`.toLowerCase();
+        if (userBranchCode === "branch-matriz" && (text.includes("matriz") || text.includes("centro"))) return true;
+        if (userBranchCode === "branch-angeles" && (text.includes("angeles") || text.includes("ángeles"))) return true;
+        if (userBranchCode === "branch-sanjuan" && text.includes("san juan")) return true;
+        if (userBranchCode === "branch-benito" && text.includes("benito")) return true;
+        if (userBranchCode === "branch-1790889237862" && text.includes("ildefonso")) return true;
+
+        return false;
+      })
+    : notifications;
+
+  const cortesCount = notifications.filter((n) => n.category === "caja").length;
+  const pedidosCount = visibleNotifications.filter((n) => n.category === "pedidos" || Boolean(n.orderId)).length;
+  const unreadVisibleCount = visibleNotifications.filter((n) => !n.read && (n.category === "pedidos" || Boolean(n.orderId))).length;
+  const effectiveUnreadCount = isAdmin ? unreadCount : unreadVisibleCount;
+
+  const filtered = visibleNotifications.filter((n) => {
+    if (!isAdmin) {
+      return n.category === "pedidos" || Boolean(n.orderId);
+    }
     if (activeTab === "unread") return !n.read;
     if (activeTab === "cortes") return n.category === "caja";
-    if (activeTab === "pedidos") return n.category === "pedidos";
+    if (activeTab === "pedidos") return n.category === "pedidos" || Boolean(n.orderId);
     return true;
   });
 
@@ -190,9 +259,9 @@ export default function NotificationsDropdown() {
         aria-label="Abrir notificaciones"
       >
         <Bell className="w-5 h-5" />
-        {unreadCount > 0 && (
+        {effectiveUnreadCount > 0 && (
           <span className="absolute -top-1 -right-1 min-w-[20px] h-5 px-1 bg-[#e41e3f] text-white font-black text-[11px] rounded-full flex items-center justify-center shadow-md border-2 border-[#1c0e08] animate-pulse">
-            {unreadCount}
+            {effectiveUnreadCount}
           </span>
         )}
       </button>
@@ -231,7 +300,7 @@ export default function NotificationsDropdown() {
                     </span>
                   ) : (
                     <span className="text-[10px] font-black uppercase tracking-wider text-amber-900 bg-gradient-to-r from-amber-100 to-orange-100 border border-amber-300 px-2.5 py-0.5 rounded-full inline-flex items-center gap-1 shadow-2xs">
-                      📍 Sucursal {(user?.assignedBranchName || "San Ildefonso").replace(/^(sucursal\s*)+/i, "").trim()}
+                      📍 Sucursal {(user?.assignedBranchName || (user?.username === "andres" || user?.name?.toLowerCase().includes("andres") ? "Los Ángeles" : user?.username === "carlos" || user?.name?.toLowerCase().includes("mendoza") ? "San Benito" : "Asignada")).replace(/^(sucursal\s*)+/i, "").trim()}
                     </span>
                   )}
                 </div>
@@ -275,16 +344,18 @@ export default function NotificationsDropdown() {
                         </span>
                         <span className="text-[10px] font-bold text-stone-400">{soundEnabled ? "Activado" : "Mudo"}</span>
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          clearAll();
-                          setShowOptionsMenu(false);
-                        }}
-                        className="w-full text-left px-3 py-2 rounded-xl hover:bg-rose-50 flex items-center gap-2 text-rose-600 cursor-pointer"
-                      >
-                        <Trash2 className="w-4 h-4" /> Limpiar todas
-                      </button>
+                      {isAdmin && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            clearAll();
+                            setShowOptionsMenu(false);
+                          }}
+                          className="w-full text-left px-3 py-2 rounded-xl hover:bg-rose-50 flex items-center gap-2 text-rose-600 cursor-pointer"
+                        >
+                          <Trash2 className="w-4 h-4" /> Limpiar todas
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>
@@ -303,65 +374,76 @@ export default function NotificationsDropdown() {
 
             {/* Filter Buttons & Mark All Read Link */}
             <div className="flex items-center gap-1.5 mt-3 flex-wrap">
-              {/* Todas Pill */}
-              <button
-                type="button"
-                onClick={() => setActiveTab("all")}
-                className={`px-3 py-1 rounded-full text-xs sm:text-[13px] transition-all cursor-pointer ${
-                  activeTab === "all"
-                    ? "bg-[#ebe4dc] text-stone-900 font-bold shadow-2xs border border-transparent"
-                    : "bg-transparent text-stone-700 font-medium border border-[#ded5cb] hover:bg-[#ede5dc]/60"
-                }`}
-              >
-                Todas ({notifications.length})
-              </button>
+              {isAdmin ? (
+                <>
+                  {/* Todas Pill */}
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab("all")}
+                    className={`px-3 py-1 rounded-full text-xs sm:text-[13px] transition-all cursor-pointer ${
+                      activeTab === "all"
+                        ? "bg-[#ebe4dc] text-stone-900 font-bold shadow-2xs border border-transparent"
+                        : "bg-transparent text-stone-700 font-medium border border-[#ded5cb] hover:bg-[#ede5dc]/60"
+                    }`}
+                  >
+                    Todas ({notifications.length})
+                  </button>
 
-              {/* Cierres de Turno Pill - Exclusivo Administrador */}
-              {isAdmin && (
+                  {/* Cierres de Turno Pill - Exclusivo Administrador */}
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab("cortes")}
+                    className={`px-2.5 py-1 rounded-full text-xs sm:text-[13px] transition-all cursor-pointer flex items-center gap-1 ${
+                      activeTab === "cortes"
+                        ? "bg-amber-100 text-amber-950 font-bold shadow-2xs border border-amber-300"
+                        : "bg-transparent text-stone-700 font-medium border border-[#ded5cb] hover:bg-[#ede5dc]/60"
+                    }`}
+                  >
+                    🏁 Cierres ({cortesCount})
+                  </button>
+
+                  {/* Pedidos Pill */}
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab("pedidos")}
+                    className={`px-2.5 py-1 rounded-full text-xs sm:text-[13px] transition-all cursor-pointer flex items-center gap-1 ${
+                      activeTab === "pedidos"
+                        ? "bg-purple-100 text-purple-950 font-bold shadow-2xs border border-purple-300"
+                        : "bg-transparent text-stone-700 font-medium border border-[#ded5cb] hover:bg-[#ede5dc]/60"
+                    }`}
+                  >
+                    🎂 Pedidos ({pedidosCount})
+                  </button>
+
+                  {/* No leídas Pill */}
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab("unread")}
+                    className={`px-2.5 py-1 rounded-full text-xs sm:text-[13px] transition-all cursor-pointer ${
+                      activeTab === "unread"
+                        ? "bg-[#ebe4dc] text-stone-900 font-bold shadow-2xs border border-transparent"
+                        : "bg-transparent text-stone-700 font-medium border border-[#ded5cb] hover:bg-[#ede5dc]/60"
+                    }`}
+                  >
+                    No leídas ({unreadCount})
+                  </button>
+                </>
+              ) : (
+                /* Para perfiles de cajero / sucursales: ÚNICAMENTE el botón de Pedidos (todos los otros botones retirados) */
                 <button
                   type="button"
-                  onClick={() => setActiveTab("cortes")}
-                  className={`px-2.5 py-1 rounded-full text-xs sm:text-[13px] transition-all cursor-pointer flex items-center gap-1 ${
-                    activeTab === "cortes"
-                      ? "bg-amber-100 text-amber-950 font-bold shadow-2xs border border-amber-300"
-                      : "bg-transparent text-stone-700 font-medium border border-[#ded5cb] hover:bg-[#ede5dc]/60"
-                  }`}
+                  onClick={() => setActiveTab("pedidos")}
+                  className="px-3.5 py-1.5 rounded-full text-xs sm:text-[13px] font-bold shadow-2xs border border-purple-400 bg-purple-100 text-purple-950 flex items-center gap-1.5 cursor-default"
                 >
-                  🏁 Cierres ({cortesCount})
+                  🎂 Pedidos ({pedidosCount})
                 </button>
               )}
-
-              {/* Pedidos Pill */}
-              <button
-                type="button"
-                onClick={() => setActiveTab("pedidos")}
-                className={`px-2.5 py-1 rounded-full text-xs sm:text-[13px] transition-all cursor-pointer flex items-center gap-1 ${
-                  activeTab === "pedidos"
-                    ? "bg-purple-100 text-purple-950 font-bold shadow-2xs border border-purple-300"
-                    : "bg-transparent text-stone-700 font-medium border border-[#ded5cb] hover:bg-[#ede5dc]/60"
-                }`}
-              >
-                🎂 Pedidos ({pedidosCount})
-              </button>
-
-              {/* No leídas Pill */}
-              <button
-                type="button"
-                onClick={() => setActiveTab("unread")}
-                className={`px-2.5 py-1 rounded-full text-xs sm:text-[13px] transition-all cursor-pointer ${
-                  activeTab === "unread"
-                    ? "bg-[#ebe4dc] text-stone-900 font-bold shadow-2xs border border-transparent"
-                    : "bg-transparent text-stone-700 font-medium border border-[#ded5cb] hover:bg-[#ede5dc]/60"
-                }`}
-              >
-                No leídas ({unreadCount})
-              </button>
 
               {/* Marcar todo como leído Text Link */}
               <button
                 type="button"
                 onClick={markAllAsRead}
-                disabled={unreadCount === 0}
+                disabled={(!isAdmin ? unreadVisibleCount : unreadCount) === 0}
                 className="text-[#c25425] hover:text-[#9e3f18] underline underline-offset-2 font-medium text-xs sm:text-[13px] ml-auto cursor-pointer disabled:opacity-40 disabled:no-underline disabled:cursor-not-allowed transition-colors"
               >
                 Marcar leídas
@@ -374,9 +456,13 @@ export default function NotificationsDropdown() {
             {filtered.length === 0 ? (
               <div className="p-8 my-4 text-center text-stone-400 flex flex-col items-center justify-center space-y-2 bg-white/70 rounded-2xl border border-[#ede5dc]">
                 <Inbox className="w-10 h-10 text-stone-300 stroke-[1.5]" />
-                <p className="font-bold text-sm text-stone-800">No hay notificaciones</p>
+                <p className="font-bold text-sm text-stone-800">
+                  {isAdmin ? "No hay notificaciones" : "No hay pedidos pendientes"}
+                </p>
                 <p className="text-xs text-stone-500 max-w-xs text-center">
-                  Te avisaremos al instante sobre cierres de turno (si cuadró o no la caja) y nuevos pedidos realizados.
+                  {isAdmin
+                    ? "Te avisaremos al instante sobre cierres de turno (si cuadró o no la caja) y nuevos pedidos realizados."
+                    : "Te avisaremos al instante cuando se registre o entregue un pedido dirigido a esta sucursal."}
                 </p>
               </div>
             ) : (
@@ -528,8 +614,9 @@ function parseOrderNotification(notif: FBNotification) {
     cleanDesc = notif.description;
   }
 
-  // 6. Flags de Pago y Entrega
+  // 6. Flags de Pago, Entrega y Cancelación
   const isPaid =
+    storedOrder?.paymentStatus === "liquidado" ||
     combined.toLowerCase().includes("liquidado") ||
     combined.toLowerCase().includes("100% pagado") ||
     (notif.title && notif.title.toLowerCase().includes("liquidado")) ||
@@ -537,8 +624,20 @@ function parseOrderNotification(notif: FBNotification) {
     (remainingMatch && (remainingMatch[1] === "0" || remainingMatch[1] === "0.00"));
 
   const isDelivered =
-    combined.toLowerCase().includes("entregad") ||
-    (notif.title && notif.title.toLowerCase().includes("entregado"));
+    storedOrder?.status === "entregado" ||
+    notif.id.includes("order-delivered") ||
+    (notif.id.includes("order-status") && notif.id.includes("entregado")) ||
+    (notif.title && /\bentregad[oa]s?\b/i.test(notif.title)) ||
+    (notif.highlightText && /\bentregad[oa]s?\b/i.test(notif.highlightText)) ||
+    /fue entregado|ha sido entregado|entregado al cliente|entregado con éxito/i.test(notif.description);
+
+  const isCancelled =
+    storedOrder?.status === "cancelado" ||
+    notif.id.includes("order-cancelled") ||
+    notif.id.includes("cancelado") ||
+    (notif.title && (/\bcancelad[oa]s?\b/i.test(notif.title) || /\bdad[oa] de baja\b/i.test(notif.title))) ||
+    (notif.highlightText && (/\bcancelad[oa]s?\b/i.test(notif.highlightText) || /\bdad[oa] de baja\b/i.test(notif.highlightText))) ||
+    /dado de baja|fue cancelado|ha sido cancelado/i.test(notif.description);
 
   const isPaymentEvent =
     (notif.id && notif.id.includes("order-pay")) ||
@@ -558,7 +657,9 @@ function parseOrderNotification(notif: FBNotification) {
     cleanDesc,
     isPaid,
     isDelivered,
+    isCancelled,
     isPaymentEvent,
+    storedOrder,
   };
 }
 
@@ -585,6 +686,8 @@ function NotificationCardItem({
   onCloseDropdown: () => void;
 }) {
   const [isExpanded, setIsExpanded] = useState(false);
+  const { user } = useAuth();
+  const isAdmin = Boolean(user && (user.role === "admin" || user.role === "auxiliar_admin"));
   const { openOrderDetail, openOrderPayment, openShiftCutDetail } = useNotifications();
   const isMenuOpen = activeItemMenu === notif.id;
 
@@ -602,6 +705,12 @@ function NotificationCardItem({
 
   const parsedOrder = isOrder ? parseOrderNotification(notif) : null;
   const cutData = isShiftCut ? findShiftCutForNotification(notif) : null;
+  const orderCreation = isOrder
+    ? formatOrderCreation(parsedOrder?.storedOrder || { timestamp: resolvedTs, createdAt: notif.createdAt })
+    : null;
+
+  const isOrderCancelled = Boolean(isOrder && parsedOrder?.isCancelled);
+  const isOrderDelivered = Boolean(isOrder && !isOrderCancelled && parsedOrder?.isDelivered);
 
   const fullText = `${notif.title} ${notif.highlightText} ${notif.description}`.toLowerCase();
   const isSquare =
@@ -633,8 +742,14 @@ function NotificationCardItem({
           openShiftCutDetail(notif);
         }
       }}
-      className={`bg-white/95 rounded-2xl border border-[#e8ded2] hover:border-amber-400 p-3.5 sm:p-4 shadow-xs hover:shadow-md space-y-2.5 relative group transition-all ${
+      className={`rounded-2xl border p-3.5 sm:p-4 shadow-xs space-y-2.5 relative group transition-all ${
         isOrder || isShiftCut ? "cursor-pointer" : ""
+      } ${
+        isOrderCancelled
+          ? "bg-rose-50/95 border-rose-300 ring-2 ring-rose-200/70 hover:border-rose-400 hover:shadow-md hover:shadow-rose-100"
+          : isOrderDelivered
+          ? "bg-sky-50/95 border-sky-300 ring-2 ring-sky-200/70 hover:border-sky-400 hover:shadow-md hover:shadow-sky-100"
+          : "bg-white/95 border-[#e8ded2] hover:border-amber-400 hover:shadow-md"
       }`}
     >
       {/* Top Header Tag: Status Pill + Cross-Branch Route + Time */}
@@ -664,17 +779,17 @@ function NotificationCardItem({
 
           {isOrder && (
             <>
-              {parsedOrder?.isPaid && parsedOrder?.isDelivered ? (
-                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-gradient-to-r from-emerald-100 to-teal-100 text-emerald-950 border border-emerald-300 shadow-2xs">
-                  ✅📦 PAGADO Y ENTREGADO
+              {isOrderCancelled ? (
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-rose-100 text-rose-900 border border-rose-300 shadow-2xs">
+                  <XCircle className="w-3 h-3 text-rose-700" /> ❌ PEDIDO CANCELADO
+                </span>
+              ) : isOrderDelivered ? (
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-sky-100 text-sky-900 border border-sky-300 shadow-2xs">
+                  <PackageCheck className="w-3 h-3 text-sky-700" /> 📦 PEDIDO ENTREGADO
                 </span>
               ) : parsedOrder?.isPaid ? (
                 <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-900 border border-emerald-300 shadow-2xs">
                   ✅ PEDIDO LIQUIDADO
-                </span>
-              ) : parsedOrder?.isDelivered ? (
-                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-blue-100 text-blue-900 border border-blue-300 shadow-2xs">
-                  📦 PEDIDO ENTREGADO
                 </span>
               ) : parsedOrder?.isPaymentEvent ? (
                 <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-amber-100 text-amber-900 border border-amber-300 shadow-2xs">
@@ -699,15 +814,17 @@ function NotificationCardItem({
 
         <div
           className="flex items-center gap-1.5 ml-auto shrink-0 bg-stone-100/90 hover:bg-amber-100/70 px-2.5 py-0.5 rounded-full border border-stone-200/80 text-[11px] font-semibold transition-colors cursor-help shadow-2xs"
-          title={timeInfo.fullTooltip}
+          title={isOrder && orderCreation ? `Pedido realizado el ${orderCreation.fullDateStr}` : timeInfo.fullTooltip}
         >
           <Clock className={`w-3.5 h-3.5 shrink-0 ${timeInfo.secondsAgo < 60 ? "text-amber-600 animate-pulse" : "text-stone-400"}`} />
-          <span className="font-bold text-stone-900 font-mono tracking-tight">{timeInfo.exactTime}</span>
+          <span className="font-bold text-stone-900 font-mono tracking-tight">
+            {isOrder && orderCreation ? orderCreation.exactTimeStr : timeInfo.exactTime}
+          </span>
           {timeInfo.secondsAgo >= 60 && (
             <>
               <span className="text-stone-300 font-bold">•</span>
               <span className="font-medium text-stone-500 font-mono">
-                {timeInfo.liveTimeAgo}
+                {isOrder && orderCreation ? orderCreation.shortDateStr : timeInfo.liveTimeAgo}
               </span>
             </>
           )}
@@ -718,7 +835,13 @@ function NotificationCardItem({
       <div className="flex items-start gap-3">
         {/* Avatar Container with Warm Bakery Gradient & Overlapping Badge */}
         <div className="relative shrink-0">
-          <div className="w-12 h-12 sm:w-13 sm:h-13 rounded-2xl bg-gradient-to-br from-amber-100/90 via-orange-50 to-pink-50 border border-amber-200/80 flex items-center justify-center p-1 shadow-2xs">
+          <div className={`w-12 h-12 sm:w-13 sm:h-13 rounded-2xl border flex items-center justify-center p-1 shadow-2xs ${
+            isOrderCancelled
+              ? "bg-gradient-to-br from-rose-100 via-rose-50 to-red-100 border-rose-300"
+              : isOrderDelivered
+              ? "bg-gradient-to-br from-sky-100 via-sky-50 to-blue-100 border-sky-300"
+              : "bg-gradient-to-br from-amber-100/90 via-orange-50 to-pink-50 border-amber-200/80"
+          }`}>
             {notif.badgeIcon === "harina" ? (
               <FlourSackGraphic className="w-9 h-9 sm:w-10 sm:h-10" />
             ) : notif.badgeIcon === "pastel" ? (
@@ -728,9 +851,21 @@ function NotificationCardItem({
             )}
           </div>
 
-          {/* Overlapping Badge Icon in Terracotta Circle */}
-          <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-gradient-to-br from-[#c25425] to-[#a83d12] border-2 border-white flex items-center justify-center text-white shadow-xs">
-            {getBadgeIcon(notif.badgeIcon)}
+          {/* Overlapping Badge Icon in Terracotta / Status Circle */}
+          <div className={`absolute -bottom-1 -right-1 w-5 h-5 rounded-full border-2 border-white flex items-center justify-center text-white shadow-xs ${
+            isOrderCancelled
+              ? "bg-rose-600"
+              : isOrderDelivered
+              ? "bg-sky-600"
+              : "bg-gradient-to-br from-[#c25425] to-[#a83d12]"
+          }`}>
+            {isOrderCancelled ? (
+              <XCircle className="w-3 h-3" />
+            ) : isOrderDelivered ? (
+              <PackageCheck className="w-3 h-3" />
+            ) : (
+              getBadgeIcon(notif.badgeIcon)
+            )}
           </div>
         </div>
 
@@ -750,6 +885,19 @@ function NotificationCardItem({
                     {notif.title || `Pedido ${parsedOrder.folio || ""}`}
                   </h5>
                 </div>
+
+                {/* Día y Hora exacta en que se realizó el pedido */}
+                {orderCreation && (
+                  <div
+                    className="flex items-center gap-1.5 text-[11px] font-bold text-amber-900 bg-gradient-to-r from-amber-50 to-orange-50/80 border border-amber-200/90 px-2 py-0.5 rounded-lg w-fit shadow-2xs"
+                    title={`Pedido registrado el: ${orderCreation.fullDateStr}`}
+                  >
+                    <Clock className="w-3.5 h-3.5 text-amber-700 shrink-0" />
+                    <span className="text-stone-500 font-medium">Pedido:</span>
+                    <span className="font-mono font-black text-amber-950">{orderCreation.fullBadgeStr}</span>
+                  </div>
+                )}
+
                 <p className="text-[11px] font-semibold text-stone-600 truncate">
                   👤 {parsedOrder.customer || notif.highlightText}
                 </p>
@@ -773,19 +921,39 @@ function NotificationCardItem({
                         Anticipo: <strong className="font-mono font-black text-emerald-700">{parsedOrder.deposit}</strong>
                       </span>
                     )}
-                    {parsedOrder.remaining && (
+                    {parsedOrder.remaining && !isOrderDelivered && !isOrderCancelled && (
                       <span className="text-[11px] font-bold text-amber-900 bg-amber-50 px-2 py-0.5 rounded-lg border border-amber-300">
                         Por Cobrar: <strong className="font-mono font-black text-amber-800">{parsedOrder.remaining}</strong>
                       </span>
                     )}
                   </>
                 )}
-                {parsedOrder.isDelivered && (
-                  <span className="text-[11px] font-black text-blue-900 bg-blue-100/90 px-2.5 py-0.5 rounded-lg border border-blue-300 font-mono">
+                {isOrderDelivered && (
+                  <span className="text-[11px] font-black text-sky-900 bg-sky-100/90 px-2.5 py-0.5 rounded-lg border border-sky-300 font-mono">
                     ✓ Entregado
                   </span>
                 )}
+                {isOrderCancelled && (
+                  <span className="text-[11px] font-black text-rose-900 bg-rose-100/90 px-2.5 py-0.5 rounded-lg border border-rose-300 font-mono">
+                    ✕ Cancelado
+                  </span>
+                )}
               </div>
+
+              {/* Distinctive Centered Status Banner in the Middle of the Card */}
+              {isOrderDelivered && (
+                <div className="my-2 py-1.5 px-3 rounded-xl bg-sky-100/90 border border-sky-300 text-sky-950 flex items-center justify-center gap-2 shadow-2xs animate-in fade-in">
+                  <PackageCheck className="w-4 h-4 text-sky-700 shrink-0" />
+                  <span className="font-black text-xs sm:text-sm tracking-wider uppercase">ENTREGADO</span>
+                </div>
+              )}
+
+              {isOrderCancelled && (
+                <div className="my-2 py-1.5 px-3 rounded-xl bg-rose-100/90 border border-rose-300 text-rose-950 flex items-center justify-center gap-2 shadow-2xs animate-in fade-in">
+                  <XCircle className="w-4 h-4 text-rose-700 shrink-0" />
+                  <span className="font-black text-xs sm:text-sm tracking-wider uppercase">CANCELADO</span>
+                </div>
+              )}
 
               {/* Description / Items with "Leer más" Toggle */}
               {parsedOrder.cleanDesc && (
@@ -922,17 +1090,19 @@ function NotificationCardItem({
                     <Check className="w-3.5 h-3.5 text-emerald-600" /> Marcar como leída
                   </button>
                 )}
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    deleteNotification(notif.id);
-                    setActiveItemMenu(null);
-                  }}
-                  className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-rose-50 flex items-center gap-2 text-rose-600 cursor-pointer"
-                >
-                  <Trash2 className="w-3.5 h-3.5" /> Eliminar
-                </button>
+                {isAdmin && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      deleteNotification(notif.id);
+                      setActiveItemMenu(null);
+                    }}
+                    className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-rose-50 flex items-center gap-2 text-rose-600 cursor-pointer"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" /> Eliminar
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -1062,6 +1232,35 @@ function NotificationCardItem({
         >
           <span>Ver Corte de Caja</span>
           <span className="text-sm font-bold leading-none">➔</span>
+        </button>
+      ) : isOrder && (isOrderDelivered || isOrderCancelled) ? (
+        /* Full-width status action button for Delivered or Cancelled orders */
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            markAsRead(notif.id);
+            onCloseDropdown();
+            openOrderDetail(notif);
+          }}
+          className={`w-full text-white font-bold text-xs sm:text-[13px] py-2.5 px-4 rounded-xl flex items-center justify-center gap-2 shadow-xs transition-all cursor-pointer active:scale-98 ${
+            isOrderCancelled
+              ? "bg-gradient-to-r from-rose-600 via-red-600 to-rose-700 hover:from-rose-500 hover:to-red-500 shadow-rose-200"
+              : "bg-gradient-to-r from-sky-600 via-blue-600 to-sky-700 hover:from-sky-500 hover:to-blue-500 shadow-sky-200"
+          }`}
+        >
+          {isOrderCancelled ? (
+            <>
+              <XCircle className="w-4 h-4 shrink-0" />
+              <span>Ver Detalle de Baja</span>
+            </>
+          ) : (
+            <>
+              <PackageCheck className="w-4 h-4 shrink-0" />
+              <span>Ver Detalle del Pedido</span>
+            </>
+          )}
+          <span className="text-sm font-bold leading-none ml-1">➔</span>
         </button>
       ) : notif.secondaryActionLabel ? (
         /* Dual action buttons matching Card in user mockup */

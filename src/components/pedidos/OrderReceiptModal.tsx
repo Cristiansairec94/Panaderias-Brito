@@ -17,9 +17,9 @@ import {
   UserPlus
 } from "lucide-react";
 import { CustomOrder, Customer } from "@/types";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, formatOrderCreation } from "@/lib/utils";
 import { getStoredCustomers, createCustomerInDb, normalizeCustomerName } from "@/lib/customers";
-import { updateCustomOrder } from "@/lib/orders";
+import { updateCustomOrder, extractOrderOriginAndNotes } from "@/lib/orders";
 
 interface OrderReceiptModalProps {
   isOpen: boolean;
@@ -122,6 +122,9 @@ export default function OrderReceiptModal({ isOpen, onClose, order }: OrderRecei
     window.print();
   };
 
+  const { originName, cleanNotes, isCrossBranch } = extractOrderOriginAndNotes(order);
+  const creationInfo = formatOrderCreation(order);
+
   return (
     <div 
       className="fixed inset-0 z-[300] flex items-center justify-center bg-stone-950/80 backdrop-blur-md p-4 animate-in fade-in duration-200"
@@ -169,13 +172,22 @@ export default function OrderReceiptModal({ isOpen, onClose, order }: OrderRecei
             </div>
 
             {/* Order info */}
-            <div className="space-y-1 border-b border-dashed border-stone-300 pb-3 font-sans">
+            <div className="space-y-1.5 border-b border-dashed border-stone-300 pb-3 font-sans">
               <div className="flex justify-between items-center">
                 <span className="font-bold text-xs">ORDEN:</span>
                 <span className="font-black text-sm text-amber-800 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
                   {order.orderNumber}
                 </span>
               </div>
+
+              {/* Fecha y Hora Exacta en que se hizo el Pedido */}
+              <div className="flex justify-between items-center text-[10px] bg-stone-50 border border-stone-200 px-2 py-1 rounded">
+                <span className="font-semibold text-stone-600">PEDIDO REALIZADO:</span>
+                <span className="font-black text-stone-900 font-mono">
+                  {creationInfo.formattedDateOnly} • {creationInfo.exactTimeStr}
+                </span>
+              </div>
+
               <div className="flex justify-between text-[11px]">
                 <span className="text-stone-500">Cliente:</span>
                 <span className="font-bold text-stone-900">{order.customerName}</span>
@@ -188,6 +200,16 @@ export default function OrderReceiptModal({ isOpen, onClose, order }: OrderRecei
                 <span className="text-stone-500">Atendió:</span>
                 <span>{order.cashier}</span>
               </div>
+              <div className="flex justify-between text-[11px]">
+                <span className="text-stone-500">Sucursal Origen:</span>
+                <span className="font-bold text-stone-900">{originName}</span>
+              </div>
+              {isCrossBranch && (
+                <div className="flex justify-between text-[11px]">
+                  <span className="text-stone-500">Sucursal Entrega:</span>
+                  <span className="font-bold text-stone-900">{order.branchName}</span>
+                </div>
+              )}
               <div className="flex justify-between text-[11px]">
                 <span className="text-stone-500">Modalidad:</span>
                 <span className="font-bold uppercase">
@@ -204,18 +226,28 @@ export default function OrderReceiptModal({ isOpen, onClose, order }: OrderRecei
             {/* Delivery Date & Time Highlight */}
             <div className="bg-amber-50 border border-amber-300 rounded-xl p-2.5 text-center font-sans space-y-0.5">
               <span className="text-[10px] font-bold text-amber-900 block uppercase tracking-wider">
-                ⏰ FECHA Y HORA DE ENTREGA
+                ⏰ FECHA Y HORA DE ENTREGA PROGRAMADA
               </span>
               <span className="text-sm font-black text-stone-900 block">
                 {order.deliveryDate} • {order.deliveryTime || "16:00"} hrs
               </span>
             </div>
 
-            {/* Observaciones */}
-            {order.dedication && (
-              <div className="bg-stone-50 border border-stone-200 rounded-xl p-2 font-sans text-stone-800">
-                <span className="text-[10px] font-bold text-stone-500 block uppercase">📝 Observaciones:</span>
-                <span className="text-xs font-bold text-amber-900 italic">"{order.dedication}"</span>
+            {/* Dedicatoria y Observaciones */}
+            {(order.dedication || cleanNotes) && (
+              <div className="space-y-1.5 font-sans">
+                {order.dedication && (
+                  <div className="bg-stone-50 border border-stone-200 rounded-xl p-2 text-stone-800">
+                    <span className="text-[10px] font-bold text-stone-500 block uppercase">🎂 Dedicatoria:</span>
+                    <span className="text-xs font-bold text-amber-900 italic">"{order.dedication}"</span>
+                  </div>
+                )}
+                {cleanNotes && (
+                  <div className="bg-stone-50 border border-stone-200 rounded-xl p-2 text-stone-800">
+                    <span className="text-[10px] font-bold text-stone-500 block uppercase">📝 Observaciones:</span>
+                    <span className="text-xs text-stone-800 font-medium">{cleanNotes}</span>
+                  </div>
+                )}
               </div>
             )}
 
@@ -308,6 +340,22 @@ export default function OrderReceiptModal({ isOpen, onClose, order }: OrderRecei
                       Ref / Folio: {order.paymentReference}
                     </div>
                   )}
+                </div>
+              )}
+              {/* Historial de Abonos Registrados si existen */}
+              {order.payments && order.payments.length > 0 && (
+                <div className="pt-1.5 pb-1 border-t border-dashed border-stone-300 font-sans space-y-1">
+                  <span className="text-[10px] font-black uppercase text-stone-700 block">
+                    Historial de Abonos / Pagos:
+                  </span>
+                  {order.payments.map((p, idx) => (
+                    <div key={idx} className="flex justify-between items-center text-[10px] text-stone-700">
+                      <span>
+                        Abono #{idx + 1} ({p.paymentMethod || "efectivo"}{p.date ? ` - ${p.date.split(" ")[0]}` : ""}):
+                      </span>
+                      <span className="font-bold text-stone-900">{formatCurrency(p.amount)}</span>
+                    </div>
+                  ))}
                 </div>
               )}
               <div className="flex justify-between items-center text-rose-600 font-extrabold text-sm pt-1 border-t border-dashed border-stone-300">

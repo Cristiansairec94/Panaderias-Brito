@@ -357,9 +357,27 @@ const BranchContext = createContext<BranchContextType | undefined>(undefined);
 
 export function BranchProvider({ children }: { children: React.ReactNode }) {
   const { user, permissions } = useAuth();
-  const isAdmin = !user || user.role === "admin" || user.role === "auxiliar_admin";
-  const canSwitchBranches = isAdmin || user?.role === "supervisor" || Boolean(permissions?.canAccessSucursales);
-  const userAssignedBranchId = (user?.assignedBranchId || "").trim();
+  const isBranchProfile = Boolean(
+    !user ||
+    user.role === "cajero" ||
+    user.role === "panadero" ||
+    user.role === "supervisor" ||
+    user.username === "andres" ||
+    user.username === "carlos" ||
+    user.username === "carlos.bueno" ||
+    user.name?.toLowerCase().includes("andres") ||
+    user.name?.toLowerCase().includes("carlos") ||
+    Boolean(user.assignedBranchId && user.role !== "admin" && user.role !== "auxiliar_admin")
+  );
+  const isAdmin = !isBranchProfile && Boolean(user && (user.role === "admin" || user.role === "auxiliar_admin"));
+  const canSwitchBranches = isAdmin;
+  const userAssignedBranchId = (
+    user?.assignedBranchId ||
+    (user?.username === "andres" || user?.name?.toLowerCase().includes("andres") ? "branch-angeles" : "") ||
+    (user?.username === "carlos" || user?.name?.toLowerCase().includes("mendoza") ? "branch-benito" : "") ||
+    (user?.username === "carlos.bueno" || user?.name?.toLowerCase().includes("bueno") ? "branch-matriz" : "") ||
+    ""
+  ).trim();
 
   const [branches, setBranches] = useState<Branch[]>(() => {
     if (typeof window !== "undefined") {

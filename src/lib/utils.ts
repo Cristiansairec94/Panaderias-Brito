@@ -14,6 +14,17 @@ export function formatCurrency(amount: number | string | undefined | null): stri
 }
 
 /**
+ * Formatea un número con separadores de miles (comas) y 2 decimales (punto) en formato es-MX (sin el signo $)
+ */
+export function formatNumberWithDecimals(amount: number | string | undefined | null): string {
+  const num = typeof amount === "number" && !isNaN(amount) ? amount : (Number(amount) || 0);
+  return new Intl.NumberFormat("es-MX", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(num);
+}
+
+/**
  * Bloquea cualquier tecla que no sea número en el teclado físico o virtual
  */
 export function onlyNumbersKeyDown(
@@ -213,6 +224,108 @@ export function parseDateTimeSafe(input?: Date | string | number | null): number
 
   return 0;
 }
+
+export interface OrderCreationInfo {
+  timestamp: number;
+  fullDateStr: string;       // e.g. "Lunes, 12 de octubre de 2026 a las 08:35 hrs"
+  shortDateStr: string;      // e.g. "Lun 12 Oct"
+  exactTimeStr: string;      // e.g. "08:35 hrs"
+  timeOnlyStr: string;       // e.g. "08:35"
+  relativeStr: string;       // e.g. "Hace 15 min"
+  fullBadgeStr: string;      // e.g. "Hoy • 08:35 hrs" o "Lun 12 Oct • 08:35 hrs"
+  dayOfWeek: string;         // e.g. "Lunes" o "Lun"
+  formattedDateOnly: string; // e.g. "12/10/2026"
+}
+
+/**
+ * Formatea de forma exhaustiva, segura y sincronizada el día y la hora exacta en que se realizó/levantó un pedido.
+ */
+export function formatOrderCreation(
+  order?: { createdAt?: string; timestamp?: number; id?: string; orderNumber?: string } | null,
+  now: number = Date.now()
+): OrderCreationInfo {
+  let ts = 0;
+  if (order?.timestamp && typeof order.timestamp === "number" && order.timestamp > 1000000000000) {
+    ts = order.timestamp;
+  } else if (order?.createdAt) {
+    ts = parseDateTimeSafe(order.createdAt);
+  }
+  if (!ts || isNaN(ts) || ts < 1000000000000) {
+    const idMatch = ((order?.id || "") + " " + (order?.orderNumber || "")).match(/\b(17\d{11})\b/);
+    if (idMatch && idMatch[1]) {
+      ts = parseInt(idMatch[1], 10);
+    } else {
+      ts = now;
+    }
+  }
+
+  const d = new Date(ts);
+  const nowDate = new Date(now);
+
+  const daysShort = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
+  const daysFull = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
+  const monthsShort = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
+  const monthsFull = [
+    "enero", "febrero", "marzo", "abril", "mayo", "junio",
+    "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"
+  ];
+
+  const dayOfWeek = daysShort[d.getDay()];
+  const dayOfWeekFull = daysFull[d.getDay()];
+  const dayNum = d.getDate();
+  const monthName = monthsShort[d.getMonth()];
+  const monthNameFull = monthsFull[d.getMonth()];
+  const year = d.getFullYear();
+
+  const hours = String(d.getHours()).padStart(2, "0");
+  const minutes = String(d.getMinutes()).padStart(2, "0");
+  const timeStr = `${hours}:${minutes}`;
+  const exactTimeStr = `${timeStr} hrs`;
+
+  const isToday = d.toDateString() === nowDate.toDateString();
+  const yesterday = new Date(nowDate);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const isYesterday = d.toDateString() === yesterday.toDateString();
+
+  let relativeStr = "";
+  const diffSec = Math.floor(Math.max(0, now - ts) / 1000);
+  if (diffSec < 60) {
+    relativeStr = `Hace ${diffSec}s`;
+  } else if (diffSec < 3600) {
+    relativeStr = `Hace ${Math.floor(diffSec / 60)} min`;
+  } else if (diffSec < 86400 && isToday) {
+    relativeStr = `Hoy a las ${timeStr}`;
+  } else if (isYesterday) {
+    relativeStr = `Ayer a las ${timeStr}`;
+  } else {
+    relativeStr = `${dayNum} ${monthName}`;
+  }
+
+  const fullDateStr = `${dayOfWeekFull}, ${dayNum} de ${monthNameFull} de ${year} a las ${exactTimeStr}`;
+  const shortDateStr = `${dayOfWeek} ${dayNum} ${monthName}`;
+  const fullBadgeStr = isToday
+    ? `Hoy • ${exactTimeStr}`
+    : isYesterday
+    ? `Ayer • ${exactTimeStr}`
+    : `${dayOfWeek} ${dayNum} ${monthName} • ${exactTimeStr}`;
+
+  const dayStr = String(dayNum).padStart(2, "0");
+  const monthNumStr = String(d.getMonth() + 1).padStart(2, "0");
+  const formattedDateOnly = `${dayStr}/${monthNumStr}/${year}`;
+
+  return {
+    timestamp: ts,
+    fullDateStr,
+    shortDateStr,
+    exactTimeStr,
+    timeOnlyStr: timeStr,
+    relativeStr,
+    fullBadgeStr,
+    dayOfWeek: dayOfWeekFull,
+    formattedDateOnly,
+  };
+}
+
 
 /**
  * Extrae la clave de ordenamiento (timestamp numérico y secuencia de ID) de cualquier movimiento.

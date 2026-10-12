@@ -20,7 +20,11 @@ import {
 } from "lucide-react";
 import { useSidebar } from "@/context/SidebarContext";
 import { useAuth } from "@/context/AuthContext";
-import { useNotifications } from "@/context/NotificationContext";
+import { 
+  useNotifications, 
+  getCanonicalBranchCode, 
+  findOrderForNotification 
+} from "@/context/NotificationContext";
 import { NotificationItem, getBadgeIcon } from "./NotificationsDropdown";
 
 export default function MobileBottomNav() {
@@ -28,8 +32,24 @@ export default function MobileBottomNav() {
   const { user } = useAuth();
   const { isMobileOpen, toggleMobile, setMobileOpen } = useSidebar();
   
+  const isBranchProfile = Boolean(
+    !user ||
+    user.role === "cajero" ||
+    user.role === "panadero" ||
+    user.role === "supervisor" ||
+    user.username === "andres" ||
+    user.username === "carlos" ||
+    user.username === "carlos.bueno" ||
+    user.name?.toLowerCase().includes("andres") ||
+    user.name?.toLowerCase().includes("carlos") ||
+    Boolean(user.assignedBranchId && user.role !== "admin" && user.role !== "auxiliar_admin")
+  );
+  const isAdmin = !isBranchProfile && Boolean(user && (user.role === "admin" || user.role === "auxiliar_admin"));
+
   const [showNotifications, setShowNotifications] = useState(false);
-  const [activeTab, setActiveTab] = useState<"all" | "cortes" | "pedidos" | "unread">("all");
+  const [activeTab, setActiveTab] = useState<"all" | "cortes" | "pedidos" | "unread">(
+    isAdmin ? "all" : "pedidos"
+  );
   const [showOptionsMenu, setShowOptionsMenu] = useState(false);
   const [activeItemMenu, setActiveItemMenu] = useState<string | null>(null);
 
@@ -46,8 +66,6 @@ export default function MobileBottomNav() {
     clearAll,
   } = useNotifications();
 
-  const isAdmin = !user || user.role === "admin" || user.role === "auxiliar_admin";
-
   const [now, setNow] = useState(Date.now());
 
   useEffect(() => {
@@ -60,10 +78,12 @@ export default function MobileBottomNav() {
   }, [showNotifications]);
 
   useEffect(() => {
-    if (!isAdmin && activeTab === "cortes") {
+    if (!isAdmin) {
+      setActiveTab("pedidos");
+    } else {
       setActiveTab("all");
     }
-  }, [isAdmin, activeTab]);
+  }, [isAdmin, user?.id]);
 
   // Si no hay usuario logueado, no mostrar la barra
   if (!user) return null;
@@ -89,15 +109,62 @@ export default function MobileBottomNav() {
     setShowNotifications((prev) => !prev);
   };
 
-  const cortesCount = notifications.filter((n) => n.category === "caja").length;
-  const pedidosCount = notifications.filter((n) => n.category === "pedidos").length;
+  // Identificar el código canónico de la sucursal del cajero/perfil de sucursal
+  const userBranchCode = getCanonicalBranchCode(
+    user?.assignedBranchId ||
+    user?.assignedBranchName ||
+    (user?.username === "andres" || user?.name?.toLowerCase().includes("andres") ? "branch-angeles" : "") ||
+    (user?.username === "carlos" || user?.name?.toLowerCase().includes("mendoza") ? "branch-benito" : "") ||
+    (user?.username === "carlos.bueno" || user?.name?.toLowerCase().includes("bueno") ? "branch-matriz" : "")
+  );
 
-  const filtered = notifications.filter((n) => {
+  // Para usuarios con rol cajero o perfiles de sucursal:
+  // Únicamente se visualizan las notificaciones de pedidos de su sucursal. Todo lo demás se oculta estrictamente.
+  const visibleNotifications = !isAdmin
+    ? notifications.filter((n) => {
+        const isPed = n.category === "pedidos" || Boolean(n.orderId);
+        if (!isPed) return false;
+        if (!userBranchCode || userBranchCode === "all") return true;
+
+        const notifDest = getCanonicalBranchCode(n.branchId || n.branchName);
+        if (notifDest && notifDest === userBranchCode) return true;
+
+        const notifOrigin = getCanonicalBranchCode(n.operatingBranchId || n.operatingBranchName);
+        if (notifOrigin && notifOrigin === userBranchCode) return true;
+
+        const order = findOrderForNotification(n);
+        if (order) {
+          const oDest = getCanonicalBranchCode(order.branchId || order.branchName);
+          if (oDest && oDest === userBranchCode) return true;
+          const oOrigin = getCanonicalBranchCode(order.operatingBranchId || order.operatingBranchName);
+          if (oOrigin && oOrigin === userBranchCode) return true;
+        }
+
+        const text = `${n.title || ""} ${n.highlightText || ""} ${n.description || ""} ${n.senderName || ""}`.toLowerCase();
+        if (userBranchCode === "branch-matriz" && (text.includes("matriz") || text.includes("centro"))) return true;
+        if (userBranchCode === "branch-angeles" && (text.includes("angeles") || text.includes("ángeles"))) return true;
+        if (userBranchCode === "branch-sanjuan" && text.includes("san juan")) return true;
+        if (userBranchCode === "branch-benito" && text.includes("benito")) return true;
+        if (userBranchCode === "branch-1790889237862" && text.includes("ildefonso")) return true;
+
+        return false;
+      })
+    : notifications;
+
+  const cortesCount = notifications.filter((n) => n.category === "caja").length;
+  const pedidosCount = visibleNotifications.filter((n) => n.category === "pedidos" || Boolean(n.orderId)).length;
+  const unreadVisibleCount = visibleNotifications.filter((n) => !n.read && (n.category === "pedidos" || Boolean(n.orderId))).length;
+
+  const filtered = visibleNotifications.filter((n) => {
+    if (!isAdmin) {
+      return n.category === "pedidos" || Boolean(n.orderId);
+    }
     if (activeTab === "unread") return !n.read;
     if (activeTab === "cortes") return n.category === "caja";
-    if (activeTab === "pedidos") return n.category === "pedidos";
+    if (activeTab === "pedidos") return n.category === "pedidos" || Boolean(n.orderId);
     return true;
   });
+
 
   const recentNotifications = filtered.filter((n) => n.group === "recientes");
   const olderNotifications = filtered.filter((n) => n.group === "anteriores");
@@ -170,16 +237,18 @@ export default function MobileBottomNav() {
                           </span>
                           <span className="text-[10px] font-bold text-stone-400">{soundEnabled ? "Activo" : "Mudo"}</span>
                         </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            clearAll();
-                            setShowOptionsMenu(false);
-                          }}
-                          className="w-full text-left px-3 py-2 rounded-xl hover:bg-rose-50 flex items-center gap-2 text-rose-600 cursor-pointer"
-                        >
-                          <Trash2 className="w-4 h-4" /> Limpiar todas
-                        </button>
+                        {isAdmin && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              clearAll();
+                              setShowOptionsMenu(false);
+                            }}
+                            className="w-full text-left px-3 py-2 rounded-xl hover:bg-rose-50 flex items-center gap-2 text-rose-600 cursor-pointer"
+                          >
+                            <Trash2 className="w-4 h-4" /> Limpiar todas
+                          </button>
+                        )}
                       </div>
                     )}
                   </div>
@@ -202,56 +271,66 @@ export default function MobileBottomNav() {
 
               {/* Botones de filtro y enlace marcar todo como leído */}
               <div className="flex items-center gap-1.5 mt-3 flex-wrap">
-                <button
-                  type="button"
-                  onClick={() => setActiveTab("all")}
-                  className={`px-3 py-1 rounded-full text-xs sm:text-[13px] transition-all cursor-pointer ${
-                    activeTab === "all"
-                      ? "bg-[#ebe4dc] text-stone-900 font-bold shadow-2xs border border-transparent"
-                      : "bg-transparent text-stone-700 font-medium border border-[#ded5cb] hover:bg-[#ede5dc]/60"
-                  }`}
-                >
-                  Todas ({notifications.length})
-                </button>
-                {isAdmin && (
+                {isAdmin ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab("all")}
+                      className={`px-3 py-1 rounded-full text-xs sm:text-[13px] transition-all cursor-pointer ${
+                        activeTab === "all"
+                          ? "bg-[#ebe4dc] text-stone-900 font-bold shadow-2xs border border-transparent"
+                          : "bg-transparent text-stone-700 font-medium border border-[#ded5cb] hover:bg-[#ede5dc]/60"
+                      }`}
+                    >
+                      Todas ({notifications.length})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab("cortes")}
+                      className={`px-2.5 py-1 rounded-full text-xs sm:text-[13px] transition-all cursor-pointer flex items-center gap-1 ${
+                        activeTab === "cortes"
+                          ? "bg-amber-100 text-amber-950 font-bold shadow-2xs border border-amber-300"
+                          : "bg-transparent text-stone-700 font-medium border border-[#ded5cb] hover:bg-[#ede5dc]/60"
+                      }`}
+                    >
+                      🏁 Cierres ({cortesCount})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab("pedidos")}
+                      className={`px-2.5 py-1 rounded-full text-xs sm:text-[13px] transition-all cursor-pointer flex items-center gap-1 ${
+                        activeTab === "pedidos"
+                          ? "bg-purple-100 text-purple-950 font-bold shadow-2xs border border-purple-300"
+                          : "bg-transparent text-stone-700 font-medium border border-[#ded5cb] hover:bg-[#ede5dc]/60"
+                      }`}
+                    >
+                      🎂 Pedidos ({pedidosCount})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab("unread")}
+                      className={`px-2.5 py-1 rounded-full text-xs sm:text-[13px] transition-all cursor-pointer ${
+                        activeTab === "unread"
+                          ? "bg-[#ebe4dc] text-stone-900 font-bold shadow-2xs border border-transparent"
+                          : "bg-transparent text-stone-700 font-medium border border-[#ded5cb] hover:bg-[#ede5dc]/60"
+                      }`}
+                    >
+                      No leídas ({unreadCount})
+                    </button>
+                  </>
+                ) : (
                   <button
                     type="button"
-                    onClick={() => setActiveTab("cortes")}
-                    className={`px-2.5 py-1 rounded-full text-xs sm:text-[13px] transition-all cursor-pointer flex items-center gap-1 ${
-                      activeTab === "cortes"
-                        ? "bg-amber-100 text-amber-950 font-bold shadow-2xs border border-amber-300"
-                        : "bg-transparent text-stone-700 font-medium border border-[#ded5cb] hover:bg-[#ede5dc]/60"
-                    }`}
+                    onClick={() => setActiveTab("pedidos")}
+                    className="px-3.5 py-1.5 rounded-full text-xs sm:text-[13px] font-bold shadow-2xs border border-purple-400 bg-purple-100 text-purple-950 flex items-center gap-1.5 cursor-default"
                   >
-                    🏁 Cierres ({cortesCount})
+                    🎂 Pedidos ({pedidosCount})
                   </button>
                 )}
                 <button
                   type="button"
-                  onClick={() => setActiveTab("pedidos")}
-                  className={`px-2.5 py-1 rounded-full text-xs sm:text-[13px] transition-all cursor-pointer flex items-center gap-1 ${
-                    activeTab === "pedidos"
-                      ? "bg-purple-100 text-purple-950 font-bold shadow-2xs border border-purple-300"
-                      : "bg-transparent text-stone-700 font-medium border border-[#ded5cb] hover:bg-[#ede5dc]/60"
-                  }`}
-                >
-                  🎂 Pedidos ({pedidosCount})
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveTab("unread")}
-                  className={`px-2.5 py-1 rounded-full text-xs sm:text-[13px] transition-all cursor-pointer ${
-                    activeTab === "unread"
-                      ? "bg-[#ebe4dc] text-stone-900 font-bold shadow-2xs border border-transparent"
-                      : "bg-transparent text-stone-700 font-medium border border-[#ded5cb] hover:bg-[#ede5dc]/60"
-                  }`}
-                >
-                  No leídas ({unreadCount})
-                </button>
-                <button
-                  type="button"
                   onClick={markAllAsRead}
-                  disabled={unreadCount === 0}
+                  disabled={(!isAdmin ? unreadVisibleCount : unreadCount) === 0}
                   className="text-[#c25425] hover:text-[#9e3f18] underline underline-offset-2 font-medium text-xs sm:text-[13px] ml-auto cursor-pointer disabled:opacity-40 disabled:no-underline disabled:cursor-not-allowed transition-colors"
                 >
                   Marcar leídas
@@ -413,9 +492,9 @@ export default function MobileBottomNav() {
           >
             <div className="relative">
               <Bell className={`w-5 h-5 transition-transform group-hover:scale-110 ${showNotifications ? "stroke-[2.5]" : "stroke-[1.75]"}`} />
-              {unreadCount > 0 && (
+              {(!isAdmin ? unreadVisibleCount : unreadCount) > 0 && (
                 <span className="absolute -top-1 -right-2 min-w-[16px] h-4 px-1 bg-[#e41e3f] text-white font-black text-[9px] rounded-full flex items-center justify-center shadow-sm border border-white animate-pulse">
-                  {unreadCount > 9 ? "9+" : unreadCount}
+                  {(!isAdmin ? unreadVisibleCount : unreadCount) > 9 ? "9+" : (!isAdmin ? unreadVisibleCount : unreadCount)}
                 </span>
               )}
               {showNotifications && (

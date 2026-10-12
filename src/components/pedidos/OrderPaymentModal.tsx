@@ -12,14 +12,17 @@ import {
   User,
   Store,
   Calendar,
-  Sparkles
+  Sparkles,
+  Lock,
+  History,
+  Check
 } from "lucide-react";
 import { CustomOrder } from "@/types";
 import { formatCurrency, onlyNumbersKeyDown, cleanDecimalNumbers } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
 import { useBranch } from "@/context/BranchContext";
 import { useNotifications } from "@/context/NotificationContext";
-import { addOrderPayment } from "@/lib/orders";
+import { addOrderPayment, extractOrderOriginAndNotes } from "@/lib/orders";
 
 interface OrderPaymentModalProps {
   isOpen: boolean;
@@ -37,27 +40,60 @@ export default function OrderPaymentModal({
   const { user } = useAuth();
   const { currentBranch, registerRealSale } = useBranch();
   const { addNotification } = useNotifications();
+
+  // Mode: "abono" (partial payment step by step) vs "liquidar" (full balance)
+  const [paymentMode, setPaymentMode] = useState<"abono" | "liquidar">("abono");
   const [amount, setAmount] = useState<string>("");
   const [paymentMethod, setPaymentMethod] = useState<"efectivo" | "tarjeta" | "transferencia">("efectivo");
   const [markAsDelivered, setMarkAsDelivered] = useState(false);
   const [notes, setNotes] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
 
   const numericAmount = parseFloat(amount) || 0;
 
   useEffect(() => {
     if (order) {
-      setAmount(order.remainingBalance > 0 ? order.remainingBalance.toString() : "");
+      // By default open in abono mode with empty or quick preset so user can easily enter partial abonos
+      setPaymentMode("abono");
+      setAmount("");
       setMarkAsDelivered(false);
       setNotes("");
+      setShowHistory(false);
     }
   }, [order]);
 
   if (!isOpen || !order) return null;
 
+  const newRemaining = Math.max(0, order.remainingBalance - numericAmount);
+  const isFullPayment = numericAmount >= order.remainingBalance && order.remainingBalance > 0;
+  const { originName, isCrossBranch } = extractOrderOriginAndNotes(order);
+
+  const handleSelectMode = (mode: "abono" | "liquidar") => {
+    setPaymentMode(mode);
+    if (mode === "liquidar") {
+      setAmount(order.remainingBalance.toString());
+    } else {
+      setAmount("");
+      setMarkAsDelivered(false);
+    }
+  };
+
+  const handleSetQuickAmount = (val: number) => {
+    setPaymentMode("abono");
+    setAmount(val.toString());
+  };
+
+  const handleAddQuickAmount = (val: number) => {
+    setPaymentMode("abono");
+    const current = parseFloat(amount) || 0;
+    const nextVal = Math.min(order.remainingBalance, current + val);
+    setAmount(nextVal.toString());
+  };
+
   const handleConfirmPayment = () => {
     if (numericAmount <= 0) {
-      alert("El monto del abono o liquidación debe ser mayor a $0.");
+      alert("El monto del abono o pago debe ser mayor a $0.");
       return;
     }
     if (numericAmount > order.remainingBalance) {
@@ -76,9 +112,8 @@ export default function OrderPaymentModal({
       const pickupBranchId = order.branchId || paymentBranchId;
       const pickupBranchName = order.branchName || paymentBranchName;
 
-      const isDeliveredNow = Boolean(markAsDelivered && numericAmount === order.remainingBalance);
-      const isFullyPaid = numericAmount >= order.remainingBalance;
-      const newRemaining = Math.max(0, order.remainingBalance - numericAmount);
+      // Delivery is strictly allowed ONLY if the remaining balance is fully covered ($0 remaining)
+      const isDeliveredNow = Boolean(markAsDelivered && isFullPayment);
 
       addOrderPayment(order.id, {
         amount: numericAmount,
@@ -86,7 +121,7 @@ export default function OrderPaymentModal({
         cashier: user?.name || "Cajero en Turno",
         operatingBranchId: paymentBranchId,
         operatingBranchName: paymentBranchName,
-        notes: notes.trim() || undefined,
+        notes: notes.trim() || (isFullPayment ? "Liquidación total de saldo" : "Abono parcial a cuenta"),
         markAsDelivered: isDeliveredNow,
       });
 
@@ -97,7 +132,7 @@ export default function OrderPaymentModal({
             numericAmount,
             paymentMethod,
             user?.name || "Cajero en Turno",
-            `Liquidación/Abono Pedido ${order.orderNumber} - ${order.customerName}`
+            `${isFullPayment ? "Liquidación" : "Abono"} Pedido ${order.orderNumber} - ${order.customerName}`
           );
         } catch (saleErr) {
           console.warn("Could not register in registerRealSale:", saleErr);
@@ -108,27 +143,27 @@ export default function OrderPaymentModal({
 
           const notifTitle = isDeliveredNow
             ? `Pedido Liquidado y Entregado ${order.orderNumber}: ${formatCurrency(numericAmount)}`
-            : isFullyPaid
+            : isFullPayment
             ? `Pedido Liquidado ${order.orderNumber}: ${formatCurrency(numericAmount)}`
             : `Abono de Pedido ${order.orderNumber}: ${formatCurrency(numericAmount)}`;
 
-          const notifHighlight = `${order.customerName} - ${isFullyPaid ? "100% Pagado" : `Resta: ${formatCurrency(newRemaining)}`}${isDeliveredNow ? " • Entregado" : ""}`;
+          const notifHighlight = `${order.customerName} - ${isFullPayment ? "100% Pagado" : `Resta: ${formatCurrency(newRemaining)}`}${isDeliveredNow ? " • Entregado" : ""}`;
 
           const notifDescription = isCross
-            ? `Se cobró ${formatCurrency(numericAmount)} (${paymentMethod}) en ${paymentBranchName}. Pedido originado en ${originBranchName}. ${isDeliveredNow ? "Entregado con éxito al cliente en mostrador." : isFullyPaid ? "Listo para entrega final." : `Saldo restante: ${formatCurrency(newRemaining)}.`}`
-            : `Se cobró ${formatCurrency(numericAmount)} (${paymentMethod}). Pedido: ${order.description}. ${isDeliveredNow ? "Entregado con éxito al cliente en mostrador." : isFullyPaid ? "Listo para entrega final." : `Saldo restante: ${formatCurrency(newRemaining)}.`}`;
+            ? `Se cobró abono de ${formatCurrency(numericAmount)} (${paymentMethod}) en ${paymentBranchName}. Pedido originado en ${originBranchName}. ${isDeliveredNow ? "Entregado con éxito al cliente en mostrador." : isFullPayment ? "Listo para entrega final." : `Saldo restante: ${formatCurrency(newRemaining)}.`}`
+            : `Se cobró abono de ${formatCurrency(numericAmount)} (${paymentMethod}). Pedido: ${order.description}. ${isDeliveredNow ? "Entregado con éxito al cliente en mostrador." : isFullPayment ? "Listo para entrega final." : `Saldo restante: ${formatCurrency(newRemaining)}.`}`;
 
           const notifSender = isDeliveredNow
             ? `📦✅ Pedido Liquidado y Entregado (${paymentBranchName})`
-            : isFullyPaid
+            : isFullPayment
             ? `🎂 Pedido Liquidado (${paymentBranchName})`
             : `💰 Abono Recibido (${paymentBranchName})`;
 
           addNotification({
-            id: `notif-order-pay-${order.id}-${numericAmount}`,
+            id: `notif-order-pay-${order.id}-${Date.now()}`,
             timestamp: Date.now(),
             senderName: notifSender,
-            senderAvatar: isDeliveredNow ? "📦" : "🎂",
+            senderAvatar: isDeliveredNow ? "📦" : isFullPayment ? "🎂" : "💰",
             badgeIcon: "pastel",
             title: notifTitle,
             highlightText: notifHighlight,
@@ -168,49 +203,109 @@ export default function OrderPaymentModal({
     }
   };
 
-  const isFullPayment = numericAmount >= order.remainingBalance;
+  const hasPreviousPayments = Boolean(order.payments && order.payments.length > 0);
+  const halfAmount = Math.round(order.remainingBalance / 2);
 
   return (
-    <div className="fixed inset-0 z-[350] flex items-center justify-center bg-stone-950/80 backdrop-blur-md p-4 sm:p-6 animate-in fade-in duration-200">
-      <div className="bg-white rounded-3xl shadow-2xl max-w-lg w-full overflow-hidden border border-stone-200 flex flex-col">
+    <div className="fixed inset-0 z-[350] flex items-center justify-center bg-stone-950/80 backdrop-blur-md p-3 sm:p-6 animate-in fade-in duration-200">
+      <div className="bg-white rounded-3xl shadow-2xl max-w-lg w-full overflow-hidden border border-stone-200 flex flex-col max-h-[92vh]">
+        
         {/* Header */}
-        <div className="bg-gradient-to-r from-emerald-800 to-stone-900 text-white p-5 px-6 flex items-center justify-between">
+        <div className="bg-gradient-to-r from-emerald-800 via-stone-900 to-stone-900 text-white p-4 sm:p-5 px-6 flex items-center justify-between shrink-0 border-b border-emerald-950/40">
           <div className="flex items-center gap-3">
-            <div className="p-2.5 bg-emerald-500/20 border border-emerald-400/30 rounded-2xl text-emerald-300">
+            <div className="p-2.5 bg-emerald-500/20 border border-emerald-400/30 rounded-2xl text-emerald-300 shrink-0">
               <DollarSign className="w-6 h-6" />
             </div>
             <div>
-              <h3 className="font-extrabold text-lg leading-tight">
-                {order.remainingBalance > 0 ? "Liquidar / Abonar al Pedido" : "Pedido Liquidado"}
-              </h3>
-              <span className="text-xs text-emerald-200/90 font-mono font-bold">
-                {order.orderNumber} • {order.customerName}
+              <div className="flex items-center gap-2">
+                <h3 className="font-extrabold text-base sm:text-lg leading-tight">
+                  Abonar / Liquidar Pedido
+                </h3>
+                <span className="text-[10px] font-mono font-black bg-emerald-400/20 text-emerald-200 px-2 py-0.5 rounded border border-emerald-400/30">
+                  {order.orderNumber}
+                </span>
+              </div>
+              <span className="text-xs text-stone-300 font-medium truncate block max-w-xs">
+                Cliente: <strong className="text-white">{order.customerName}</strong>
               </span>
             </div>
           </div>
           <button
+            type="button"
             onClick={onClose}
-            className="p-2 text-stone-400 hover:text-white rounded-xl hover:bg-white/10 transition-colors"
+            className="p-2 text-stone-400 hover:text-white rounded-xl hover:bg-white/10 transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Content */}
-        <div className="p-6 sm:p-7 space-y-5">
+        {/* Content (Scrollable) */}
+        <div className="p-5 sm:p-6 space-y-4 overflow-y-auto flex-1">
+          
           {/* Summary Cards */}
-          <div className="grid grid-cols-2 gap-3">
-            <div className="bg-stone-50 border border-stone-200 rounded-2xl p-4">
-              <span className="text-[11px] font-bold text-stone-400 uppercase tracking-wider block">Total del Pedido</span>
-              <span className="text-lg font-black text-stone-900 mt-0.5 block">{formatCurrency(order.total)}</span>
-              <span className="text-[10px] text-emerald-700 font-semibold">Anticipo: {formatCurrency(order.deposit)}</span>
+          <div className="grid grid-cols-3 gap-2.5">
+            <div className="bg-stone-50 border border-stone-200 rounded-2xl p-3 text-center">
+              <span className="text-[10px] font-bold text-stone-400 uppercase tracking-wider block">Total</span>
+              <span className="text-sm sm:text-base font-black text-stone-900 mt-0.5 block font-mono">
+                {formatCurrency(order.total)}
+              </span>
             </div>
-            <div className="bg-rose-50/80 border border-rose-200 rounded-2xl p-4">
-              <span className="text-[11px] font-bold text-rose-500 uppercase tracking-wider block">Falta por Liquidar</span>
-              <span className="text-xl font-black text-rose-700 mt-0.5 block font-mono">
+            <div className="bg-emerald-50/70 border border-emerald-200 rounded-2xl p-3 text-center">
+              <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider block">Abonado</span>
+              <span className="text-sm sm:text-base font-black text-emerald-800 mt-0.5 block font-mono">
+                {formatCurrency(order.deposit)}
+              </span>
+            </div>
+            <div className="bg-rose-50 border border-rose-200 rounded-2xl p-3 text-center">
+              <span className="text-[10px] font-bold text-rose-500 uppercase tracking-wider block">Falta por Pagar</span>
+              <span className="text-sm sm:text-base font-black text-rose-700 mt-0.5 block font-mono">
                 {formatCurrency(order.remainingBalance)}
               </span>
-              <span className="text-[10px] text-rose-600 font-medium">Saldo pendiente</span>
+            </div>
+          </div>
+
+          {/* Sucursal de Origen / Entrega */}
+          <div className="bg-amber-50/70 border border-amber-200/90 rounded-xl px-3 py-1.5 text-xs flex items-center justify-between flex-wrap gap-1 shadow-2xs">
+            <span className="text-amber-950 font-bold flex items-center gap-1.5">
+              <span>🏬 Origen:</span> <strong className="text-amber-900">{originName}</strong>
+            </span>
+            {isCrossBranch && (
+              <span className="text-stone-700 font-medium flex items-center gap-1">
+                <span>📦 Entrega en:</span> <strong className="text-stone-900 font-bold">{order.branchName}</strong>
+              </span>
+            )}
+          </div>
+
+          {/* Selector de Modo: Abonar Poco a Poco vs Liquidar Todo */}
+          <div className="space-y-1.5">
+            <span className="text-xs font-black text-stone-800 block">¿Qué deseas registrar?</span>
+            <div className="grid grid-cols-2 gap-2 p-1 bg-stone-100 rounded-2xl border border-stone-200">
+              <button
+                type="button"
+                onClick={() => handleSelectMode("abono")}
+                className={`py-2 px-3 rounded-xl font-black text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                  paymentMode === "abono"
+                    ? "bg-white text-emerald-900 shadow-sm border border-emerald-200"
+                    : "text-stone-600 hover:text-stone-900"
+                }`}
+              >
+                <span>💰 Registrar Abono</span>
+                <span className="text-[10px] font-bold text-stone-400 font-sans hidden sm:inline">(Poco a poco)</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSelectMode("liquidar")}
+                className={`py-2 px-3 rounded-xl font-black text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                  paymentMode === "liquidar"
+                    ? "bg-emerald-600 text-white shadow-sm"
+                    : "text-stone-600 hover:text-stone-900"
+                }`}
+              >
+                <span>★ Liquidar Total</span>
+                <span className="text-[10px] font-mono font-bold text-emerald-100 hidden sm:inline">
+                  ({formatCurrency(order.remainingBalance)})
+                </span>
+              </button>
             </div>
           </div>
 
@@ -218,19 +313,21 @@ export default function OrderPaymentModal({
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <label className="text-xs font-bold text-stone-800">
-                Monto que entrega el cliente ($ MXN)
+                Monto que el cliente entrega para abonar ($ MXN):
               </label>
-              <button
-                type="button"
-                onClick={() => setAmount(order.remainingBalance.toString())}
-                className="text-[11px] font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-2.5 py-0.5 rounded-lg transition-colors cursor-pointer"
-              >
-                Liquidar todo ({formatCurrency(order.remainingBalance)})
-              </button>
+              {paymentMode === "abono" && (
+                <button
+                  type="button"
+                  onClick={() => setAmount(order.remainingBalance.toString())}
+                  className="text-[11px] font-bold text-emerald-700 hover:text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-2 py-0.5 rounded-lg transition-colors cursor-pointer"
+                >
+                  Cubrir todo ({formatCurrency(order.remainingBalance)})
+                </button>
+              )}
             </div>
 
             <div className="relative">
-              <span className="absolute left-4 top-3.5 text-stone-400 font-bold text-lg pointer-events-none select-none">$</span>
+              <span className="absolute left-4 top-3 text-stone-400 font-bold text-xl pointer-events-none select-none">$</span>
               <input
                 type="text"
                 inputMode="decimal"
@@ -238,23 +335,23 @@ export default function OrderPaymentModal({
                 value={amount}
                 onKeyDown={(e) => onlyNumbersKeyDown(e, true)}
                 onFocus={() => {
-                  if (amount !== "") setAmount("");
+                  if (amount !== "" && paymentMode === "abono") setAmount("");
                 }}
                 onClick={() => {
-                  if (amount !== "") setAmount("");
+                  if (amount !== "" && paymentMode === "abono") setAmount("");
                 }}
                 onChange={(e) => {
                   const clean = cleanDecimalNumbers(e.target.value);
                   setAmount(clean);
                 }}
-                className="w-full pl-10 pr-10 py-3 border-2 border-stone-300 rounded-2xl font-black text-xl text-stone-900 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 focus:outline-none transition-colors [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                className="w-full pl-9 pr-10 py-2.5 sm:py-3 border-2 border-stone-300 rounded-2xl font-black text-xl text-stone-900 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 focus:outline-none transition-colors [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
               />
               {amount !== "" && (
                 <button
                   type="button"
                   onClick={() => setAmount("")}
                   title="Borrar monto"
-                  className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-stone-400 hover:text-stone-600 cursor-pointer"
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-stone-400 hover:text-stone-600 cursor-pointer"
                 >
                   <span className="bg-stone-200 hover:bg-stone-300 text-stone-600 w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold">
                     ✕
@@ -263,114 +360,220 @@ export default function OrderPaymentModal({
               )}
             </div>
 
-            {/* Quick chips if partial */}
-            {order.remainingBalance > 100 && (
-              <div className="flex flex-wrap gap-1.5 pt-1">
-                {[100, 200, 500].filter((val) => val < order.remainingBalance).map((val) => (
+            {/* Quick Abono Presets Chips */}
+            <div className="space-y-1">
+              <span className="text-[10px] font-bold text-stone-400 uppercase tracking-wider block">
+                Sugerencias de abono rápido:
+              </span>
+              <div className="flex flex-wrap gap-1.5">
+                {[50, 100, 200, 500]
+                  .filter((val) => val <= order.remainingBalance)
+                  .map((val) => (
+                    <button
+                      key={val}
+                      type="button"
+                      onClick={() => handleSetQuickAmount(val)}
+                      className="px-2.5 py-1 text-xs font-bold rounded-xl border border-stone-200 bg-stone-50 hover:bg-emerald-50 hover:border-emerald-300 hover:text-emerald-800 text-stone-700 transition-colors cursor-pointer shadow-2xs"
+                    >
+                      ${val}
+                    </button>
+                  ))}
+                {halfAmount > 50 && halfAmount < order.remainingBalance && (
                   <button
-                    key={val}
                     type="button"
-                    onClick={() => setAmount(val.toString())}
-                    className="px-2.5 py-1 text-xs font-semibold rounded-lg border border-stone-200 bg-stone-50 hover:bg-stone-100 text-stone-700 cursor-pointer"
+                    onClick={() => handleSetQuickAmount(halfAmount)}
+                    className="px-2.5 py-1 text-xs font-bold rounded-xl border border-stone-200 bg-stone-50 hover:bg-emerald-50 hover:border-emerald-300 hover:text-emerald-800 text-stone-700 transition-colors cursor-pointer shadow-2xs"
                   >
-                    + ${val}
+                    50% ({formatCurrency(halfAmount)})
                   </button>
-                ))}
+                )}
+                <button
+                  type="button"
+                  onClick={() => handleSelectMode("liquidar")}
+                  className="px-2.5 py-1 text-xs font-bold rounded-xl border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 transition-colors cursor-pointer shadow-2xs ml-auto"
+                >
+                  Todo ({formatCurrency(order.remainingBalance)})
+                </button>
               </div>
-            )}
+            </div>
           </div>
 
+          {/* Real-time Resulting Balance Preview Box */}
+          {numericAmount > 0 && (
+            <div className={`p-3.5 rounded-2xl border transition-all ${
+              isFullPayment
+                ? "bg-emerald-50/90 border-emerald-300 text-emerald-950"
+                : "bg-amber-50/90 border-amber-300 text-amber-950"
+            }`}>
+              <div className="flex items-center justify-between text-xs font-black">
+                <span>{isFullPayment ? "Resultado tras este pago:" : "Nuevo saldo que quedará pendiente:"}</span>
+                <span className={`text-base font-black font-mono ${isFullPayment ? "text-emerald-800" : "text-amber-900"}`}>
+                  {isFullPayment ? "¡$0.00 (100% CUBIERTO)!" : formatCurrency(newRemaining)}
+                </span>
+              </div>
+
+              {!isFullPayment ? (
+                <div className="mt-2 pt-2 border-t border-amber-200/80 text-[11px] text-amber-800 flex items-start gap-1.5">
+                  <Lock className="w-3.5 h-3.5 text-amber-700 shrink-0 mt-0.5" />
+                  <span>
+                    El cliente aún deberá <strong>{formatCurrency(newRemaining)}</strong>. El pedido podrá seguir recibiendo más abonos en cualquier momento y <strong>no se podrá entregar hasta liquidar el 100%</strong>.
+                  </span>
+                </div>
+              ) : (
+                <div className="mt-2 pt-2 border-t border-emerald-200/80 space-y-2">
+                  <div className="text-[11px] text-emerald-800 flex items-center gap-1.5 font-medium">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                    <span>¡Excelente! Con este pago el pedido queda totalmente liquidado. Ya se autoriza la entrega al cliente.</span>
+                  </div>
+
+                  {/* Entrega inmediata checkbox */}
+                  <div className="bg-white/80 border border-emerald-300/80 rounded-xl p-2.5 flex items-start gap-2.5">
+                    <input
+                      type="checkbox"
+                      id="deliveredCheck"
+                      checked={markAsDelivered}
+                      onChange={(e) => setMarkAsDelivered(e.target.checked)}
+                      className="mt-0.5 rounded text-emerald-600 focus:ring-emerald-500 w-4 h-4 cursor-pointer"
+                    />
+                    <label htmlFor="deliveredCheck" className="text-xs text-emerald-950 font-bold cursor-pointer select-none">
+                      Marcar pedido como Entregado al cliente ahora mismo
+                      <span className="block text-[10.5px] font-normal text-emerald-700">
+                        El cliente se está llevando el pedido en mostrador o ya va en camino para entrega.
+                      </span>
+                    </label>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Payment Method */}
-          <div className="space-y-2">
+          <div className="space-y-1.5">
             <label className="text-xs font-bold text-stone-800 block">
-              Método de Pago
+              Forma de Pago del Abono:
             </label>
-            <div className="grid grid-cols-3 gap-2.5">
+            <div className="grid grid-cols-3 gap-2">
               <button
                 type="button"
                 onClick={() => setPaymentMethod("efectivo")}
-                className={`p-3 rounded-2xl border-2 text-xs font-bold flex flex-col items-center gap-1.5 transition-all ${
+                className={`p-2.5 rounded-2xl border-2 text-xs font-bold flex flex-col items-center gap-1 transition-all cursor-pointer ${
                   paymentMethod === "efectivo"
                     ? "bg-emerald-50 border-emerald-500 text-emerald-900 shadow-xs"
                     : "bg-white border-stone-200 text-stone-600 hover:bg-stone-50"
                 }`}
               >
-                <Banknote className="w-5 h-5 text-emerald-600" /> Efectivo
+                <Banknote className="w-4 h-4 text-emerald-600" /> Efectivo
               </button>
               <button
                 type="button"
                 onClick={() => setPaymentMethod("tarjeta")}
-                className={`p-3 rounded-2xl border-2 text-xs font-bold flex flex-col items-center gap-1.5 transition-all ${
+                className={`p-2.5 rounded-2xl border-2 text-xs font-bold flex flex-col items-center gap-1 transition-all cursor-pointer ${
                   paymentMethod === "tarjeta"
                     ? "bg-emerald-50 border-emerald-500 text-emerald-900 shadow-xs"
                     : "bg-white border-stone-200 text-stone-600 hover:bg-stone-50"
                 }`}
               >
-                <CreditCard className="w-5 h-5 text-blue-600" /> Tarjeta
+                <CreditCard className="w-4 h-4 text-blue-600" /> Tarjeta
               </button>
               <button
                 type="button"
                 onClick={() => setPaymentMethod("transferencia")}
-                className={`p-3 rounded-2xl border-2 text-xs font-bold flex flex-col items-center gap-1.5 transition-all ${
+                className={`p-2.5 rounded-2xl border-2 text-xs font-bold flex flex-col items-center gap-1 transition-all cursor-pointer ${
                   paymentMethod === "transferencia"
                     ? "bg-emerald-50 border-emerald-500 text-emerald-900 shadow-xs"
                     : "bg-white border-stone-200 text-stone-600 hover:bg-stone-50"
                 }`}
               >
-                <Store className="w-5 h-5 text-purple-600" /> Transferencia
+                <Store className="w-4 h-4 text-purple-600" /> Transferencia
               </button>
             </div>
           </div>
 
-          {/* Mark as delivered option */}
-          {isFullPayment && (
-            <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-3.5 flex items-start gap-3">
-              <input
-                type="checkbox"
-                id="deliveredCheck"
-                checked={markAsDelivered}
-                onChange={(e) => setMarkAsDelivered(e.target.checked)}
-                className="mt-1 rounded text-emerald-600 focus:ring-emerald-500 w-4 h-4"
-              />
-              <label htmlFor="deliveredCheck" className="text-xs text-emerald-950 font-medium cursor-pointer">
-                <strong className="block text-emerald-900">Marcar pedido como Entregado</strong>
-                <span className="text-[11px] text-emerald-700">
-                  El cliente está recogiendo el pedido en mostrador o se está enviando a domicilio.
-                </span>
-              </label>
-            </div>
-          )}
-
           {/* Notes */}
           <div className="space-y-1">
-            <label className="text-[11px] font-bold text-stone-500 block">Nota o referencia de pago (opcional)</label>
+            <label className="text-[11px] font-bold text-stone-500 block">
+              Nota o referencia del abono (opcional)
+            </label>
             <input
               type="text"
-              placeholder="Ej. Pagó con billete de $500, entregado por Lupita..."
+              placeholder="Ej. Abono #2 pagado en efectivo, cliente dejó $200..."
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              className="w-full text-xs px-3.5 py-2.5 border border-stone-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+              className="w-full text-xs px-3.5 py-2 border border-stone-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none"
             />
           </div>
+
+          {/* Historial de Abonos Anteriores (si existen) */}
+          {hasPreviousPayments && (
+            <div className="border border-stone-200 rounded-2xl overflow-hidden bg-stone-50/60">
+              <button
+                type="button"
+                onClick={() => setShowHistory(!showHistory)}
+                className="w-full px-3.5 py-2 flex items-center justify-between text-xs font-bold text-stone-700 hover:bg-stone-100 transition-colors cursor-pointer"
+              >
+                <span className="flex items-center gap-1.5 text-stone-800">
+                  <History className="w-3.5 h-3.5 text-amber-600" />
+                  Ver Historial de Abonos Anteriores ({order.payments!.length})
+                </span>
+                <span className="text-[10px] text-stone-500 font-mono">
+                  {showHistory ? "Ocultar ▲" : "Ver ▼"}
+                </span>
+              </button>
+
+              {showHistory && (
+                <div className="p-3 pt-0 space-y-1.5 max-h-36 overflow-y-auto border-t border-stone-200/80 mt-1">
+                  {order.payments!.map((p, idx) => (
+                    <div key={idx} className="bg-white p-2 rounded-xl border border-stone-200 text-xs flex items-center justify-between">
+                      <div className="space-y-0.5">
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-bold text-stone-900">Abono #{idx + 1}</span>
+                          <span className="text-[10px] text-stone-500 uppercase bg-stone-100 px-1.5 py-0.2 rounded font-bold">
+                            {p.paymentMethod || "efectivo"}
+                          </span>
+                        </div>
+                        <div className="text-[10px] text-stone-500">
+                          {p.date || "Fecha no registrada"} {p.cashier ? `• ${p.cashier}` : ""}
+                        </div>
+                        {p.notes && <div className="text-[10px] text-stone-600 italic">"{p.notes}"</div>}
+                      </div>
+                      <span className="font-mono font-black text-emerald-700 text-sm">
+                        {formatCurrency(p.amount)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Footer */}
-        <div className="bg-stone-100 border-t border-stone-200 p-4 px-6 flex items-center justify-end gap-3">
+        <div className="bg-stone-100 border-t border-stone-200 p-4 px-6 flex items-center justify-between gap-3 shrink-0">
           <button
             type="button"
             onClick={onClose}
-            className="px-5 py-2.5 text-xs font-bold text-stone-600 hover:bg-stone-200 rounded-xl transition-colors"
+            className="px-4 py-2 text-xs font-bold text-stone-600 hover:bg-stone-200 rounded-xl transition-colors cursor-pointer"
           >
             Cancelar
           </button>
+          
           <button
             type="button"
-            disabled={isSubmitting || numericAmount <= 0}
+            disabled={isSubmitting || numericAmount <= 0 || numericAmount > order.remainingBalance}
             onClick={handleConfirmPayment}
-            className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs rounded-xl shadow-md transition-all flex items-center gap-2 disabled:opacity-50"
+            className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-black text-xs rounded-xl shadow-md transition-all flex items-center gap-2 disabled:opacity-50 cursor-pointer"
           >
             <CheckCircle2 className="w-4 h-4" />
-            {isSubmitting ? "Registrando cobro..." : `Cobrar ${formatCurrency(numericAmount)}`}
+            {isSubmitting
+              ? "Registrando..."
+              : numericAmount <= 0
+              ? "Ingresa un monto"
+              : isFullPayment
+              ? markAsDelivered
+                ? `Liquidar ${formatCurrency(numericAmount)} y Entregar`
+                : `Liquidar Totalmente ${formatCurrency(numericAmount)}`
+              : `Registrar Abono de ${formatCurrency(numericAmount)} (Resta ${formatCurrency(newRemaining)})`
+            }
           </button>
         </div>
       </div>

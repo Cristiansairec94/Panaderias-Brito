@@ -49,7 +49,7 @@ export default function SpecialOrdersDrawer({
   const [isCreateOpen, setIsCreateOpen] = useState(false);
 
   const loadOrders = () => {
-    const all = getStoredOrders().filter((o) => o && o.status !== "entregado" && o.status !== "cancelado");
+    const all = getStoredOrders().filter((o) => o && o.status !== "cancelado");
     setOrders(all);
   };
 
@@ -68,8 +68,8 @@ export default function SpecialOrdersDrawer({
   // Filtered orders for this branch
   const filteredOrders = useMemo(() => {
     return orders.filter((order) => {
-      // Excluir 100% pedidos entregados o cancelados
-      if (order.status === "entregado" || order.status === "cancelado") return false;
+      // Solo excluir pedidos cancelados. Los pedidos entregados NO desaparecen
+      if (order.status === "cancelado") return false;
 
       // Branch filter if specified (visible en sucursal que levanta y sucursal que entrega)
       if (branchId && branchId !== "all") {
@@ -119,7 +119,7 @@ export default function SpecialOrdersDrawer({
     const message = encodeURIComponent(
       `Hola ${order.customerName}, le saludamos de Panaderías Brito (${branchName}). Le recordamos que su pedido #${order.orderNumber} (${order.description}) está programado para entrega el ${order.deliveryDate} a las ${order.deliveryTime}. ${
         order.remainingBalance > 0
-          ? `Resta por liquidar: $${order.remainingBalance.toFixed(2)} MXN.`
+          ? `Resta por liquidar: ${formatCurrency(order.remainingBalance)}.`
           : "¡Ya está totalmente pagado!"
       } ¡Lo esperamos con gusto!`
     );
@@ -129,7 +129,7 @@ export default function SpecialOrdersDrawer({
 
   const handleQuickDeliver = (order: CustomOrder) => {
     if (order.remainingBalance > 0) {
-      alert(`⛔ No se puede entregar:\n\nEl pedido #${order.orderNumber} aún tiene un saldo pendiente de $${order.remainingBalance.toFixed(2)} MXN.\n\nDebe estar 100% pagado antes de poder entregarse.`);
+      alert(`⛔ No se puede entregar:\n\nEl pedido #${order.orderNumber} aún tiene un saldo pendiente de ${formatCurrency(order.remainingBalance)}.\n\nDebe estar 100% pagado antes de poder entregarse.`);
       setSelectedOrderForPayment(order);
       return;
     }
@@ -285,7 +285,11 @@ export default function SpecialOrdersDrawer({
               return (
                 <div
                   key={order.id}
-                  className="bg-stone-900 border border-stone-800 hover:border-amber-900/60 rounded-2xl p-3.5 space-y-2.5 transition-all shadow-md"
+                  className={`rounded-2xl p-3.5 space-y-2.5 transition-all shadow-md ${
+                    isDelivered
+                      ? "bg-sky-950/40 border-2 border-sky-500/70 ring-2 ring-sky-500/30 hover:border-sky-400"
+                      : "bg-stone-900 border border-stone-800 hover:border-amber-900/60"
+                  }`}
                 >
                   {/* Fila 1: Folio, Cliente y Total */}
                   <div className="flex items-center justify-between gap-2 border-b border-stone-800 pb-2">
@@ -329,6 +333,13 @@ export default function SpecialOrdersDrawer({
                       <span>🏬 Levantado: {order.operatingBranchName.replace("Sucursal ", "")}</span>
                       <span className="text-amber-500">➔</span>
                       <span className="text-emerald-300">Entrega: {order.branchName.replace("Sucursal ", "")}</span>
+                    </div>
+                  )}
+
+                  {/* Banner Centrado de Estado: ENTREGADO */}
+                  {isDelivered && (
+                    <div className="py-1 px-3 rounded-xl bg-sky-900/60 border border-sky-400/80 text-sky-200 flex items-center justify-center gap-1.5 shadow-2xs">
+                      <span className="font-black text-xs tracking-wider uppercase">📦 ENTREGADO</span>
                     </div>
                   )}
 
@@ -408,10 +419,10 @@ export default function SpecialOrdersDrawer({
                         <button
                           type="button"
                           onClick={() => setSelectedOrderForPayment(order)}
-                          className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-600 hover:to-orange-600 text-white font-black text-xs shadow-md transition-all active:scale-95 flex items-center gap-1.5 cursor-pointer"
+                          className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-black text-xs shadow-md transition-all active:scale-95 flex items-center gap-1.5 cursor-pointer"
                         >
                           <DollarSign className="w-3.5 h-3.5" />
-                          <span>Cobrar {formatCurrency(order.remainingBalance)} y Entregar</span>
+                          <span>Abonar / Liquidar ({formatCurrency(order.remainingBalance)})</span>
                         </button>
                       ) : !isDelivered ? (
                         <button
@@ -477,7 +488,7 @@ export default function SpecialOrdersDrawer({
             if (o.status === "pendiente" || o.status === "en_horno") nextStatus = "listo";
             else if (o.status === "listo") {
               if (o.remainingBalance > 0) {
-                alert(`⛔ No se puede entregar:\n\nEl pedido #${o.orderNumber} aún tiene un saldo pendiente de $${o.remainingBalance.toFixed(2)} MXN.\n\nDebe estar 100% pagado antes de entregarse.`);
+                alert(`⛔ No se puede entregar:\n\nEl pedido #${o.orderNumber} aún tiene un saldo pendiente de ${formatCurrency(o.remainingBalance)}.\n\nDebe estar 100% pagado antes de entregarse.`);
                 setSelectedOrderForDetail(null);
                 setSelectedOrderForPayment(o);
                 return;
@@ -493,15 +504,16 @@ export default function SpecialOrdersDrawer({
           }}
           onDeliverOrder={(o) => {
             if (o.remainingBalance > 0) {
-              alert(`⛔ No se puede entregar:\n\nEl pedido #${o.orderNumber} aún tiene un saldo pendiente de $${o.remainingBalance.toFixed(2)} MXN.\n\nDebe estar 100% pagado antes de entregarse.`);
+              alert(`⛔ No se puede entregar:\n\nEl pedido #${o.orderNumber} aún tiene un saldo pendiente de ${formatCurrency(o.remainingBalance)}.\n\nDebe estar 100% pagado antes de entregarse.`);
               setSelectedOrderForDetail(null);
               setSelectedOrderForPayment(o);
               return;
             }
-            if (confirm(`¿Confirmas marcar el pedido #${o.orderNumber} de "${o.customerName}" como ENTREGADO?\n\nEl pedido se marcará como entregado y desaparecerá de la lista de pedidos pendientes.`)) {
+            if (confirm(`¿Confirmas marcar el pedido #${o.orderNumber} de "${o.customerName}" como ENTREGADO?`)) {
               updateOrderStatus(o.id, "entregado");
-              setSelectedOrderForDetail(null);
               loadOrders();
+              const updated = getStoredOrders().find((item) => item.id === o.id);
+              if (updated) setSelectedOrderForDetail(updated);
             }
           }}
           onDarDeBaja={(o) => {

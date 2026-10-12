@@ -2138,8 +2138,8 @@ export default function POSPage() {
     try {
       return getStoredOrders().filter((o) => {
         if (!o) return false;
-        // Los pedidos entregados y cancelados desaparecen por completo de la vista activa y del turno
-        if (o.status === "entregado" || o.status === "cancelado") return false;
+        // Solo excluir pedidos cancelados (dados de baja). Los pedidos entregados NO desaparecen del turno
+        if (o.status === "cancelado") return false;
         if (activeBranch && activeBranch.id !== "all") {
           const bId = activeBranch.id.toLowerCase().trim();
           const bName = (activeBranch.name || "").toLowerCase().trim();

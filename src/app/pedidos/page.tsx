@@ -39,10 +39,11 @@ import {
   Archive,
   Building2,
   Lock,
-  X
+  X,
+  XCircle
 } from "lucide-react";
 import { CustomOrder } from "@/types";
-import { formatCurrency, playScanBeep } from "@/lib/utils";
+import { formatCurrency, playScanBeep, formatOrderCreation } from "@/lib/utils";
 import { useBranch } from "@/context/BranchContext";
 import { useAuth } from "@/context/AuthContext";
 import { useNotifications } from "@/context/NotificationContext";
@@ -52,7 +53,8 @@ import {
   getStoredOrders,
   syncOrdersWithServer,
   updateOrderStatus,
-  deleteCustomOrder
+  deleteCustomOrder,
+  extractOrderOriginAndNotes
 } from "@/lib/orders";
 import CreateOrderModal from "@/components/pedidos/CreateOrderModal";
 import OrderPaymentModal from "@/components/pedidos/OrderPaymentModal";
@@ -104,11 +106,31 @@ export default function PedidosPage() {
   const { addNotification } = useNotifications();
 
   // Control de roles y asignación de sucursal:
-  // Administradores y supervisores: control y visualización total multi-sucursal ("all" y cualquier tienda)
-  // Perfiles operativos (cajeros): estrictamente su sucursal asignada
-  const isAdmin = !user || user.role === "admin" || user.role === "auxiliar_admin";
-  const canFilterBranches = isAdmin || user?.role === "supervisor" || Boolean(user?.permissions?.canAccessSucursales);
-  const userBranchId = (user?.assignedBranchId || currentBranch?.id || branches[0]?.id || "branch-matriz").trim();
+  // Administradores: control y visualización total multi-sucursal ("all" y cualquier tienda)
+  // Perfiles de sucursal (Andrés Sánchez, Carlos, cajeros): estrictamente los pedidos de su sucursal asignada
+  const isBranchProfile = Boolean(
+    !user ||
+    user.role === "cajero" ||
+    user.role === "panadero" ||
+    user.role === "supervisor" ||
+    user.username === "andres" ||
+    user.username === "carlos" ||
+    user.username === "carlos.bueno" ||
+    user.name?.toLowerCase().includes("andres") ||
+    user.name?.toLowerCase().includes("carlos") ||
+    Boolean(user.assignedBranchId && user.role !== "admin" && user.role !== "auxiliar_admin")
+  );
+  const isAdmin = !isBranchProfile && Boolean(user && (user.role === "admin" || user.role === "auxiliar_admin"));
+  const canFilterBranches = isAdmin;
+  const userBranchId = (
+    user?.assignedBranchId ||
+    (user?.username === "andres" || user?.name?.toLowerCase().includes("andres") ? "branch-angeles" : "") ||
+    (user?.username === "carlos" || user?.name?.toLowerCase().includes("mendoza") ? "branch-benito" : "") ||
+    (user?.username === "carlos.bueno" || user?.name?.toLowerCase().includes("bueno") ? "branch-matriz" : "") ||
+    currentBranch?.id ||
+    branches[0]?.id ||
+    "branch-matriz"
+  ).trim();
   const userBranch = branches.find((b) => b.id === userBranchId) || currentBranch || branches[0];
 
   // State: Default view is "productos" en formato "lista" compacta y ordenada
@@ -116,10 +138,11 @@ export default function PedidosPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedBranchFilter, setSelectedBranchFilter] = useState<string>(() => (canFilterBranches ? "all" : userBranchId));
 
-  // Filtro efectivo de sucursal: por defecto inicia en la sucursal asignada del cajero o "all", pero permite seleccionar otra sucursal o "all"
+  // Filtro efectivo de sucursal: para cajeros/Andrés/Carlos SIEMPRE es userBranchId
   const effectiveBranchFilter = useMemo(() => {
+    if (!canFilterBranches) return userBranchId;
     return selectedBranchFilter || userBranchId || "all";
-  }, [selectedBranchFilter, userBranchId]);
+  }, [canFilterBranches, selectedBranchFilter, userBranchId]);
 
   const [classificationFilter, setClassificationFilter] = useState<OrderClassificationKey>("all");
   const [historialSubFilter, setHistorialSubFilter] = useState<"todos" | "entregados" | "cancelados">("todos");
@@ -262,11 +285,13 @@ export default function PedidosPage() {
   // para cajeros por defecto inicia en su tienda asignada, pero permitiéndoles seleccionar "all" u otra tienda si lo desean.
   const hasInitializedBranchRef = useRef(false);
   useEffect(() => {
+    if (!canFilterBranches) {
+      setSelectedBranchFilter(userBranchId);
+      return;
+    }
     if (!hasInitializedBranchRef.current) {
       hasInitializedBranchRef.current = true;
-      if (!canFilterBranches) {
-        setSelectedBranchFilter(userBranchId);
-      } else if (isAllBranches) {
+      if (isAllBranches) {
         setSelectedBranchFilter("all");
       } else if (currentBranch && currentBranch.id) {
         setSelectedBranchFilter(currentBranch.id);
@@ -519,7 +544,7 @@ export default function PedidosPage() {
     for (const o of branchFiltered) {
       const oDate = normalizeDateStr(o.deliveryDate);
       if (o.status !== "entregado" && o.status !== "cancelado") activos++;
-      if (oDate === todayStr && o.status !== "cancelado" && o.status !== "entregado") hoy++;
+      if (oDate === todayStr && o.status !== "cancelado") hoy++;
       if (checkIsPending(o)) pendientes++;
       if (checkIsUnpaid(o)) porPagar++;
       if (checkIsPaid(o)) {
@@ -539,7 +564,7 @@ export default function PedidosPage() {
     }
 
     return {
-      all: activos,
+      all: branchFiltered.filter((o) => o.status !== "cancelado").length,
       activos,
       hoy,
       pendientes,
@@ -566,7 +591,10 @@ export default function PedidosPage() {
         if (historialSubFilter === "cancelados") return o.status === "cancelado";
         return o.status === "entregado" || o.status === "cancelado";
       }
-      return o.status !== "entregado" && o.status !== "cancelado";
+      if (classificationFilter === "activos") {
+        return o.status !== "entregado" && o.status !== "cancelado";
+      }
+      return o.status !== "cancelado";
     });
 
     let todos = baseOrders.length;
@@ -626,9 +654,17 @@ export default function PedidosPage() {
           // Si historialSubFilter === "todos", mostrar concluidos (entregados y cancelados)
           if (order.status !== "entregado" && order.status !== "cancelado") return false;
         }
-      } else {
-        // En vistas de pedidos activos, excluir pedidos ya concluidos o cancelados
+      } else if (classificationFilter === "activos") {
+        // En vista 'activos', excluir pedidos entregados o cancelados
         if (order.status === "entregado" || order.status === "cancelado") {
+          return false;
+        }
+      } else if (classificationFilter === "entregados") {
+        if (order.status !== "entregado") return false;
+      } else {
+        // En vistas generales ('all', 'hoy', etc.): SOLO excluir cancelados (dados de baja).
+        // Los pedidos entregados NO deben desaparecer de la lista principal
+        if (order.status === "cancelado") {
           return false;
         }
       }
@@ -1217,14 +1253,14 @@ export default function PedidosPage() {
         );
       case "entregado":
         return (
-          <span className="bg-teal-100 text-teal-900 border border-teal-300 px-3 py-1 rounded-full font-extrabold text-[11px] inline-flex items-center gap-1.5 shadow-2xs">
-            <Check className="w-3.5 h-3.5 text-teal-700" /> Ya Entregado
+          <span className="bg-sky-100 text-sky-900 border border-sky-300 px-3 py-1 rounded-full font-extrabold text-[11px] inline-flex items-center gap-1.5 shadow-2xs">
+            <PackageCheck className="w-3.5 h-3.5 text-sky-700" /> Entregado
           </span>
         );
       case "cancelado":
         return (
           <span className="bg-rose-100 text-rose-900 border border-rose-300 px-3 py-1 rounded-full font-extrabold text-[11px] inline-flex items-center gap-1.5 shadow-2xs">
-            ✕ Dado de Baja / Cancelado
+            <XCircle className="w-3.5 h-3.5 text-rose-700" /> Cancelado
           </span>
         );
     }
@@ -2402,25 +2438,26 @@ export default function PedidosPage() {
                 const totalPieces = order.items && order.items.length > 0
                   ? order.items.reduce((sum, item) => sum + (item.quantity || 0), 0)
                   : 1;
+                const creationInfo = formatOrderCreation(order);
 
                 return (
                   <div
                     key={order.id}
                     onClick={() => setSelectedOrderForDetail(order)}
-                    className={`bg-white rounded-2xl border p-3 sm:p-3.5 transition-all duration-150 shadow-2xs hover:shadow-md cursor-pointer group border-l-4 ${
+                    className={`rounded-2xl border p-3 sm:p-3.5 transition-all duration-150 shadow-2xs hover:shadow-md cursor-pointer group border-l-4 ${
                       order.status === "cancelado"
-                        ? "border-l-rose-500 hover:bg-rose-50/20 border-rose-200"
+                        ? "border-l-rose-500 bg-rose-50/80 hover:bg-rose-50/95 border-rose-300 ring-2 ring-rose-200/50"
                         : order.status === "entregado"
-                        ? "border-l-teal-600 hover:bg-teal-50/20 border-teal-200"
+                        ? "border-l-sky-500 bg-sky-50/80 hover:bg-sky-50/95 border-sky-300 ring-2 ring-sky-200/50"
                         : isOverdue
-                        ? "border-l-rose-500 hover:bg-rose-50/20 border-rose-200"
+                        ? "bg-white border-l-rose-500 hover:bg-rose-50/20 border-rose-200"
                         : isReady
-                        ? "border-l-emerald-500 hover:bg-emerald-50/20 border-emerald-200"
+                        ? "bg-white border-l-emerald-500 hover:bg-emerald-50/20 border-emerald-200"
                         : isUpcoming
-                        ? "border-l-blue-500 hover:bg-blue-50/20 border-blue-200"
+                        ? "bg-white border-l-blue-500 hover:bg-blue-50/20 border-blue-200"
                         : isPending
-                        ? "border-l-amber-500 hover:bg-amber-50/20 border-amber-200"
-                        : "border-l-stone-300 hover:bg-stone-50 border-stone-200"
+                        ? "bg-white border-l-amber-500 hover:bg-amber-50/20 border-amber-200"
+                        : "bg-white border-l-stone-300 hover:bg-stone-50 border-stone-200"
                     }`}
                   >
                     {/* Cuadrícula Maestra de 4 Columnas Alineadas (Desktop xl:grid-cols-12) */}
@@ -2444,6 +2481,30 @@ export default function PedidosPage() {
                               </span>
                             )}
                             {getStatusBadge(order.status)}
+                          </div>
+
+                          {/* Centered Status Banner */}
+                          {order.status === "entregado" && (
+                            <div className="my-1.5 py-1 px-2.5 rounded-xl bg-sky-100/90 border border-sky-300 text-sky-950 flex items-center justify-center gap-1.5 shadow-2xs">
+                              <PackageCheck className="w-3.5 h-3.5 text-sky-700 shrink-0" />
+                              <span className="font-black text-xs tracking-wider uppercase">ENTREGADO</span>
+                            </div>
+                          )}
+                          {order.status === "cancelado" && (
+                            <div className="my-1.5 py-1 px-2.5 rounded-xl bg-rose-100/90 border border-rose-300 text-rose-950 flex items-center justify-center gap-1.5 shadow-2xs">
+                              <XCircle className="w-3.5 h-3.5 text-rose-700 shrink-0" />
+                              <span className="font-black text-xs tracking-wider uppercase">CANCELADO</span>
+                            </div>
+                          )}
+
+                          {/* Día y Hora exacta en que se realizó/levantó el pedido */}
+                          <div
+                            className="flex items-center gap-1.5 mt-1.5 text-[11px] font-bold text-amber-900 bg-gradient-to-r from-amber-50 to-orange-50/80 border border-amber-200/90 px-2 py-0.5 rounded-lg w-fit shadow-2xs"
+                            title={`Pedido registrado el: ${creationInfo.fullDateStr}`}
+                          >
+                            <Clock className="w-3.5 h-3.5 text-amber-700 shrink-0" />
+                            <span className="text-stone-500 font-medium">Pedido:</span>
+                            <span className="font-mono font-black text-amber-950">{creationInfo.fullBadgeStr}</span>
                           </div>
 
                           <h4
@@ -2582,9 +2643,26 @@ export default function PedidosPage() {
 
                       {/* COLUMNA 3: Entrega, Cliente y Saldo Cuadrado (xl:col-span-2) */}
                       <div className="md:col-span-1 xl:col-span-2 min-w-0 flex flex-col justify-between gap-1.5 h-full py-0.5">
+                        {/* Fecha y Hora de Pedido (Cuándo se hizo) */}
+                        <div className="pb-1 border-b border-stone-100">
+                          <span className="text-[9px] font-black uppercase tracking-wider text-amber-800 flex items-center gap-1 mb-0.5">
+                            <Clock className="w-3 h-3 text-amber-600 shrink-0" />
+                            <span>Pedido Realizado</span>
+                          </span>
+                          <div
+                            className="flex items-center justify-between gap-1 text-stone-700 font-bold text-xs bg-amber-50/70 border border-amber-200/80 px-2 py-0.5 rounded-md"
+                            title={`Registrado: ${creationInfo.fullDateStr}`}
+                          >
+                            <span className="truncate">{creationInfo.shortDateStr}</span>
+                            <span className="font-mono tabular-nums font-black text-amber-950 bg-amber-100/90 border border-amber-300 px-1.5 rounded shrink-0">
+                              {creationInfo.exactTimeStr}
+                            </span>
+                          </div>
+                        </div>
+
                         {/* Fecha y Hora de Entrega */}
                         <div>
-                          <span className="text-[10px] font-extrabold uppercase tracking-wider text-stone-400 block mb-0.5">Entrega</span>
+                          <span className="text-[10px] font-extrabold uppercase tracking-wider text-stone-400 block mb-0.5">Entrega Programada</span>
                           <div className="flex items-center gap-1.5 flex-wrap">
                             {normalizeDateStr(order.deliveryDate) === todayStr ? (
                               <span className="text-[10px] font-black bg-rose-600 text-white px-2 py-0.5 rounded-md shadow-2xs animate-pulse">
@@ -2652,10 +2730,10 @@ export default function PedidosPage() {
                                 type="button"
                                 onClick={() => setSelectedOrderForPayment(order)}
                                 className="flex-1 py-2 px-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 active:scale-95 text-white font-black text-xs rounded-xl shadow-xs transition-all flex items-center justify-center gap-1 cursor-pointer whitespace-nowrap"
-                                title={`Cobrar saldo restante de ${formatCurrency(order.remainingBalance)}`}
+                                title={`Abonar a cuenta o liquidar saldo de ${formatCurrency(order.remainingBalance)}`}
                               >
                                 <DollarSign className="w-3.5 h-3.5 shrink-0" />
-                                <span className="font-mono tabular-nums">Cobrar {formatCurrency(order.remainingBalance)}</span>
+                                <span className="font-mono tabular-nums">Abonar / Liquidar {formatCurrency(order.remainingBalance)}</span>
                               </button>
 
                               {order.status !== "listo" ? (
@@ -2750,26 +2828,28 @@ export default function PedidosPage() {
                             <span>Ver</span>
                           </button>
 
-                          {!isConcludedOrHistory ? (
-                            <button
-                              type="button"
-                              onClick={() => handleDarDeBaja(order)}
-                              className="py-1.5 px-1 bg-rose-50 hover:bg-rose-600 active:scale-95 text-rose-700 hover:text-white border border-rose-200 hover:border-rose-600 font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-1 cursor-pointer shadow-2xs"
-                              title="Dar de baja este pedido"
-                            >
-                              <Trash2 className="w-3.5 h-3.5 shrink-0" />
-                              <span>Baja</span>
-                            </button>
-                          ) : (
-                            <button
-                              type="button"
-                              onClick={() => handleDeletePermanent(order.id, order.orderNumber, order.customerName)}
-                              className="py-1.5 px-1 bg-rose-50 hover:bg-rose-600 active:scale-95 text-rose-700 hover:text-white border border-rose-200 hover:border-rose-600 font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-1 cursor-pointer shadow-2xs"
-                              title="Eliminar permanentemente del historial"
-                            >
-                              <Trash2 className="w-3.5 h-3.5 shrink-0" />
-                              <span>Borrar</span>
-                            </button>
+                          {isAdmin && (
+                            !isConcludedOrHistory ? (
+                              <button
+                                type="button"
+                                onClick={() => handleDarDeBaja(order)}
+                                className="py-1.5 px-1 bg-rose-50 hover:bg-rose-600 active:scale-95 text-rose-700 hover:text-white border border-rose-200 hover:border-rose-600 font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-1 cursor-pointer shadow-2xs"
+                                title="Dar de baja este pedido"
+                              >
+                                <Trash2 className="w-3.5 h-3.5 shrink-0" />
+                                <span>Baja</span>
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => handleDeletePermanent(order.id, order.orderNumber, order.customerName)}
+                                className="py-1.5 px-1 bg-rose-50 hover:bg-rose-600 active:scale-95 text-rose-700 hover:text-white border border-rose-200 hover:border-rose-600 font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-1 cursor-pointer shadow-2xs"
+                                title="Eliminar permanentemente del historial"
+                              >
+                                <Trash2 className="w-3.5 h-3.5 shrink-0" />
+                                <span>Borrar</span>
+                              </button>
+                            )
                           )}
                         </div>
                       </div>
@@ -2790,23 +2870,24 @@ export default function PedidosPage() {
                 const totalPieces = order.items && order.items.length > 0
                   ? order.items.reduce((sum, item) => sum + (item.quantity || 0), 0)
                   : 1;
+                const creationInfo = formatOrderCreation(order);
 
                 return (
                   <div
                     key={order.id}
                     onClick={() => setSelectedOrderForDetail(order)}
-                    className={`bg-white rounded-3xl border transition-all duration-200 shadow-xs hover:shadow-xl cursor-pointer flex flex-col justify-between group overflow-hidden ${
+                    className={`rounded-3xl border transition-all duration-200 shadow-xs hover:shadow-xl cursor-pointer flex flex-col justify-between group overflow-hidden ${
                       order.status === "cancelado"
-                        ? "border-rose-200 bg-rose-50/15 hover:border-rose-300"
+                        ? "border-2 border-rose-300 bg-rose-50/80 ring-2 ring-rose-200/60 hover:border-rose-400 shadow-sm"
                         : order.status === "entregado"
-                        ? "border-teal-200 bg-teal-50/10 hover:border-teal-300"
+                        ? "border-2 border-sky-300 bg-sky-50/80 ring-2 ring-sky-200/60 hover:border-sky-400 shadow-sm"
                         : isOverdue
-                        ? "border-rose-400 bg-rose-50/10 ring-2 ring-rose-400/20 hover:border-rose-500"
+                        ? "bg-white border-rose-400 bg-rose-50/10 ring-2 ring-rose-400/20 hover:border-rose-500"
                         : isReady
-                        ? "border-emerald-300 bg-emerald-50/10 hover:border-emerald-400"
+                        ? "bg-white border-emerald-300 bg-emerald-50/10 hover:border-emerald-400"
                         : isUpcoming
-                        ? "border-amber-300 bg-amber-50/10 hover:border-amber-400"
-                        : "border-stone-200/90 hover:border-amber-400 hover:shadow-amber-500/5"
+                        ? "bg-white border-amber-300 bg-amber-50/10 hover:border-amber-400"
+                        : "bg-white border-stone-200/90 hover:border-amber-400 hover:shadow-amber-500/5"
                     }`}
                   >
                     {/* Cuerpo de la Tarjeta */}
@@ -2845,6 +2926,16 @@ export default function PedidosPage() {
                           )}
                           {getStatusBadge(order.status)}
                         </div>
+                      </div>
+
+                      {/* Día y Hora exacta en que se realizó/levantó el pedido */}
+                      <div
+                        className="flex items-center gap-1.5 text-[11px] font-bold text-amber-900 bg-amber-50/80 border border-amber-200/80 px-2.5 py-1 rounded-xl w-fit shadow-2xs"
+                        title={`Pedido registrado el: ${creationInfo.fullDateStr}`}
+                      >
+                        <Clock className="w-3.5 h-3.5 text-amber-700 shrink-0" />
+                        <span className="text-stone-500 font-medium">Pedido realizado:</span>
+                        <span className="font-mono font-black text-amber-950">{creationInfo.fullBadgeStr}</span>
                       </div>
 
                       {/* 2. Resumen: Piezas y Total del Pedido */}
@@ -2956,19 +3047,52 @@ export default function PedidosPage() {
                       })()}
 
                       {/* Observaciones / Empaque */}
-                      {order.notes && (
-                        <div className="bg-stone-50 border border-stone-200/80 rounded-xl px-3 py-1.5 text-stone-800 text-xs">
-                          <span className="text-[10px] font-extrabold text-stone-400 uppercase tracking-wider block">
-                            📌 Observaciones:
-                          </span>
-                          <p className="text-[11px] font-medium text-stone-700 truncate">
-                            {order.notes}
-                          </p>
+                      {(() => {
+                        const { cleanNotes } = extractOrderOriginAndNotes(order);
+                        if (!cleanNotes) return null;
+                        return (
+                          <div className="bg-stone-50 border border-stone-200/80 rounded-xl px-3 py-1.5 text-stone-800 text-xs">
+                            <span className="text-[10px] font-extrabold text-stone-400 uppercase tracking-wider block">
+                              📌 Observaciones:
+                            </span>
+                            <p className="text-[11px] font-medium text-stone-700 truncate">
+                              {cleanNotes}
+                            </p>
+                          </div>
+                        );
+                      })()}
+
+                      {/* Banner Centrado de Estado: ENTREGADO o CANCELADO */}
+                      {order.status === "entregado" && (
+                        <div className="py-2 px-3 rounded-2xl bg-sky-100/90 border border-sky-300 text-sky-950 flex items-center justify-center gap-2 shadow-2xs animate-in fade-in">
+                          <PackageCheck className="w-4 h-4 text-sky-700 shrink-0" />
+                          <span className="font-black text-xs sm:text-sm tracking-wider uppercase">ENTREGADO</span>
+                        </div>
+                      )}
+
+                      {order.status === "cancelado" && (
+                        <div className="py-2 px-3 rounded-2xl bg-rose-100/90 border border-rose-300 text-rose-950 flex items-center justify-center gap-2 shadow-2xs animate-in fade-in">
+                          <XCircle className="w-4 h-4 text-rose-700 shrink-0" />
+                          <span className="font-black text-xs sm:text-sm tracking-wider uppercase">CANCELADO</span>
                         </div>
                       )}
 
                       {/* 4. Datos de Entrega, Cliente y Cobro */}
                       <div className="bg-stone-50/90 rounded-2xl p-3 border border-stone-200/80 space-y-2">
+                        {/* Fecha y Hora de Pedido (Cuándo se hizo) */}
+                        <div className="flex items-center justify-between gap-2 border-b border-stone-200/60 pb-1.5 text-[11px]">
+                          <span className="font-extrabold text-amber-800 flex items-center gap-1">
+                            <Clock className="w-3.5 h-3.5 text-amber-600" />
+                            <span>Pedido Realizado:</span>
+                          </span>
+                          <span
+                            className="font-mono font-black text-amber-950 bg-amber-100/90 border border-amber-300 px-2 py-0.5 rounded-lg shadow-2xs"
+                            title={`Registrado: ${creationInfo.fullDateStr}`}
+                          >
+                            {creationInfo.fullBadgeStr}
+                          </span>
+                        </div>
+
                         <div className="flex items-center justify-between gap-2 border-b border-stone-200/60 pb-1.5 text-xs">
                           <div className="flex items-center gap-1.5">
                             <Calendar className="w-3.5 h-3.5 text-amber-600 shrink-0" />
@@ -3042,10 +3166,10 @@ export default function PedidosPage() {
                               type="button"
                               onClick={() => setSelectedOrderForPayment(order)}
                               className="w-full py-2 px-2.5 bg-amber-500 hover:bg-amber-600 active:scale-95 text-stone-950 font-black text-xs rounded-xl shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap"
-                              title={`Cobrar saldo restante de ${formatCurrency(order.remainingBalance)}`}
+                              title={`Abonar a cuenta o liquidar saldo de ${formatCurrency(order.remainingBalance)}`}
                             >
                               <DollarSign className="w-4 h-4" />
-                              <span>Pagar {formatCurrency(order.remainingBalance)}</span>
+                              <span>Abonar / Liquidar {formatCurrency(order.remainingBalance)}</span>
                             </button>
                           ) : (
                             <div className="hidden sm:flex items-center justify-center px-2 py-1 bg-emerald-50/80 rounded-xl border border-emerald-200 text-emerald-800 text-[11px] font-black">
@@ -3078,7 +3202,7 @@ export default function PedidosPage() {
                             <span className="hidden sm:inline">Ticket</span>
                           </button>
 
-                          {!isConcludedOrHistory && (
+                          {!isConcludedOrHistory && isAdmin && (
                             <button
                               type="button"
                               onClick={(e) => {
@@ -3148,7 +3272,11 @@ export default function PedidosPage() {
                     <React.Fragment key={order.id}>
                       <tr
                         className={`transition-all duration-150 group cursor-pointer hover:shadow-xs border-l-4 ${
-                          isOverdue
+                          order.status === "cancelado"
+                            ? "bg-rose-50/80 border-l-rose-500 hover:bg-rose-100/80"
+                            : order.status === "entregado"
+                            ? "bg-sky-50/80 border-l-sky-500 hover:bg-sky-100/80"
+                            : isOverdue
                             ? "bg-rose-50/35 border-l-rose-500 hover:bg-rose-100/60"
                             : isReadyNotDelivered
                             ? "bg-emerald-50/20 border-l-emerald-500 hover:bg-emerald-100/50"
@@ -3398,16 +3526,16 @@ export default function PedidosPage() {
                               <span>Ticket</span>
                             </button>
 
-                            {/* 2. Pagar restante si no han liquidado (solo pedidos activos) */}
+                            {/* 2. Abonar / Liquidar si tiene saldo pendiente (solo pedidos activos) */}
                             {!isConcludedOrHistory && order.remainingBalance > 0 && (
                               <button
                                 type="button"
                                 onClick={() => setSelectedOrderForPayment(order)}
                                 className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-black text-xs rounded-xl transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap shadow-2xs"
-                                title={`Cobrar restante de ${formatCurrency(order.remainingBalance)}`}
+                                title={`Abonar a cuenta o liquidar saldo de ${formatCurrency(order.remainingBalance)}`}
                               >
                                 <DollarSign className="w-3.5 h-3.5" />
-                                <span>Pagar Restante ({formatCurrency(order.remainingBalance)})</span>
+                                <span>Abonar / Liquidar ({formatCurrency(order.remainingBalance)})</span>
                               </button>
                             )}
 
@@ -3422,8 +3550,8 @@ export default function PedidosPage() {
                               <span>WhatsApp</span>
                             </button>
 
-                            {/* 4. Editar (disponible para todos los pedidos activos en catálogo) */}
-                            {!isConcludedOrHistory && (
+                            {/* 4. Editar (disponible para todos los pedidos activos en catálogo - solo administradores) */}
+                            {!isConcludedOrHistory && isAdmin && (
                               <button
                                 type="button"
                                 onClick={() => setSelectedOrderForEdit(order)}
@@ -3435,8 +3563,8 @@ export default function PedidosPage() {
                               </button>
                             )}
 
-                            {/* 5. Eliminar Pedido (solo pedidos activos) */}
-                            {!isConcludedOrHistory && (
+                            {/* 5. Eliminar Pedido (solo pedidos activos - solo administradores) */}
+                            {!isConcludedOrHistory && isAdmin && (
                               <button
                                 type="button"
                                 onClick={(e) => {
@@ -3543,23 +3671,27 @@ export default function PedidosPage() {
                                     </div>
                                   )}
 
-                                  {order.notes && (
-                                    <div className="bg-amber-100/80 border-2 border-amber-400/90 rounded-xl p-3 text-amber-950 shadow-xs hover:bg-amber-100 hover:border-amber-500 hover:shadow-sm transition-all duration-150">
-                                      <div className="flex items-center gap-1.5 text-amber-900 font-black text-[11px] uppercase tracking-wider mb-1">
-                                        <span>📌</span>
-                                        <span>Notas:</span>
+                                  {(() => {
+                                    const { cleanNotes } = extractOrderOriginAndNotes(order);
+                                    if (!cleanNotes) return null;
+                                    return (
+                                      <div className="bg-amber-100/80 border-2 border-amber-400/90 rounded-xl p-3 text-amber-950 shadow-xs hover:bg-amber-100 hover:border-amber-500 hover:shadow-sm transition-all duration-150">
+                                        <div className="flex items-center gap-1.5 text-amber-900 font-black text-[11px] uppercase tracking-wider mb-1">
+                                          <span>📌</span>
+                                          <span>Notas:</span>
+                                        </div>
+                                        <p className="text-xs font-bold text-amber-950 leading-relaxed pl-5">
+                                          {cleanNotes}
+                                        </p>
                                       </div>
-                                      <p className="text-xs font-bold text-amber-950 leading-relaxed pl-5">
-                                        {order.notes}
-                                      </p>
-                                    </div>
-                                  )}
+                                    );
+                                  })()}
                                 </div>
 
                                 <div className="pt-3 flex flex-wrap items-center justify-between gap-2 border-t-2 border-stone-200 mt-2.5">
                                   <span className="text-xs font-semibold text-stone-500">Atendió: {order.cashier}</span>
                                   <div className="flex items-center gap-2">
-                                    {!isConcludedOrHistory && order.status !== "cancelado" && (
+                                    {isAdmin && !isConcludedOrHistory && order.status !== "cancelado" && (
                                       <button
                                         type="button"
                                         onClick={() => handleCancelOrder(order.id)}
@@ -3570,7 +3702,7 @@ export default function PedidosPage() {
                                         <span>Cancelar Pedido</span>
                                       </button>
                                     )}
-                                    {!isConcludedOrHistory && (
+                                    {isAdmin && !isConcludedOrHistory && (
                                       <button
                                         type="button"
                                         onClick={() => handleDeletePermanent(order.id, order.orderNumber, order.customerName)}
@@ -3654,8 +3786,7 @@ export default function PedidosPage() {
         isHistoryMode={
           classificationFilter === "historial" ||
           (selectedOrderForDetail
-            ? selectedOrderForDetail.status === "entregado" ||
-              selectedOrderForDetail.status === "cancelado"
+            ? selectedOrderForDetail.status === "cancelado"
             : false)
         }
         onPrintReceipt={(o) => {
@@ -3664,9 +3795,9 @@ export default function PedidosPage() {
         onOpenPayment={(o) => {
           setSelectedOrderForPayment(o);
         }}
-        onOpenEdit={(o) => {
+        onOpenEdit={isAdmin ? (o) => {
           setSelectedOrderForEdit(o);
-        }}
+        } : undefined}
         onAdvanceStatus={(o) => {
           handleAdvanceStatus(o);
           setReadyNotificationOrder(o);
@@ -3684,7 +3815,8 @@ export default function PedidosPage() {
           }
           updateOrderStatus(o.id, "entregado");
           loadOrders();
-          setSelectedOrderForDetail(null);
+          const updated = getStoredOrders().find((item) => item.id === o.id);
+          if (updated) setSelectedOrderForDetail(updated);
           addNotification({
             id: `notif-order-status-${o.id}-entregado`,
             title: "Pedido Entregado",
@@ -3704,9 +3836,9 @@ export default function PedidosPage() {
         onSendWhatsApp={(o) => {
           handleSendWhatsApp(o);
         }}
-        onDarDeBaja={(o) => {
+        onDarDeBaja={isAdmin ? (o) => {
           handleDarDeBaja(o);
-        }}
+        } : undefined}
       />
 
       {/* Dashboard Independiente de Historial de Pedidos (Entregados y Cancelados) */}
@@ -3750,9 +3882,9 @@ export default function PedidosPage() {
             });
           }
         }}
-        onDeleteOrderPermanently={(order) => {
+        onDeleteOrderPermanently={isAdmin ? (order) => {
           handleDarDeBaja(order);
-        }}
+        } : undefined}
       />
 
       {/* ── Mensaje Personalizado con Color: "El producto ya está en sucursal" ── */}

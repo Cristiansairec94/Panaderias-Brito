@@ -35,7 +35,7 @@ export default function EditOrderModal({
   onOrderUpdated,
 }: EditOrderModalProps) {
   const { user } = useAuth();
-  const isAdmin = user?.role === "admin";
+  const isAdmin = Boolean(user && (user.role === "admin" || user.role === "auxiliar_admin"));
   const { branches } = useBranch();
 
   const [customerName, setCustomerName] = useState("");
@@ -63,7 +63,7 @@ export default function EditOrderModal({
     }
   }, [order]);
 
-  if (!isOpen || !order) return null;
+  if (!isOpen || !order || !isAdmin) return null;
 
   const handleSave = () => {
     if (!customerName.trim()) {

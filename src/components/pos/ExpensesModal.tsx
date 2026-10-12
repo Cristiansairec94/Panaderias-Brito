@@ -723,15 +723,15 @@ export default function ExpensesModal({
   const [expandedSaleId, setExpandedSaleId] = useState<string | null>(null);
   const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
 
-  // Sincronizar pedidos especiales en memoria y desde almacenamiento (excluyendo 100% entregados y cancelados)
+  // Sincronizar pedidos especiales en memoria y desde almacenamiento (excluyendo solo cancelados)
   const [internalOrders, setInternalOrders] = useState<CustomOrder[]>(() => {
     const raw = Array.isArray(orders) ? orders : getStoredOrders();
-    return raw.filter((o) => o && o.status !== "entregado" && o.status !== "cancelado");
+    return raw.filter((o) => o && o.status !== "cancelado");
   });
 
   useEffect(() => {
     const raw = Array.isArray(orders) ? orders : getStoredOrders();
-    setInternalOrders(raw.filter((o) => o && o.status !== "entregado" && o.status !== "cancelado"));
+    setInternalOrders(raw.filter((o) => o && o.status !== "cancelado"));
   }, [orders, isOpen]);
 
   const [ordersVersion, setOrdersVersion] = useState(0);
@@ -739,7 +739,7 @@ export default function ExpensesModal({
   useEffect(() => {
     const handleOrdersUpdated = () => {
       setOrdersVersion((v) => v + 1);
-      setInternalOrders(getStoredOrders().filter((o) => o && o.status !== "entregado" && o.status !== "cancelado"));
+      setInternalOrders(getStoredOrders().filter((o) => o && o.status !== "cancelado"));
     };
     window.addEventListener("brito_orders_updated", handleOrdersUpdated);
     window.addEventListener("storage", handleOrdersUpdated);
@@ -1570,7 +1570,7 @@ export default function ExpensesModal({
       window.dispatchEvent(new Event("brito_orders_updated"));
     }
     setOrdersVersion((v) => v + 1);
-    setInternalOrders(getStoredOrders().filter((o) => o && o.status !== "entregado" && o.status !== "cancelado"));
+    setInternalOrders(getStoredOrders().filter((o) => o && o.status !== "cancelado"));
   };
 
   const handleCancelOrder = (order: CustomOrder) => {
@@ -1590,7 +1590,7 @@ export default function ExpensesModal({
       window.dispatchEvent(new Event("brito_orders_updated"));
     }
     setOrdersVersion((v) => v + 1);
-    setInternalOrders(getStoredOrders().filter((o) => o && o.status !== "entregado" && o.status !== "cancelado"));
+    setInternalOrders(getStoredOrders().filter((o) => o && o.status !== "cancelado"));
   };
 
   const handleSendOrderWhatsApp = (order: CustomOrder) => {
@@ -2412,7 +2412,7 @@ export default function ExpensesModal({
                   </div>
                   <div className="text-right shrink-0">
                     <span className="text-stone-400 text-[10px] mr-2">
-                      ${Number(item.unitPrice || 0).toFixed(2)} c/u
+                      {formatCurrency(item.unitPrice || 0)} c/u
                     </span>
                     <span className="font-black text-stone-900">
                       {formatCurrency((item.unitPrice || 0) * item.quantity)}
@@ -4927,13 +4927,13 @@ export default function ExpensesModal({
           }
           if (nextStatus !== order.status) {
             updateOrderStatus(order.id, nextStatus);
-            const updated = getStoredOrders().find((o) => o.id === order.id);
-            if (updated) setSelectedOrderDetail(updated);
             if (typeof window !== "undefined") {
               window.dispatchEvent(new Event("brito_orders_updated"));
             }
             setOrdersVersion((v) => v + 1);
-            setInternalOrders(getStoredOrders().filter((o) => o && o.status !== "entregado" && o.status !== "cancelado"));
+            setInternalOrders(getStoredOrders().filter((o) => o && o.status !== "cancelado"));
+            const updated = getStoredOrders().find((o) => o.id === order.id);
+            if (updated) setSelectedOrderDetail(updated);
           }
         }}
         onDeliverOrder={(order) => {
@@ -4944,14 +4944,15 @@ export default function ExpensesModal({
             handlePayOrder(order);
             return;
           }
-          if (confirm(`¿Confirmas marcar el pedido #${order.orderNumber} de "${order.customerName}" como ENTREGADO?\n\nEl pedido se marcará como entregado y desaparecerá de la lista de pedidos pendientes.`)) {
+          if (confirm(`¿Confirmas marcar el pedido #${order.orderNumber} de "${order.customerName}" como ENTREGADO?`)) {
             updateOrderStatus(order.id, "entregado");
-            setSelectedOrderDetail(null);
             if (typeof window !== "undefined") {
               window.dispatchEvent(new Event("brito_orders_updated"));
             }
             setOrdersVersion((v) => v + 1);
-            setInternalOrders(getStoredOrders().filter((o) => o && o.status !== "entregado" && o.status !== "cancelado"));
+            setInternalOrders(getStoredOrders().filter((o) => o && o.status !== "cancelado"));
+            const updated = getStoredOrders().find((item) => item.id === order.id);
+            if (updated) setSelectedOrderDetail(updated);
           }
         }}
         onSendWhatsApp={(order) => {

@@ -30,6 +30,7 @@ import { getStoredProducts } from "@/lib/products";
 import { getStoredOrders, addCustomOrder, addOrderPayment, updateOrderStatus } from "@/lib/orders";
 import { useNotifications } from "@/context/NotificationContext";
 import { useBranch } from "@/context/BranchContext";
+import OrderPaymentModal from "@/components/pedidos/OrderPaymentModal";
 
 interface BreadOrdersDrawerProps {
   isOpen: boolean;
@@ -92,6 +93,7 @@ export default function BreadOrdersDrawer({
   // Liquidation modal or action state
   const [payingOrderId, setPayingOrderId] = useState<string | null>(null);
   const [liquidationPaymentMethod, setLiquidationPaymentMethod] = useState<"efectivo" | "tarjeta" | "transferencia">("efectivo");
+  const [selectedOrderForPayment, setSelectedOrderForPayment] = useState<CustomOrder | null>(null);
 
   // Load products and orders on mount & when opened
   useEffect(() => {
@@ -1018,49 +1020,16 @@ export default function BreadOrdersDrawer({
                           </button>
                         </div>
 
-                        {/* Botón de Cobrar y Entregar */}
+                        {/* Botón de Abonar o Liquidar / Entregar */}
                         {order.remainingBalance > 0 ? (
-                          !isPayingThis ? (
-                            <button
-                              type="button"
-                              onClick={() => setPayingOrderId(order.id)}
-                              className="py-1.5 px-3 bg-[#3e2723] hover:bg-black text-amber-50 rounded-xl text-xs font-black shadow-sm transition-all flex items-center gap-1.5 border border-amber-600"
-                            >
-                              <DollarSign className="w-3.5 h-3.5 text-amber-400" />
-                              <span>Cobrar {formatCurrency(order.remainingBalance)} y Entregar</span>
-                            </button>
-                          ) : (
-                            <div className="flex items-center gap-2 bg-stone-100 p-1.5 rounded-xl border border-stone-300 w-full justify-between">
-                              <span className="text-xs font-black text-stone-800">
-                                Cobrar {formatCurrency(order.remainingBalance)} en:
-                              </span>
-                              <div className="flex items-center gap-1">
-                                <select
-                                  value={liquidationPaymentMethod}
-                                  onChange={(e) => setLiquidationPaymentMethod(e.target.value as any)}
-                                  className="text-xs font-bold bg-white border border-stone-300 rounded-lg px-2 py-1"
-                                >
-                                  <option value="efectivo">Efectivo</option>
-                                  <option value="tarjeta">Tarjeta</option>
-                                  <option value="transferencia">Transferencia</option>
-                                </select>
-                                <button
-                                  type="button"
-                                  onClick={() => handleLiquidateOrder(order)}
-                                  className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold"
-                                >
-                                  Confirmar Cobro
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => setPayingOrderId(null)}
-                                  className="px-2 py-1 bg-stone-200 hover:bg-stone-300 text-stone-700 rounded-lg text-xs"
-                                >
-                                  ✕
-                                </button>
-                              </div>
-                            </div>
-                          )
+                          <button
+                            type="button"
+                            onClick={() => setSelectedOrderForPayment(order)}
+                            className="py-1.5 px-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-xl text-xs font-black shadow-sm transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
+                          >
+                            <DollarSign className="w-3.5 h-3.5 text-white" />
+                            <span>Abonar / Liquidar ({formatCurrency(order.remainingBalance)})</span>
+                          </button>
                         ) : (
                           <button
                             type="button"
@@ -1068,7 +1037,7 @@ export default function BreadOrdersDrawer({
                               updateOrderStatus(order.id, "entregado");
                               refreshOrders();
                             }}
-                            className="py-1.5 px-3 bg-stone-900 hover:bg-stone-800 text-white rounded-xl text-xs font-black shadow-sm transition-all flex items-center gap-1"
+                            className="py-1.5 px-3 bg-stone-900 hover:bg-stone-800 text-white rounded-xl text-xs font-black shadow-sm transition-all flex items-center gap-1 cursor-pointer active:scale-95"
                           >
                             <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
                             <span>Marcar como Entregado</span>
@@ -1085,6 +1054,18 @@ export default function BreadOrdersDrawer({
         </div>
 
       </div>
+
+      {selectedOrderForPayment && (
+        <OrderPaymentModal
+          isOpen={!!selectedOrderForPayment}
+          onClose={() => setSelectedOrderForPayment(null)}
+          order={selectedOrderForPayment}
+          onPaymentSuccess={() => {
+            refreshOrders();
+            setSelectedOrderForPayment(null);
+          }}
+        />
+      )}
     </div>
   );
 }
