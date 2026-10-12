@@ -6,7 +6,7 @@ import { realtimeHub } from "@/lib/realtime/realtimeHub";
 import { recordCashOutflowAsExpense } from "@/lib/expenses";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/context/AuthContext";
-import { parseDateTimeSafe, getStoredShiftStartBoundary, formatDateTimeSafe, compareMovementsDesc } from "@/lib/utils";
+import { parseDateTimeSafe, getStoredShiftStartBoundary, formatDateTimeSafe, compareMovementsDesc, resolveBranchId } from "@/lib/utils";
 import { normalizeOrder } from "@/lib/orders";
 
 export interface SimulatedSale {
@@ -353,33 +353,82 @@ interface BranchContextType {
   };
 }
 
+export function syncBranchWithUsers(branch: Branch, users: any[]): Branch {
+  if (!users || users.length === 0 || !branch || !branch.id) return branch;
+
+  // 1. Buscar usuario asignado explícitamente por ID
+  let assignedUser = branch.assignedUserId 
+    ? users.find((u: any) => u.id === branch.assignedUserId && u.status !== "inactivo") 
+    : undefined;
+
+  // 2. Si no se encuentra o el usuario asignado no coincide con la sucursal, buscar usuario activo cuya sucursal asignada coincida con este ID
+  if (!assignedUser || (assignedUser.assignedBranchId && assignedUser.assignedBranchId !== branch.id)) {
+    const branchUsers = users.filter((u: any) => u.assignedBranchId === branch.id && u.status !== "inactivo");
+    assignedUser = branchUsers.find((u: any) => u.role === "cajero") || 
+                   branchUsers.find((u: any) => u.role === "supervisor") || 
+                   branchUsers[0] || 
+                   assignedUser;
+  }
+
+  // 3. Si no se encuentra, buscar por coincidencia en el nombre o usuario previo
+  if (!assignedUser) {
+    const mgrLower = (branch.manager || "").toLowerCase().trim();
+    const assLower = (branch.assignedUserName || "").toLowerCase().trim();
+    assignedUser = users.find((u: any) => 
+      u.status !== "inactivo" && (
+        (u.name && (mgrLower === u.name.toLowerCase() || assLower === u.name.toLowerCase())) ||
+        (u.username && (mgrLower === u.username.toLowerCase() || assLower === u.username.toLowerCase()))
+      )
+    );
+  }
+
+  if (assignedUser) {
+    return {
+      ...branch,
+      assignedUserId: assignedUser.id,
+      assignedUserName: assignedUser.name,
+      assignedUserEmail: assignedUser.email || branch.assignedUserEmail,
+      manager: assignedUser.name,
+      currentShift: branch.currentShift ? {
+        ...branch.currentShift,
+        cashier: assignedUser.name,
+      } : branch.currentShift,
+    };
+  }
+
+  return branch;
+}
+
 const BranchContext = createContext<BranchContextType | undefined>(undefined);
 
 export function BranchProvider({ children }: { children: React.ReactNode }) {
-  const { user, permissions } = useAuth();
+  const { user, usersList, permissions } = useAuth();
   const isBranchProfile = Boolean(
     !user ||
     user.role === "cajero" ||
     user.role === "panadero" ||
     user.role === "supervisor" ||
-    user.username === "andres" ||
-    user.username === "carlos" ||
-    user.username === "carlos.bueno" ||
-    user.name?.toLowerCase().includes("andres") ||
-    user.name?.toLowerCase().includes("carlos") ||
     Boolean(user.assignedBranchId && user.role !== "admin" && user.role !== "auxiliar_admin")
   );
   const isAdmin = !isBranchProfile && Boolean(user && (user.role === "admin" || user.role === "auxiliar_admin"));
   const canSwitchBranches = isAdmin;
   const userAssignedBranchId = (
     user?.assignedBranchId ||
-    (user?.username === "andres" || user?.name?.toLowerCase().includes("andres") ? "branch-angeles" : "") ||
-    (user?.username === "carlos" || user?.name?.toLowerCase().includes("mendoza") ? "branch-benito" : "") ||
-    (user?.username === "carlos.bueno" || user?.name?.toLowerCase().includes("bueno") ? "branch-matriz" : "") ||
     ""
   ).trim();
 
   const [branches, setBranches] = useState<Branch[]>(() => {
+    let initialUsers: any[] = [];
+    if (typeof window !== "undefined") {
+      try {
+        const rawUsers = localStorage.getItem("brito_custom_users");
+        if (rawUsers) {
+          const parsedU = JSON.parse(rawUsers);
+          if (Array.isArray(parsedU)) initialUsers = parsedU;
+        }
+      } catch {}
+    }
+
     if (typeof window !== "undefined") {
       try {
         const deletedIds = getDeletedBranchIds();
@@ -390,7 +439,7 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
             // Filtrar estrictamente cualquier sucursal eliminada por un administrador
             const filtered = parsed.filter((b: Branch) => b && b.id && !deletedIds.has(b.id));
             if (filtered.length > 0) {
-              return filtered;
+              return filtered.map((b) => syncBranchWithUsers(b, initialUsers));
             }
           }
         }
@@ -398,7 +447,8 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
     }
     const deletedIds = typeof window !== "undefined" ? getDeletedBranchIds() : new Set<string>();
     const initialDefault = DEFAULT_BRANCHES.filter((b) => !deletedIds.has(b.id));
-    return initialDefault.length > 0 ? initialDefault : [DEFAULT_BRANCHES[0]];
+    const base = initialDefault.length > 0 ? initialDefault : [DEFAULT_BRANCHES[0]];
+    return base.map((b) => syncBranchWithUsers(b, initialUsers));
   });
 
 function resolveBranchParam(param: string | null): string | null {
@@ -461,6 +511,62 @@ function resolveBranchParam(param: string | null): string | null {
       } catch {}
     }
   }, [canSwitchBranches, userAssignedBranchId]);
+
+  // Sincronizar dinámicamente cada sucursal con la plantilla autoritativa de perfiles del administrador
+  useEffect(() => {
+    if (!usersList || usersList.length === 0) return;
+    setBranches((prevBranches) => {
+      let changed = false;
+      const reconciled = prevBranches.map((b) => {
+        const synced = syncBranchWithUsers(b, usersList);
+        if (
+          synced.manager !== b.manager ||
+          synced.assignedUserName !== b.assignedUserName ||
+          synced.assignedUserId !== b.assignedUserId ||
+          synced.currentShift?.cashier !== b.currentShift?.cashier
+        ) {
+          changed = true;
+          return synced;
+        }
+        return b;
+      });
+      if (changed) {
+        try {
+          localStorage.setItem("brito_branches_data", JSON.stringify(reconciled));
+        } catch {}
+        return reconciled;
+      }
+      return prevBranches;
+    });
+  }, [usersList]);
+
+  // Escuchar eventos de actualización de perfiles desde cualquier pestaña o componente del administrador
+  useEffect(() => {
+    const handleUsersUpdated = () => {
+      try {
+        const raw = localStorage.getItem("brito_custom_users");
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setBranches((prev) => {
+              const reconciled = prev.map((b) => syncBranchWithUsers(b, parsed));
+              try {
+                localStorage.setItem("brito_branches_data", JSON.stringify(reconciled));
+              } catch {}
+              return reconciled;
+            });
+          }
+        }
+      } catch {}
+    };
+    window.addEventListener("brito_users_updated", handleUsersUpdated);
+    window.addEventListener("storage", (e) => {
+      if (e.key === "brito_custom_users") handleUsersUpdated();
+    });
+    return () => {
+      window.removeEventListener("brito_users_updated", handleUsersUpdated);
+    };
+  }, []);
 
   const [isLiveSimulating, setIsLiveSimulating] = useState(false);
   const [recentSimulatedSales, setRecentSimulatedSales] = useState<SimulatedSale[]>([]);
@@ -581,13 +687,8 @@ function resolveBranchParam(param: string | null): string | null {
 
           allCutsList.forEach((cut) => {
             let bId = cut.branchId || "branch-matriz";
-            if (bId === "branch-matriz") {
-              const resp = (cut.responsible || cut.outgoingCashier || "").toLowerCase();
-              if (resp.includes("silvia")) {
-                bId = "branch-1790889237862";
-              } else if (resp.includes("andres")) {
-                bId = "branch-angeles";
-              }
+            if (bId === "branch-matriz" && (cut.responsible || cut.outgoingCashier)) {
+              bId = resolveBranchId(cut.branchId, cut.responsible || cut.outgoingCashier);
             }
             if (!latestCutByBranch.has(bId)) {
               latestCutByBranch.set(bId, cut);
@@ -731,17 +832,7 @@ function resolveBranchParam(param: string | null): string | null {
           });
 
           const resolveBranchForRecord = (rawBranchId: string | null | undefined, cashierName?: string): string => {
-            let bId = rawBranchId || "branch-matriz";
-            if (cashierName) {
-              const cLower = cashierName.toLowerCase();
-              if (cLower.includes("silvia")) {
-                return "branch-1790889237862";
-              }
-              if (cLower.includes("andres")) {
-                return "branch-angeles";
-              }
-            }
-            return bId;
+            return resolveBranchId(rawBranchId, cashierName);
           };
 
           // 1. Agregar ventas de mostrador (filtrando turno activo vs acumulado)
@@ -1014,32 +1105,35 @@ function resolveBranchParam(param: string | null): string | null {
               const totalOutflows = Math.max(agg.cashOutflow, agg.expCash);
               const calculatedCash = Math.max(0, initialFund + agg.deskCash + agg.orderCash + agg.cashInflow - totalOutflows);
 
-              // Cajero del turno activo:
-              let activeCashier = b.currentShift?.cashier || b.manager || "Cajero";
+              // Cajero del turno activo vinculado estrictamente a la plantilla de perfiles del administrador:
+              const assignedEmployee = usersList.find((u) => 
+                (b.assignedUserId && u.id === b.assignedUserId && u.status !== "inactivo") || 
+                (u.assignedBranchId === b.id && u.status !== "inactivo")
+              );
+
+              let activeCashier = assignedEmployee?.name || b.assignedUserName || b.manager || "Don Toño Brito";
+
               if (user && user.role === "cajero" && (user.id === b.assignedUserId || user.assignedBranchId === b.id) && user.name) {
                 activeCashier = user.name;
-              } else if (agg.lastCashier && agg.lastCashier.trim().length > 0) {
-                activeCashier = agg.lastCashier;
-              } else if (latestCut?.incomingCashier && !latestCut.incomingCashier.includes("Cajera 2")) {
-                activeCashier = latestCut.incomingCashier;
-              } else if (b.id === "branch-matriz") {
-                activeCashier = "carlos bueno";
-              } else if (b.id === "branch-1790889237862") {
-                activeCashier = "silvia puga";
-              } else if (b.id === "branch-angeles") {
-                activeCashier = "andres sanchez";
-              } else if (b.id === "branch-sanjuan") {
-                activeCashier = "noe velasquez";
-              } else if (b.id === "branch-benito") {
-                activeCashier = "Carlos Mendoza";
-              } else if (b.currentShift?.cashier && !b.currentShift.cashier.includes("Cajera 2")) {
+              } else if (assignedEmployee?.name) {
+                activeCashier = assignedEmployee.name;
+              } else if (b.currentShift?.cashier && usersList.some((u) => u.name === b.currentShift.cashier)) {
                 activeCashier = b.currentShift.cashier;
+              } else if (latestCut?.incomingCashier && usersList.some((u) => u.name === latestCut.incomingCashier)) {
+                activeCashier = latestCut.incomingCashier;
+              } else if (agg.lastCashier && usersList.some((u) => u.name === agg.lastCashier)) {
+                activeCashier = agg.lastCashier;
+              } else if (b.manager && usersList.some((u) => u.name === b.manager)) {
+                activeCashier = b.manager;
               } else {
-                activeCashier = b.manager || "Cajero";
+                activeCashier = "Don Toño Brito";
               }
 
               return {
                 ...b,
+                manager: activeCashier || assignedEmployee?.name || b.manager || "Don Toño Brito",
+                assignedUserName: assignedEmployee?.name || b.assignedUserName || "Don Toño Brito",
+                assignedUserId: assignedEmployee?.id || b.assignedUserId,
                 todaySales: totalCobrado,
                 todayTickets: totalTickets,
                 cashInDrawer: calculatedCash,
@@ -1051,7 +1145,6 @@ function resolveBranchParam(param: string | null): string | null {
                 lastCut: latestCut,
                 dayAccumulatedSales: agg.dayAccumulatedDeskSales + agg.dayAccumulatedOrdersDeposit,
                 dayAccumulatedTickets: agg.dayAccumulatedDeskTickets,
-                manager: activeCashier,
                 currentShift: {
                   id: b.currentShift?.id || `shift-${b.id}`,
                   name: latestCut?.nextShift || b.currentShift?.name || (b.id === "branch-1790889237862" ? "Turno Matutino" : "Turno General"),
@@ -1427,12 +1520,7 @@ function resolveBranchParam(param: string | null): string | null {
     // 1. Escuchar VENTAS en tiempo real
     const unsubSale = realtimeHub.onSale
       ? realtimeHub.onSale((sale) => {
-          let targetBranchId = sale.branchId;
-          if ((!targetBranchId || targetBranchId === "branch-matriz") && sale.cashier && sale.cashier.toLowerCase().includes("silvia")) {
-            targetBranchId = "branch-1790889237862";
-          } else if ((!targetBranchId || targetBranchId === "branch-matriz") && sale.cashier && sale.cashier.toLowerCase().includes("andres")) {
-            targetBranchId = "branch-angeles";
-          }
+          const targetBranchId = resolveBranchId(sale.branchId, sale.cashier);
 
           // A) Actualizar métricas y turno de la sucursal receptora
           setBranches((prev) => {
@@ -1795,13 +1883,8 @@ function resolveBranchParam(param: string | null): string | null {
       ? realtimeHub.onShiftCut((cut) => {
           if (!cut) return;
           let bId = cut.branchId || "branch-matriz";
-          if (bId === "branch-matriz") {
-            const resp = (cut.responsible || cut.outgoingCashier || "").toLowerCase();
-            if (resp.includes("silvia")) {
-              bId = "branch-1790889237862";
-            } else if (resp.includes("andres")) {
-              bId = "branch-angeles";
-            }
+          if (bId === "branch-matriz" && (cut.responsible || cut.outgoingCashier)) {
+            bId = resolveBranchId(cut.branchId, cut.responsible || cut.outgoingCashier);
           }
           const bName = cut.branchName || (bId === "branch-1790889237862" ? "Sucursal San Ildefonso" : "Sucursal");
           const cutMov: BranchCashMovement = {
@@ -2528,9 +2611,10 @@ function resolveBranchParam(param: string | null): string | null {
 
         const isMatutino = b.currentShift.name.includes("Matutino");
         const nextShiftName = isMatutino ? "Turno Vespertino (14:00 - 22:00)" : "Turno Matutino (06:00 - 14:00)";
-        const nextCashier = isMatutino 
-          ? (b.id === "branch-matriz" ? "Raúl Gómez" : "Mariana López") 
-          : (b.id === "branch-matriz" ? "Lupita Brito" : "Carlos Mendoza");
+        const branchCandidates = usersList.filter((u) => u.assignedBranchId === b.id && u.status !== "inactivo");
+        const otherCandidates = usersList.filter((u) => u.status !== "inactivo" && u.role === "cajero");
+        const nextCandidate = branchCandidates.find((u) => u.name !== b.currentShift.cashier) || branchCandidates[0] || otherCandidates[0];
+        const nextCashier = nextCandidate ? nextCandidate.name : (b.assignedUserName || b.manager || "Don Toño Brito");
 
         const newShift: BranchShift = {
           id: `shift-${b.code.toLowerCase()}-${Date.now()}`,
