@@ -5127,15 +5127,6 @@ export default function POSPage() {
               }
             }
           } catch (e) {}
-          addNotification({
-            senderName: "💰 Pedido Liquidado",
-            senderAvatar: "🥖",
-            badgeIcon: "dinero",
-            title: "Saldo Cobrado con Éxito",
-            highlightText: "Ingreso registrado en caja",
-            description: "El saldo restante ha sido cobrado. El pedido sigue listo en sucursal para entregarse.",
-            category: "caja",
-          });
         }}
       />
     </div>

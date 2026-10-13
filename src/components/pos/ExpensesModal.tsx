@@ -67,6 +67,7 @@ import TicketModal from "@/components/pos/TicketModal";
 import OrderReceiptModal from "@/components/pedidos/OrderReceiptModal";
 import OrderDetailModal from "@/components/pedidos/OrderDetailModal";
 import PrinterConfigModal from "@/components/pos/PrinterConfigModal";
+import DeliverOrderConfirmModal from "@/components/pedidos/DeliverOrderConfirmModal";
 
 interface UnifiedTicketItem {
   id: string;
@@ -498,6 +499,7 @@ export default function ExpensesModal({
   const [previewOrder, setPreviewOrder] = useState<CustomOrder | null>(null);
   const [selectedOrderDetail, setSelectedOrderDetail] = useState<CustomOrder | null>(null);
   const [showPrinterModal, setShowPrinterModal] = useState(false);
+  const [orderToDeliver, setOrderToDeliver] = useState<CustomOrder | null>(null);
 
   useEffect(() => {
     if (initialTab) {
@@ -1594,17 +1596,17 @@ export default function ExpensesModal({
       return;
     }
 
-    const ok = confirm(
-      `¿Confirmas marcar el pedido #${order.orderNumber} de "${order.customerName}" como ENTREGADO?\n\nEl pedido se marcará como entregado y se eliminará de esta sección de pedidos por entregar en caja.`
-    );
-    if (!ok) return;
+    setOrderToDeliver(order);
+  };
 
+  const handleConfirmDeliverOrder = (order: CustomOrder) => {
     updateOrderStatus(order.id, "entregado");
     if (typeof window !== "undefined") {
       window.dispatchEvent(new Event("brito_orders_updated"));
     }
     setOrdersVersion((v) => v + 1);
     setInternalOrders(getStoredOrders().filter((o) => o && o.status !== "cancelado"));
+    setOrderToDeliver(null);
   };
 
   const handleCancelOrder = (order: CustomOrder) => {
@@ -4978,16 +4980,14 @@ export default function ExpensesModal({
             handlePayOrder(order);
             return;
           }
-          if (confirm(`¿Confirmas marcar el pedido #${order.orderNumber} de "${order.customerName}" como ENTREGADO?`)) {
-            updateOrderStatus(order.id, "entregado");
-            if (typeof window !== "undefined") {
-              window.dispatchEvent(new Event("brito_orders_updated"));
-            }
-            setOrdersVersion((v) => v + 1);
-            setInternalOrders(getStoredOrders().filter((o) => o && o.status !== "cancelado"));
-            const updated = getStoredOrders().find((item) => item.id === order.id);
-            if (updated) setSelectedOrderDetail(updated);
+          updateOrderStatus(order.id, "entregado");
+          if (typeof window !== "undefined") {
+            window.dispatchEvent(new Event("brito_orders_updated"));
           }
+          setOrdersVersion((v) => v + 1);
+          setInternalOrders(getStoredOrders().filter((o) => o && o.status !== "cancelado"));
+          const updated = getStoredOrders().find((item) => item.id === order.id);
+          if (updated) setSelectedOrderDetail(updated);
         }}
         onSendWhatsApp={(order) => {
           const cleanPhone = (order.phone || "").replace(/\D/g, "");
@@ -5024,6 +5024,17 @@ export default function ExpensesModal({
       onClose={() => setShowPrinterModal(false)}
       branchName={branchName || "Sucursal Matriz"}
       cashierName={cashierName}
+    />
+
+    <DeliverOrderConfirmModal
+      isOpen={Boolean(orderToDeliver)}
+      order={orderToDeliver}
+      onClose={() => setOrderToDeliver(null)}
+      onConfirm={() => {
+        if (orderToDeliver) {
+          handleConfirmDeliverOrder(orderToDeliver);
+        }
+      }}
     />
   </>
   );

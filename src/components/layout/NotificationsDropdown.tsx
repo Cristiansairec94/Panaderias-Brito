@@ -166,14 +166,15 @@ export default function NotificationsDropdown() {
     )
   );
 
-  // Determinar el código canónico de la sucursal activa o asignada
+  // Determinar el código canónico de la sucursal asignada al perfil (prioridad estricta al usuario en perfiles operativos)
   const activeBranchCode = getCanonicalBranchCode(
     (isAndresSanchez ? "branch-angeles" : "") ||
+    (!isAdmin ? (user?.assignedBranchId || user?.assignedBranchName || "") : "") ||
+    (usernameNorm === "carlos" || userNorm.includes("mendoza") ? "branch-benito" : "") ||
+    (usernameNorm === "carlos.bueno" || userNorm.includes("bueno") ? "branch-matriz" : "") ||
     (!isAllBranches && currentBranch?.id && currentBranch.id !== "all" ? currentBranch.id : "") ||
     user?.assignedBranchId ||
     user?.assignedBranchName ||
-    (usernameNorm === "carlos" || userNorm.includes("mendoza") ? "branch-benito" : "") ||
-    (usernameNorm === "carlos.bueno" || userNorm.includes("bueno") ? "branch-matriz" : "") ||
     (currentBranch?.id && currentBranch.id !== "all" ? currentBranch.id : "")
   );
 
@@ -234,7 +235,7 @@ export default function NotificationsDropdown() {
   }, [isOpen]);
 
   // Para sucursales (Los Ángeles, etc.) y cajeros:
-  // Únicamente se visualizan las notificaciones de pedidos correspondientes a esa sucursal.
+  // Únicamente se visualizan las notificaciones de pedidos correspondientes a esa sucursal (tanto origen como destino).
   const visibleNotifications = showOnlyPedidos
     ? notifications.filter((n) => {
         const isPed = n.category === "pedidos" || Boolean(n.orderId);
@@ -267,7 +268,7 @@ export default function NotificationsDropdown() {
           }
         }
 
-        const text = `${n.title || ""} ${n.highlightText || ""} ${n.description || ""} ${n.senderName || ""}`.toLowerCase();
+        const text = `${n.title || ""} ${n.highlightText || ""} ${n.description || ""} ${n.senderName || ""} ${order?.notes || ""}`.toLowerCase();
         if (activeBranchCode === "branch-matriz" && (text.includes("matriz") || text.includes("centro"))) return true;
         if (activeBranchCode === "branch-angeles" && (text.includes("angeles") || text.includes("ángeles"))) return true;
         if (activeBranchCode === "branch-sanjuan" && (text.includes("san juan") || text.includes("sanjuan"))) return true;
@@ -279,30 +280,47 @@ export default function NotificationsDropdown() {
       })
     : notifications;
 
+  const isOrderNotifItem = (n: FBNotification) =>
+    n.category === "pedidos" ||
+    Boolean(n.orderId) ||
+    Boolean(n.orderData) ||
+    n.title.toLowerCase().includes("pedido") ||
+    /PED-\d+/i.test(`${n.title} ${n.highlightText} ${n.description}`);
+
+  const isShiftCutNotifItem = (n: FBNotification) =>
+    !isOrderNotifItem(n) &&
+    (n.category === "caja" ||
+      Boolean(n.cutId) ||
+      Boolean(n.shiftCutData) ||
+      n.title.toLowerCase().includes("cierre") ||
+      n.title.toLowerCase().includes("corte"));
+
   const seenOrderKeys = new Set<string>();
   const deduplicatedVisibleNotifications = visibleNotifications.filter((n) => {
-    const isOrderNotif = n.category === "pedidos" || Boolean(n.orderId) || n.title.toLowerCase().includes("pedido");
-    if (!isOrderNotif) return true;
+    if (!isOrderNotifItem(n)) return true;
     const parsed = parseOrderNotification(n);
-    const key = (parsed?.folio || parsed?.storedOrder?.id || n.orderId || "").toUpperCase().trim();
+    const key = (parsed?.folio || parsed?.storedOrder?.id || n.orderId || "")
+      .toUpperCase()
+      .trim()
+      .replace(/^PED-0+/i, "PED-");
     if (!key) return true;
     if (seenOrderKeys.has(key)) return false;
     seenOrderKeys.add(key);
     return true;
   });
 
-  const cortesCount = notifications.filter((n) => n.category === "caja").length;
-  const pedidosCount = deduplicatedVisibleNotifications.filter((n) => n.category === "pedidos" || Boolean(n.orderId)).length;
-  const unreadVisibleCount = deduplicatedVisibleNotifications.filter((n) => !n.read && (n.category === "pedidos" || Boolean(n.orderId))).length;
+  const cortesCount = deduplicatedVisibleNotifications.filter((n) => isShiftCutNotifItem(n)).length;
+  const pedidosCount = deduplicatedVisibleNotifications.filter((n) => isOrderNotifItem(n)).length;
+  const unreadVisibleCount = deduplicatedVisibleNotifications.filter((n) => !n.read && isOrderNotifItem(n)).length;
   const effectiveUnreadCount = isAdmin ? deduplicatedVisibleNotifications.filter((n) => !n.read).length : unreadVisibleCount;
 
   const filtered = deduplicatedVisibleNotifications.filter((n) => {
     if (!isAdmin || showOnlyPedidos) {
-      return n.category === "pedidos" || Boolean(n.orderId);
+      return isOrderNotifItem(n);
     }
     if (activeTab === "unread") return !n.read;
-    if (activeTab === "cortes") return n.category === "caja";
-    if (activeTab === "pedidos") return n.category === "pedidos" || Boolean(n.orderId);
+    if (activeTab === "cortes") return isShiftCutNotifItem(n);
+    if (activeTab === "pedidos") return isOrderNotifItem(n);
     return true;
   });
 
@@ -606,9 +624,12 @@ function parseOrderNotification(notif: FBNotification) {
   if (!storedOrder?.customerName) {
     customer = customer
       .replace(/\s*[•\-]\s*Anticipo.*$/i, "")
+      .replace(/\s*[•\-]\s*Pagado.*$/i, "")
+      .replace(/\s*[•\-]\s*Abon[óo].*$/i, "")
       .replace(/\s*[•\-]\s*Total.*$/i, "")
       .replace(/\s*[•\-]\s*Resta.*$/i, "")
       .replace(/\s*[•\-]\s*100%.*$/i, "")
+      .replace(/\s*[•\-]\s*¡?Cliente.*$/i, "")
       .replace(/\s*[•\-]\s*Entregad[oa].*$/i, "")
       .replace(/\s*[•\-]\s*Cancelad[oa].*$/i, "")
       .replace(/\s*[•\-]\s*Dad[oa] de baja.*$/i, "")
@@ -624,15 +645,44 @@ function parseOrderNotification(notif: FBNotification) {
     }
   }
 
-  // 3. Amounts
+  // 3. Amounts (Always prefer live storedOrder amounts so reused notifications show real-time balances)
   const totalMatch = combined.match(/Total:?\s*\$?([0-9,.]+)/i);
-  const total = totalMatch ? `$${totalMatch[1].replace(/^\$/, "")}` : (storedOrder?.total ? formatCurrency(storedOrder.total) : null);
+  const total =
+    storedOrder?.total !== undefined && storedOrder.total !== null
+      ? formatCurrency(storedOrder.total)
+      : totalMatch
+      ? `$${totalMatch[1].replace(/^\$/, "")}`
+      : null;
 
-  const depositMatch = combined.match(/Anticipo:?\s*\$?([0-9,.]+)/i);
-  const deposit = depositMatch ? `$${depositMatch[1].replace(/^\$/, "")}` : (storedOrder?.deposit ? formatCurrency(storedOrder.deposit) : null);
+  const depositMatch = combined.match(/(?:Pagado|Anticipo):?\s*\$?([0-9,.]+)/i);
+  const deposit =
+    storedOrder?.deposit !== undefined && storedOrder.deposit !== null
+      ? formatCurrency(storedOrder.deposit)
+      : depositMatch
+      ? `$${depositMatch[1].replace(/^\$/, "")}`
+      : null;
 
-  const remainingMatch = combined.match(/(?:Saldo restante|Cobrar|Resta):?\s*\$?([0-9,.]+)/i);
-  const remaining = remainingMatch ? `$${remainingMatch[1].replace(/^\$/, "")}` : (storedOrder?.remainingBalance !== undefined ? formatCurrency(storedOrder.remainingBalance) : null);
+  const remainingMatch = combined.match(/(?:Saldo restante|Por cobrar|Cobrar|Resta(?:\s+por\s+cobrar)?):?\s*\$?([0-9,.]+)/i);
+  const remaining =
+    storedOrder?.remainingBalance !== undefined && storedOrder.remainingBalance !== null
+      ? formatCurrency(storedOrder.remainingBalance)
+      : remainingMatch
+      ? `$${remainingMatch[1].replace(/^\$/, "")}`
+      : null;
+
+  // Extract latest abono / payment amount when customer makes an additional payment
+  const abonoRegexMatch =
+    combined.match(/(?:Abon[óo](?:\s+recibido)?|Último\s+pago|abono\s+de|cobraron):?\s*\+?\$?([0-9,.]+)/i) ||
+    notif.highlightText.match(/Abon[óo]\s*\+?\$?([0-9,.]+)/i);
+  const paymentsList = Array.isArray(storedOrder?.payments) ? storedOrder!.payments! : [];
+  const hasAdditionalPayments = paymentsList.length > 1;
+  const latestPaymentEntry = paymentsList.length > 0 ? paymentsList[paymentsList.length - 1] : null;
+  let lastAbono: string | null = null;
+  if (abonoRegexMatch && abonoRegexMatch[1]) {
+    lastAbono = `$${abonoRegexMatch[1].replace(/^\$/, "")}`;
+  } else if (hasAdditionalPayments && latestPaymentEntry?.amount) {
+    lastAbono = formatCurrency(latestPaymentEntry.amount);
+  }
 
   // 4. Cross-Branch Route
   let originBranch = notif.operatingBranchName || storedOrder?.operatingBranchName || "";
@@ -660,53 +710,66 @@ function parseOrderNotification(notif: FBNotification) {
 
   // 5. Clean Description (Strip out raw redundant strings already shown in badges)
   let cleanDesc = notif.description
-    .replace(/\[Levantado en:.*?Entrega en:.*?\]\s*/i, "")
-    .replace(/Recoge en:\s*[^.]+\.\s*/i, "")
-    .replace(/Saldo restante:\s*[^.]+\.\s*/i, "")
-    .replace(/Anticipo:\s*[^.]+\.\s*/i, "")
-    .replace(/Total:\s*[^.]+\.\s*/i, "")
+    .replace(/\[Levantado en:.*?Entrega en:.*?\]\s*/gi, "")
+    .replace(/Recoge en:\s*[^.]+\.\s*/gi, "")
+    .replace(/Total:\s*\$?[0-9,.]+\s*[•\-]\s*(?:Pagado|Anticipo):\s*\$?[0-9,.]+\s*[•\-]\s*Resta(?:\s+por\s+cobrar)?:\s*\$?[0-9,.]+\.?\s*/gi, "")
+    .replace(/Saldo restante:\s*[^.]+\.\s*/gi, "")
+    .replace(/Anticipo:\s*[^.]+\.\s*/gi, "")
+    .replace(/Total:\s*[^.]+\.\s*/gi, "")
     .trim();
 
-  if (!cleanDesc) {
+  if (!cleanDesc && storedOrder?.description) {
+    cleanDesc = storedOrder.description;
+  } else if (!cleanDesc) {
     cleanDesc = notif.description;
   }
 
   // 6. Flags de Pago, Listo, Entrega y Cancelación
-  const isPaid =
-    storedOrder?.paymentStatus === "liquidado" ||
-    combined.toLowerCase().includes("liquidado") ||
-    combined.toLowerCase().includes("100% pagado") ||
-    (notif.title && notif.title.toLowerCase().includes("liquidado")) ||
-    (notif.title && notif.title.toLowerCase().includes("pagado")) ||
-    (remainingMatch && (remainingMatch[1] === "0" || remainingMatch[1] === "0.00"));
+  const isPaid = Boolean(
+    storedOrder
+      ? storedOrder.paymentStatus === "liquidado" || Number(storedOrder.remainingBalance) <= 0
+      : combined.toLowerCase().includes("liquidado") ||
+        combined.toLowerCase().includes("100% pagado") ||
+        combined.toLowerCase().includes("ya pagó") ||
+        (notif.title && notif.title.toLowerCase().includes("liquidado")) ||
+        (notif.title && notif.title.toLowerCase().includes("pagado")) ||
+        (remainingMatch && (remainingMatch[1] === "0" || remainingMatch[1] === "0.00"))
+  );
 
-  const isReady =
-    storedOrder?.status === "listo" ||
-    (notif.id.includes("order-status") && notif.id.includes("listo")) ||
-    (notif.title && /ya est[áa] en sucursal|listo en sucursal/i.test(notif.title)) ||
-    (notif.highlightText && /listo en sucursal|listo para entrega/i.test(notif.highlightText));
+  const isReady = Boolean(
+    storedOrder
+      ? storedOrder.status === "listo"
+      : (notif.id.includes("order-status") && notif.id.includes("listo")) ||
+        (notif.title && /ya est[áa] en sucursal|ya en sucursal|listo en sucursal/i.test(notif.title)) ||
+        (notif.highlightText && /ya en sucursal|listo en sucursal|listo para entrega/i.test(notif.highlightText))
+  );
 
-  const isDelivered =
-    storedOrder?.status === "entregado" ||
-    notif.id.includes("order-delivered") ||
-    (notif.id.includes("order-status") && notif.id.includes("entregado")) ||
-    (notif.title && /\bentregad[oa]s?\b/i.test(notif.title)) ||
-    (notif.highlightText && /\bentregad[oa]s?\b/i.test(notif.highlightText)) ||
-    /fue entregado|ha sido entregado|entregado al cliente|entregado satisfactoriamente|entregado con éxito|marcado como entregado/i.test(notif.description);
+  const isDelivered = Boolean(
+    storedOrder
+      ? storedOrder.status === "entregado"
+      : notif.id.includes("order-delivered") ||
+        (notif.id.includes("order-status") && notif.id.includes("entregado")) ||
+        (notif.title && /\bentregad[oa]s?\b/i.test(notif.title)) ||
+        (notif.highlightText && /\bentregad[oa]s?\b/i.test(notif.highlightText)) ||
+        /fue entregado|ha sido entregado|entregado al cliente|entregado satisfactoriamente|entregado con éxito|marcado como entregado/i.test(notif.description)
+  );
 
-  const isCancelled =
-    storedOrder?.status === "cancelado" ||
-    notif.id.includes("order-cancelled") ||
-    notif.id.includes("cancelado") ||
-    (notif.title && (/\bcancelad[oa]s?\b/i.test(notif.title) || /\bdad[oa] de baja\b/i.test(notif.title))) ||
-    (notif.highlightText && (/\bcancelad[oa]s?\b/i.test(notif.highlightText) || /\bdad[oa] de baja\b/i.test(notif.highlightText))) ||
-    /dado de baja|fue cancelado|ha sido cancelado|eliminado permanentemente/i.test(notif.description);
+  const isCancelled = Boolean(
+    storedOrder
+      ? storedOrder.status === "cancelado"
+      : notif.id.includes("order-cancelled") ||
+        notif.id.includes("cancelado") ||
+        (notif.title && (/\bcancelad[oa]s?\b/i.test(notif.title) || /\bdad[oa] de baja\b/i.test(notif.title))) ||
+        (notif.highlightText && (/\bcancelad[oa]s?\b/i.test(notif.highlightText) || /\bdad[oa] de baja\b/i.test(notif.highlightText))) ||
+        /dado de baja|fue cancelado|ha sido cancelado|eliminado permanentemente/i.test(notif.description)
+  );
 
-  const isPaymentEvent =
-    (notif.id && notif.id.includes("order-pay")) ||
-    notif.title.toLowerCase().includes("liquidado") ||
-    notif.title.toLowerCase().includes("abono") ||
-    notif.highlightText.toLowerCase().includes("pagado");
+  const isPaymentEvent = Boolean(
+    hasAdditionalPayments ||
+      Boolean(lastAbono) ||
+      (notif.id && notif.id.includes("order-pay")) ||
+      /abono|abonó|liquidado|ya pagó|pagado/i.test(`${notif.senderName} ${notif.title} ${notif.highlightText}`)
+  );
 
   return {
     folio,
@@ -714,6 +777,7 @@ function parseOrderNotification(notif: FBNotification) {
     total,
     deposit,
     remaining,
+    lastAbono,
     originBranch,
     destBranch,
     isCross,
@@ -759,13 +823,20 @@ function NotificationCardItem({
   const resolvedTs = resolveNotificationTimestamp(notif);
   const timeInfo = formatLiveNotificationTime(resolvedTs, currentNow);
 
-  const isShiftCut =
-    notif.category === "caja" ||
-    notif.title.toLowerCase().includes("cierre") ||
-    notif.title.toLowerCase().includes("corte");
   const isOrder =
     notif.category === "pedidos" ||
-    notif.title.toLowerCase().includes("pedido");
+    Boolean(notif.orderId) ||
+    Boolean(notif.orderData) ||
+    notif.title.toLowerCase().includes("pedido") ||
+    /PED-\d+/i.test(`${notif.title} ${notif.highlightText} ${notif.description}`);
+
+  const isShiftCut =
+    !isOrder &&
+    (notif.category === "caja" ||
+      Boolean(notif.cutId) ||
+      Boolean(notif.shiftCutData) ||
+      notif.title.toLowerCase().includes("cierre") ||
+      notif.title.toLowerCase().includes("corte"));
 
   const parsedOrder = isOrder ? parseOrderNotification(notif) : null;
   const cutData = isShiftCut ? findShiftCutForNotification(notif) : null;
@@ -859,22 +930,27 @@ function NotificationCardItem({
                 <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-sky-100 text-sky-900 border border-sky-300 shadow-2xs">
                   <PackageCheck className="w-3 h-3 text-sky-700" /> 📦 PEDIDO ENTREGADO
                 </span>
-              ) : parsedOrder?.isReady ? (
-                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-900 border border-emerald-300 shadow-2xs">
-                  🎂 LISTO EN SUCURSAL
-                </span>
-              ) : parsedOrder?.isPaid ? (
-                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-900 border border-emerald-300 shadow-2xs">
-                  ✅ PEDIDO LIQUIDADO
-                </span>
-              ) : parsedOrder?.isPaymentEvent ? (
-                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-amber-100 text-amber-900 border border-amber-300 shadow-2xs">
-                  💰 ABONO RECIBIDO
-                </span>
               ) : (
-                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-gradient-to-r from-pink-100 via-rose-100 to-amber-100 text-pink-900 border border-pink-300/80 shadow-2xs">
-                  🎂 PEDIDO DE CLIENTE
-                </span>
+                <>
+                  {parsedOrder?.isReady && (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600 text-white border border-amber-300 ring-1 ring-amber-300/80 shadow-xs">
+                      🏪 ¡YA EN SUCURSAL!
+                    </span>
+                  )}
+                  {parsedOrder?.isPaid ? (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-900 border border-emerald-300 shadow-2xs">
+                      ✅ ¡CLIENTE YA PAGÓ! (LIQUIDADO)
+                    </span>
+                  ) : parsedOrder?.isPaymentEvent ? (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-amber-100 text-amber-950 border border-amber-400 shadow-2xs">
+                      💰 CLIENTE ABONÓ {parsedOrder.lastAbono ? `(+${parsedOrder.lastAbono})` : "DINERO"}
+                    </span>
+                  ) : !parsedOrder?.isReady ? (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-gradient-to-r from-pink-100 via-rose-100 to-amber-100 text-pink-900 border border-pink-300/80 shadow-2xs">
+                      🎂 PEDIDO DE CLIENTE
+                    </span>
+                  ) : null}
+                </>
               )}
             </>
           )}
@@ -890,20 +966,16 @@ function NotificationCardItem({
 
         <div
           className="flex items-center gap-1.5 ml-auto shrink-0 bg-stone-100/90 hover:bg-amber-100/70 px-2.5 py-0.5 rounded-full border border-stone-200/80 text-[11px] font-semibold transition-colors cursor-help shadow-2xs"
-          title={isOrder && orderCreation ? `Pedido realizado el ${orderCreation.fullDateStr}` : timeInfo.fullTooltip}
+          title={timeInfo.fullTooltip}
         >
           <Clock className={`w-3.5 h-3.5 shrink-0 ${timeInfo.secondsAgo < 60 ? "text-amber-600 animate-pulse" : "text-stone-400"}`} />
           <span className="font-bold text-stone-900 font-mono tracking-tight">
-            {isOrder && orderCreation ? orderCreation.exactTimeStr : timeInfo.exactTime}
+            {timeInfo.exactTime}
           </span>
-          {timeInfo.secondsAgo >= 60 && (
-            <>
-              <span className="text-stone-300 font-bold">•</span>
-              <span className="font-medium text-stone-500 font-mono">
-                {isOrder && orderCreation ? orderCreation.shortDateStr : timeInfo.liveTimeAgo}
-              </span>
-            </>
-          )}
+          <span className="text-stone-300 font-bold">•</span>
+          <span className="font-medium text-stone-500 font-mono">
+            {timeInfo.liveTimeAgo}
+          </span>
         </div>
       </div>
 
@@ -987,14 +1059,27 @@ function NotificationCardItem({
                   </span>
                 )}
                 {parsedOrder.isPaid ? (
-                  <span className="text-[11px] font-black text-emerald-900 bg-emerald-100/90 px-2.5 py-0.5 rounded-lg border border-emerald-300 font-mono">
-                    ✓ 100% Pagado
-                  </span>
+                  <>
+                    {parsedOrder.lastAbono && (
+                      <span className="text-[11px] font-bold text-amber-900 bg-amber-100/80 px-2 py-0.5 rounded-lg border border-amber-300">
+                        💵 Último pago: <strong className="font-mono font-black text-amber-950">+{parsedOrder.lastAbono}</strong>
+                      </span>
+                    )}
+                    <span className="text-[11px] font-black text-emerald-900 bg-emerald-100/90 px-2.5 py-0.5 rounded-lg border border-emerald-300 font-mono">
+                      ✓ Cliente ya pagó ({parsedOrder.total || "100% Liquidado"})
+                    </span>
+                  </>
                 ) : (
                   <>
+                    {parsedOrder.isPaymentEvent && parsedOrder.lastAbono && (
+                      <span className="text-[11px] font-bold text-amber-950 bg-amber-100 px-2 py-0.5 rounded-lg border border-amber-400 shadow-2xs">
+                        💵 Abonó: <strong className="font-mono font-black text-emerald-800">+{parsedOrder.lastAbono}</strong>
+                      </span>
+                    )}
                     {parsedOrder.deposit && (
                       <span className="text-[11px] font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-200">
-                        Anticipo: <strong className="font-mono font-black text-emerald-700">{parsedOrder.deposit}</strong>
+                        {parsedOrder.isPaymentEvent ? "Pagado:" : "Anticipo:"}{" "}
+                        <strong className="font-mono font-black text-emerald-700">{parsedOrder.deposit}</strong>
                       </span>
                     )}
                     {parsedOrder.remaining && !isOrderDelivered && !isOrderCancelled && (

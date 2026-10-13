@@ -1350,30 +1350,37 @@ export function addOrderPayment(
     const destName = order.branchName || "Sucursal";
     const isCross = originName.toLowerCase().trim() !== destName.toLowerCase().trim();
     const totalNum = Number(order.total) || 0;
+    const depositNum = Number(order.deposit) || 0;
+    const remNum = Number(order.remainingBalance) || 0;
     const baseItemsDesc = order.description ? `${order.description}. ` : "";
+    const deliverySummary = `${isCross ? `[Levantado en: ${originName} • Entrega en: ${destName}] ` : `Recoge en: ${destName}. `}Entrega: ${order.deliveryDate} a las ${order.deliveryTime} hrs.`;
 
     realtimeHub.broadcastNotification({
-      id: isDelivered ? `notif-order-status-${order.id}-entregado` : `notif-order-pay-${order.id}-${paymentAmount}`,
+      id: `notif-order-${order.id}`,
       senderName: isDelivered
         ? `📦 Pedido Entregado (${destName})`
+        : isCross
+        ? `🎂 ${originName} ➔ ${destName}`
         : isPaid
-        ? `🎂 Pedido Liquidado (${destName})`
-        : `💰 Abono Recibido (${destName})`,
-      senderAvatar: isDelivered ? "📦" : isPaid ? "🎂" : "💰",
+        ? `✅ Pedido Liquidado (${destName})`
+        : `💰 Abono de Pedido (${destName})`,
+      senderAvatar: isDelivered ? "📦" : "🎂",
       badgeIcon: "pastel",
       title: isDelivered
-        ? `Pedido Entregado con Éxito: ${order.orderNumber}${totalNum ? ` • Total $${totalNum.toFixed(2)}` : ""}`
+        ? `Pedido Entregado con Éxito: ${order.orderNumber} • Total $${totalNum.toFixed(2)}`
         : isPaid
-        ? `Pedido Liquidado ${order.orderNumber}: $${paymentAmount.toFixed(2)}`
-        : `Abono de Pedido ${order.orderNumber}: $${paymentAmount.toFixed(2)}`,
+        ? `Pedido ${order.orderNumber}: Total $${totalNum.toFixed(2)} • ¡Cliente ya pagó!`
+        : `Pedido ${order.orderNumber}: Total $${totalNum.toFixed(2)} • Abonó $${paymentAmount.toFixed(2)}`,
       highlightText: isDelivered
         ? `${order.customerName} • Entregado al Cliente`
-        : `${order.customerName} - ${isPaid ? "100% Pagado" : `Resta: $${(order.remainingBalance || 0).toFixed(2)}`}`,
+        : isPaid
+        ? `${order.customerName} • ¡Cliente ya pagó! (Total: $${totalNum.toFixed(2)})`
+        : `${order.customerName} • Abonó: $${paymentAmount.toFixed(2)} • Pagado: $${depositNum.toFixed(2)} (Resta: $${remNum.toFixed(2)})`,
       description: isDelivered
-        ? `${baseItemsDesc}El pedido ${order.orderNumber} de "${order.customerName}" fue entregado satisfactoriamente en ${destName}.${isCross ? ` (Originado en: ${originName}).` : ""}`
-        : isCross
-        ? `Se registró pago de $${paymentAmount.toFixed(2)} en ${destName}. Pedido originado en ${originName}. ${isPaid ? "Listo para entrega final." : `Saldo restante: $${(order.remainingBalance || 0).toFixed(2)}.`}`
-        : `Se registró pago de $${paymentAmount.toFixed(2)}. Pedido: ${order.description}. ${isPaid ? "Listo para entrega final." : `Saldo restante: $${(order.remainingBalance || 0).toFixed(2)}.`}`,
+        ? `${baseItemsDesc}El pedido ${order.orderNumber} de "${order.customerName}" fue liquidado y entregado satisfactoriamente en ${destName}.${isCross ? ` (Originado en: ${originName}).` : ""}`
+        : isPaid
+        ? `✅ El cliente ya pagó el total ($${totalNum.toFixed(2)} • Último abono: $${paymentAmount.toFixed(2)}). ${baseItemsDesc}${deliverySummary}`
+        : `💰 El cliente abonó $${paymentAmount.toFixed(2)} (Total pagado: $${depositNum.toFixed(2)} • Resta: $${remNum.toFixed(2)}). ${baseItemsDesc}${deliverySummary}`,
       timeAgo: formatNotificationHour(Date.now()),
       timestamp: Date.now(),
       group: "recientes",
@@ -1386,10 +1393,12 @@ export function addOrderPayment(
       operatingBranchName: order.operatingBranchName,
       actionLabel: isDelivered
         ? "Ver Pedido Entregado"
-        : (order.remainingBalance || 0) > 0
-        ? `Cobrar $${(order.remainingBalance || 0).toFixed(2)}`
+        : remNum > 0
+        ? `Cobrar $${remNum.toFixed(2)}`
         : "Ver Detalle",
       actionLink: "/pedidos",
+      secondaryActionLabel: !isDelivered && remNum > 0 ? "Ver Detalle" : undefined,
+      secondaryActionLink: !isDelivered && remNum > 0 ? "/pedidos" : undefined,
       orderData: order,
     });
   }
@@ -1451,11 +1460,12 @@ export function updateOrderStatus(orderId: string, status: CustomOrder["status"]
     const isReady = status === "listo";
     const ord = current[idx];
     const totalNum = Number(ord.total) || 0;
+    const remNum = Number(ord.remainingBalance) || 0;
     const isCross = ord.operatingBranchName && ord.branchName && ord.operatingBranchName !== ord.branchName;
     const baseItemsDesc = ord.description ? `${ord.description}. ` : "";
 
     realtimeHub.broadcastNotification({
-      id: `notif-order-status-${ord.id}-${status}`,
+      id: `notif-order-${ord.id}`,
       senderName: isDelivered
         ? `📦 Pedido Entregado (${ord.branchName})`
         : isCancelled
@@ -1471,12 +1481,12 @@ export function updateOrderStatus(orderId: string, status: CustomOrder["status"]
         ? `Pedido Cancelado / Dado de Baja: ${ord.orderNumber}${totalNum ? ` • Total $${totalNum.toFixed(2)}` : ""}`
         : isReady
         ? `El producto ya está en sucursal: ${ord.orderNumber}${totalNum ? ` • Total $${totalNum.toFixed(2)}` : ""}`
-        : `Estado de Pedido Actualizado: ${ord.orderNumber}`,
+        : `Pedido ${ord.orderNumber}: Total $${totalNum.toFixed(2)}`,
       highlightText: isDelivered
         ? `${ord.customerName} • Entregado al Cliente`
         : isCancelled
         ? `${ord.customerName} • Dado de Baja`
-        : `${ord.customerName} • ${statusMap[status] || status}`,
+        : `${ord.customerName} • ${statusMap[status] || status}${remNum > 0 ? ` (Resta: $${remNum.toFixed(2)})` : " (Liquidado)"}`,
       description: isDelivered
         ? `${baseItemsDesc}El pedido ${ord.orderNumber} de "${ord.customerName}" fue entregado satisfactoriamente en ${ord.branchName}.${isCross ? ` (Originado en: ${ord.operatingBranchName}).` : ""}`
         : isCancelled
@@ -1494,8 +1504,16 @@ export function updateOrderStatus(orderId: string, status: CustomOrder["status"]
       branchName: ord.branchName,
       operatingBranchId: ord.operatingBranchId,
       operatingBranchName: ord.operatingBranchName,
-      actionLabel: isDelivered ? "Ver Pedido Entregado" : isCancelled ? "Ver Pedido Cancelado" : "Ver Detalle",
+      actionLabel: isDelivered
+        ? "Ver Pedido Entregado"
+        : isCancelled
+        ? "Ver Pedido Cancelado"
+        : remNum > 0
+        ? `Cobrar $${remNum.toFixed(2)}`
+        : "Ver Detalle",
       actionLink: "/pedidos",
+      secondaryActionLabel: !isDelivered && !isCancelled && remNum > 0 ? "Ver Detalle" : undefined,
+      secondaryActionLink: !isDelivered && !isCancelled && remNum > 0 ? "/pedidos" : undefined,
       orderData: ord,
     });
   }

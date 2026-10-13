@@ -25,6 +25,7 @@ import { formatCurrency, formatOrderCreation } from "@/lib/utils";
 import { getStoredOrders, updateOrderStatus, deleteCustomOrder } from "@/lib/orders";
 import { useNotifications } from "@/context/NotificationContext";
 import { useAuth } from "@/context/AuthContext";
+import DeliverOrderConfirmModal from "@/components/pedidos/DeliverOrderConfirmModal";
 
 interface PosOrdersDrawerProps {
   isOpen: boolean;
@@ -55,6 +56,7 @@ export default function PosOrdersDrawer({
     (user.username === "admin" || user.username === "paulina" || user.username === "roberto" || user.name?.toLowerCase().includes("toño") || user.name?.toLowerCase().includes("paulina") || user.name?.toLowerCase().includes("morales"))
   );
   const [orders, setOrders] = useState<CustomOrder[]>([]);
+  const [orderToDeliver, setOrderToDeliver] = useState<CustomOrder | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterMode, setFilterMode] = useState<"todos" | "hoy" | "saldo">("todos");
   const [branchScope, setBranchScope] = useState<"esta" | "todas">("esta");
@@ -151,10 +153,14 @@ export default function PosOrdersDrawer({
       onSelectOrderForPayment(order);
       return;
     }
-    if (confirm(`¿Confirmas marcar el pedido #${order.orderNumber} de "${order.customerName}" como ENTREGADO?\n\nEl pedido se marcará como entregado y desaparecerá de la lista de pedidos pendientes.`)) {
-      updateOrderStatus(order.id, "entregado");
-      refreshOrders();
-    }
+    setOrderToDeliver(order);
+  };
+
+  const handleConfirmDeliver = () => {
+    if (!orderToDeliver) return;
+    updateOrderStatus(orderToDeliver.id, "entregado");
+    refreshOrders();
+    setOrderToDeliver(null);
   };
 
   const handleDeleteOrder = (order: CustomOrder) => {
@@ -507,6 +513,13 @@ export default function PosOrdersDrawer({
           )}
         </div>
       </div>
+
+      <DeliverOrderConfirmModal
+        isOpen={Boolean(orderToDeliver)}
+        order={orderToDeliver}
+        onClose={() => setOrderToDeliver(null)}
+        onConfirm={handleConfirmDeliver}
+      />
     </div>
   );
 }

@@ -31,6 +31,7 @@ import { getStoredOrders, addCustomOrder, addOrderPayment, updateOrderStatus } f
 import { useNotifications } from "@/context/NotificationContext";
 import { useBranch } from "@/context/BranchContext";
 import OrderPaymentModal from "@/components/pedidos/OrderPaymentModal";
+import DeliverOrderConfirmModal from "@/components/pedidos/DeliverOrderConfirmModal";
 
 interface BreadOrdersDrawerProps {
   isOpen: boolean;
@@ -94,6 +95,13 @@ export default function BreadOrdersDrawer({
   const [payingOrderId, setPayingOrderId] = useState<string | null>(null);
   const [liquidationPaymentMethod, setLiquidationPaymentMethod] = useState<"efectivo" | "tarjeta" | "transferencia">("efectivo");
   const [selectedOrderForPayment, setSelectedOrderForPayment] = useState<CustomOrder | null>(null);
+  const [orderToDeliver, setOrderToDeliver] = useState<CustomOrder | null>(null);
+
+  const handleConfirmDeliverOrder = (order: CustomOrder) => {
+    updateOrderStatus(order.id, "entregado");
+    refreshOrders();
+    setOrderToDeliver(null);
+  };
 
   // Load products and orders on mount & when opened
   useEffect(() => {
@@ -310,20 +318,21 @@ export default function BreadOrdersDrawer({
     if (updated) {
       try {
         addNotification({
-          id: `notif-order-pay-${order.id}-${order.remainingBalance}`,
-          senderName: `🎂 Pedido Liquidado (${branchName || "Mostrador"})`,
-          senderAvatar: "🎂",
+          id: `notif-order-${order.id}`,
+          senderName: `📦 Pedido Entregado (${branchName || order.branchName || "Mostrador"})`,
+          senderAvatar: "📦",
           badgeIcon: "pastel",
-          title: `Pedido ${order.orderNumber} Liquidado: ${formatCurrency(order.remainingBalance)}`,
-          highlightText: `${order.customerName} - 100% Pagado`,
-          description: `Se liquidó el saldo pendiente de ${formatCurrency(order.remainingBalance)} vía ${liquidationPaymentMethod}. Pedido: ${order.description}. Entregado al cliente.`,
+          title: `Pedido Entregado con Éxito: ${order.orderNumber} • Total ${formatCurrency(order.total)}`,
+          highlightText: `${order.customerName} • Entregado al Cliente`,
+          description: `${order.description ? `${order.description}. ` : ""}Se liquidó el saldo pendiente de ${formatCurrency(order.remainingBalance)} vía ${liquidationPaymentMethod} y fue entregado al cliente.`,
           category: "pedidos",
           orderId: order.id,
+          orderData: updated,
           branchId: order.branchId,
           branchName: order.branchName,
           operatingBranchId: order.operatingBranchId,
           operatingBranchName: order.operatingBranchName,
-          actionLabel: "Ver Detalle",
+          actionLabel: "Ver Pedido Entregado",
           actionLink: "/pedidos",
         });
       } catch (e) {}
@@ -1033,10 +1042,7 @@ export default function BreadOrdersDrawer({
                         ) : (
                           <button
                             type="button"
-                            onClick={() => {
-                              updateOrderStatus(order.id, "entregado");
-                              refreshOrders();
-                            }}
+                            onClick={() => setOrderToDeliver(order)}
                             className="py-1.5 px-3 bg-stone-900 hover:bg-stone-800 text-white rounded-xl text-xs font-black shadow-sm transition-all flex items-center gap-1 cursor-pointer active:scale-95"
                           >
                             <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
@@ -1066,6 +1072,17 @@ export default function BreadOrdersDrawer({
           }}
         />
       )}
+
+      <DeliverOrderConfirmModal
+        isOpen={Boolean(orderToDeliver)}
+        order={orderToDeliver}
+        onClose={() => setOrderToDeliver(null)}
+        onConfirm={() => {
+          if (orderToDeliver) {
+            handleConfirmDeliverOrder(orderToDeliver);
+          }
+        }}
+      />
     </div>
   );
 }

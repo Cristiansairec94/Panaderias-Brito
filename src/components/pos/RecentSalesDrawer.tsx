@@ -6,6 +6,7 @@ import { Sale, CustomOrder } from "@/types";
 import { formatCurrency } from "@/lib/utils";
 import { getStoredOrders, updateOrderStatus } from "@/lib/orders";
 import { useNotifications } from "@/context/NotificationContext";
+import DeliverOrderConfirmModal from "@/components/pedidos/DeliverOrderConfirmModal";
 
 interface RecentSalesDrawerProps {
   isOpen: boolean;
@@ -30,6 +31,15 @@ export default function RecentSalesDrawer({
   const [filterMethod, setFilterMethod] = useState<string>("all");
   const [typeFilter, setTypeFilter] = useState<"all" | "ventas" | "pedidos">("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const [orderToDeliver, setOrderToDeliver] = useState<CustomOrder | null>(null);
+
+  const handleConfirmDeliverOrder = (order: CustomOrder) => {
+    updateOrderStatus(order.id, "entregado");
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new Event("brito_orders_updated"));
+    }
+    setOrderToDeliver(null);
+  };
 
   if (!isOpen) return null;
 
@@ -278,15 +288,7 @@ export default function RecentSalesDrawer({
                           ) : (
                             <button
                               type="button"
-                              onClick={() => {
-                                const ok = confirm(`¿Confirmas marcar el pedido #${order.orderNumber} de "${order.customerName}" como ENTREGADO?\n\nEl pedido se marcará como entregado y pasará al historial de pedidos.`);
-                                if (ok) {
-                                  updateOrderStatus(order.id, "entregado");
-                                  if (typeof window !== "undefined") {
-                                    window.dispatchEvent(new Event("brito_orders_updated"));
-                                  }
-                                }
-                              }}
+                              onClick={() => setOrderToDeliver(order)}
                               className="px-2.5 py-1 bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white font-bold rounded-lg text-xs transition-all cursor-pointer flex items-center gap-1 active:scale-95 shadow-xs"
                               title="Marcar como entregado (se archivará en el historial)"
                             >
@@ -380,6 +382,17 @@ export default function RecentSalesDrawer({
           )}
         </div>
       </div>
+
+      <DeliverOrderConfirmModal
+        isOpen={Boolean(orderToDeliver)}
+        order={orderToDeliver}
+        onClose={() => setOrderToDeliver(null)}
+        onConfirm={() => {
+          if (orderToDeliver) {
+            handleConfirmDeliverOrder(orderToDeliver);
+          }
+        }}
+      />
     </div>
   );
 }

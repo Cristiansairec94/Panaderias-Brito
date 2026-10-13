@@ -22,6 +22,7 @@ import OrderPaymentModal from "@/components/pedidos/OrderPaymentModal";
 import OrderReceiptModal from "@/components/pedidos/OrderReceiptModal";
 import OrderDetailModal from "@/components/pedidos/OrderDetailModal";
 import CreateOrderModal from "@/components/pedidos/CreateOrderModal";
+import DeliverOrderConfirmModal from "@/components/pedidos/DeliverOrderConfirmModal";
 
 interface SpecialOrdersDrawerProps {
   isOpen: boolean;
@@ -46,6 +47,7 @@ export default function SpecialOrdersDrawer({
   const [selectedOrderForPayment, setSelectedOrderForPayment] = useState<CustomOrder | null>(null);
   const [selectedOrderForReceipt, setSelectedOrderForReceipt] = useState<CustomOrder | null>(null);
   const [selectedOrderForDetail, setSelectedOrderForDetail] = useState<CustomOrder | null>(null);
+  const [orderToDeliver, setOrderToDeliver] = useState<CustomOrder | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
 
   const loadOrders = () => {
@@ -133,10 +135,14 @@ export default function SpecialOrdersDrawer({
       setSelectedOrderForPayment(order);
       return;
     }
-    if (confirm(`¿Confirmas marcar el pedido #${order.orderNumber} de "${order.customerName}" como ENTREGADO?\n\nEl pedido se marcará como entregado y desaparecerá de la lista de pedidos pendientes.`)) {
-      updateOrderStatus(order.id, "entregado");
-      loadOrders();
-    }
+    setOrderToDeliver(order);
+  };
+
+  const handleConfirmDeliver = () => {
+    if (!orderToDeliver) return;
+    updateOrderStatus(orderToDeliver.id, "entregado");
+    loadOrders();
+    setOrderToDeliver(null);
   };
 
   const handleDeleteOrder = (order: CustomOrder) => {
@@ -520,12 +526,10 @@ export default function SpecialOrdersDrawer({
               setSelectedOrderForPayment(o);
               return;
             }
-            if (confirm(`¿Confirmas marcar el pedido #${o.orderNumber} de "${o.customerName}" como ENTREGADO?`)) {
-              updateOrderStatus(o.id, "entregado");
-              loadOrders();
-              const updated = getStoredOrders().find((item) => item.id === o.id);
-              if (updated) setSelectedOrderForDetail(updated);
-            }
+            updateOrderStatus(o.id, "entregado");
+            loadOrders();
+            const updated = getStoredOrders().find((item) => item.id === o.id);
+            if (updated) setSelectedOrderForDetail(updated);
           }}
           onDarDeBaja={(o) => {
             const isCancelled = o.status === "cancelado";
@@ -561,6 +565,14 @@ export default function SpecialOrdersDrawer({
           }}
         />
       )}
+
+      {/* Submodal 4: Confirmación Animada de Entrega Segura */}
+      <DeliverOrderConfirmModal
+        isOpen={Boolean(orderToDeliver)}
+        order={orderToDeliver}
+        onClose={() => setOrderToDeliver(null)}
+        onConfirm={handleConfirmDeliver}
+      />
     </div>
   );
 }

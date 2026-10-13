@@ -2279,7 +2279,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
             setSelectedOrderForDetail(updated);
             const totalNum = Number(updated.total) || 0;
             addNotification({
-              id: `notif-order-status-${updated.id}-listo`,
+              id: `notif-order-${updated.id}`,
               senderName: `🏪 ¡Ya en Sucursal! (${updated.branchName || "Sucursal"})`,
               senderAvatar: "🎂",
               badgeIcon: "pastel",
@@ -2313,7 +2313,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
               const totalNum = Number(updated.total) || 0;
               const isCross = updated.operatingBranchName && updated.branchName && updated.operatingBranchName !== updated.branchName;
               addNotification({
-                id: `notif-order-status-${updated.id}-entregado`,
+                id: `notif-order-${updated.id}`,
                 senderName: `📦 Pedido Entregado (${updated.branchName || "Sucursal"})`,
                 senderAvatar: "📦",
                 badgeIcon: "pastel",
@@ -2365,7 +2365,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
               const updated = updateOrderStatus(o.id, "cancelado") || { ...o, status: "cancelado" as const };
               const totalNum = Number(updated.total) || 0;
               addNotification({
-                id: `notif-order-status-${updated.id}-cancelado`,
+                id: `notif-order-${updated.id}`,
                 senderName: `🗑️ Pedido Cancelado (${updated.branchName || "Sucursal"})`,
                 senderAvatar: "🗑️",
                 badgeIcon: "pastel",

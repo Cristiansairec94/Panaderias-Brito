@@ -2585,26 +2585,6 @@ function resolveBranchParam(param: string | null): string | null {
           createdAt: saleDetails?.createdAt || new Date().toISOString(),
         });
       }
-
-      // Alerta y timbre inmediato en el celular del dueño/cajeros
-      if (realtimeHub.broadcastNotification) {
-        realtimeHub.broadcastNotification({
-          id: `sale-notif-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-          senderName: `🥖 Mostrador ${saleLog.branchName}`,
-          senderAvatar: "🥖",
-          badgeIcon: "dinero",
-          title: "Venta en Mostrador",
-          highlightText: `+$${amount.toFixed(2)} MXN • ${saleLog.branchName}`,
-          description: `${saleLog.cashier}: ${saleLog.itemsSummary} (${paymentMethod.toUpperCase()})`,
-          timeAgo: `${String(new Date().getHours()).padStart(2, "0")}:${String(new Date().getMinutes()).padStart(2, "0")} hrs`,
-          timestamp: Date.now(),
-          group: "recientes",
-          read: false,
-          category: "caja",
-          actionLabel: "Ver Flujo",
-          actionLink: "/caja",
-        });
-      }
     } catch (err) {
       console.error("Error inside registerRealSale:", err);
     }
@@ -2942,27 +2922,6 @@ function resolveBranchParam(param: string | null): string | null {
       // Transmisión inmediata por WebSocket del movimiento de dinero
       if (realtimeHub.broadcastCashMovement) {
         realtimeHub.broadcastCashMovement(newMovement);
-      }
-
-      // Notificación automática e instantánea al celular
-      if (realtimeHub.broadcastNotification) {
-        const isEntrada = movement.type === "entrada";
-        realtimeHub.broadcastNotification({
-          id: `mov-notif-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-          senderName: `💵 Caja ${branchName}`,
-          senderAvatar: isEntrada ? "📥" : "📤",
-          badgeIcon: isEntrada ? "dinero" : "alerta",
-          title: isEntrada ? "Ingreso a Caja" : "Salida de Dinero / Gasto",
-          highlightText: `${isEntrada ? "+" : "-"}$${movement.amount.toFixed(2)} MXN • ${branchName}`,
-          description: `${movement.categoryLabel}: ${movement.reason} • Autorizó: ${movement.authorizedBy}`,
-          timeAgo: `${String(new Date().getHours()).padStart(2, "0")}:${String(new Date().getMinutes()).padStart(2, "0")} hrs`,
-          timestamp: Date.now(),
-          group: "recientes",
-          read: false,
-          category: "caja",
-          actionLabel: "Ver Flujo",
-          actionLink: "/caja",
-        });
       }
     },
     [branches]

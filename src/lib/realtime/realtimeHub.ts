@@ -220,7 +220,11 @@ class RealtimeHub {
     if (rawId && typeof rawId === "string" && (rawId.includes("ING-ING") || rawId.includes("mov-mov-"))) {
       return;
     }
-    const eventId = rawId ? `${type}_${rawId}_${payload.action || ""}` : null;
+    const versionSuffix =
+      type === "notification" || type === "order" || type === "branch" || type === "user" || type === "product" || type === "customer"
+        ? `_${payload.timestamp || payload.order?.timestamp || payload.order?.deposit || payload.order?.status || payload.title || ""}`
+        : "";
+    const eventId = rawId ? `${type}_${rawId}_${payload.action || ""}${versionSuffix}` : null;
     if (eventId) {
       if (this.seenEventIds.has(eventId)) return;
       this.seenEventIds.add(eventId);

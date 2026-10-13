@@ -70,6 +70,25 @@ export async function POST(req: NextRequest) {
         );
       }
     }
+    if (type === "notification") {
+      const ordId = payload?.orderId || payload?.orderData?.id;
+      const notifId = payload?.id;
+      const folioMatch = `${payload?.title || ""} ${payload?.description || ""}`.match(/PED[-_]?0*(\d+)/i);
+      const folioKey = folioMatch ? `ped-${folioMatch[1]}` : null;
+      if (ordId || (notifId && String(notifId).startsWith("notif-order-")) || folioKey) {
+        eventsToSave = eventsToSave.filter((e) => {
+          if (e.type !== "notification") return true;
+          const eOrdId = e.payload?.orderId || e.payload?.orderData?.id;
+          const eNotifId = e.payload?.id;
+          const eFolioMatch = `${e.payload?.title || ""} ${e.payload?.description || ""}`.match(/PED[-_]?0*(\d+)/i);
+          const eFolioKey = eFolioMatch ? `ped-${eFolioMatch[1]}` : null;
+          if (ordId && eOrdId && String(ordId).toLowerCase() === String(eOrdId).toLowerCase()) return false;
+          if (notifId && eNotifId && String(notifId).toLowerCase() === String(eNotifId).toLowerCase()) return false;
+          if (folioKey && eFolioKey && folioKey === eFolioKey) return false;
+          return true;
+        });
+      }
+    }
 
     eventsToSave.push(eventRecord);
 

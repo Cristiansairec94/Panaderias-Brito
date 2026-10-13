@@ -41,8 +41,8 @@ export default function OrderPaymentModal({
   const { currentBranch, registerRealSale } = useBranch();
   const { addNotification } = useNotifications();
 
-  // Mode: "abono" (partial payment step by step) vs "liquidar" (full balance)
-  const [paymentMode, setPaymentMode] = useState<"abono" | "liquidar">("abono");
+  // Mode: "liquidar" (full balance) vs "abono" (partial payment step by step)
+  const [paymentMode, setPaymentMode] = useState<"abono" | "liquidar">("liquidar");
   const [amount, setAmount] = useState<string>("");
   const [paymentMethod, setPaymentMethod] = useState<"efectivo" | "tarjeta" | "transferencia">("efectivo");
   const [markAsDelivered, setMarkAsDelivered] = useState(false);
@@ -54,9 +54,9 @@ export default function OrderPaymentModal({
 
   useEffect(() => {
     if (order) {
-      // By default open in abono mode with empty or quick preset so user can easily enter partial abonos
-      setPaymentMode("abono");
-      setAmount("");
+      // By default open in liquidar mode with full balance ready
+      setPaymentMode("liquidar");
+      setAmount(order.remainingBalance.toString());
       setMarkAsDelivered(false);
       setNotes("");
       setShowHistory(false);
@@ -139,42 +139,50 @@ export default function OrderPaymentModal({
         }
 
         try {
-          const isCross = originBranchName.toLowerCase().trim() !== paymentBranchName.toLowerCase().trim();
+          const isCross = originBranchName.toLowerCase().trim() !== pickupBranchName.toLowerCase().trim();
+          const newTotalPaid = Number(updatedOrder?.deposit ?? (order.deposit + numericAmount));
           const finalOrder: CustomOrder = updatedOrder || {
             ...order,
-            deposit: order.deposit + numericAmount,
+            deposit: newTotalPaid,
             remainingBalance: newRemaining,
             paymentStatus: isFullPayment ? "liquidado" : "anticipo",
             status: isDeliveredNow ? "entregado" : order.status,
           };
 
+          const baseItemsDesc = order.description ? `${order.description}. ` : "";
+          const deliverySummary = `${isCross ? `[Levantado en: ${originBranchName} • Entrega en: ${pickupBranchName}] ` : `Recoge en: ${pickupBranchName}. `}Entrega: ${order.deliveryDate} a las ${order.deliveryTime} hrs.`;
+
           const notifTitle = isDeliveredNow
             ? `Pedido Entregado con Éxito: ${order.orderNumber} • Total ${formatCurrency(order.total)}`
             : isFullPayment
-            ? `Pedido Liquidado ${order.orderNumber}: ${formatCurrency(numericAmount)}`
-            : `Abono de Pedido ${order.orderNumber}: ${formatCurrency(numericAmount)}`;
+            ? `Pedido ${order.orderNumber}: Total ${formatCurrency(order.total)} • ¡Cliente ya pagó!`
+            : `Pedido ${order.orderNumber}: Total ${formatCurrency(order.total)} • Abonó ${formatCurrency(numericAmount)}`;
 
           const notifHighlight = isDeliveredNow
             ? `${order.customerName} • Entregado al Cliente`
-            : `${order.customerName} - ${isFullPayment ? "100% Pagado" : `Resta: ${formatCurrency(newRemaining)}`}`;
+            : isFullPayment
+            ? `${order.customerName} • ¡Cliente ya pagó! (Total: ${formatCurrency(order.total)})`
+            : `${order.customerName} • Abonó: ${formatCurrency(numericAmount)} • Pagado: ${formatCurrency(newTotalPaid)} (Resta: ${formatCurrency(newRemaining)})`;
 
           const notifDescription = isDeliveredNow
-            ? `${order.description ? `${order.description}. ` : ""}El pedido ${order.orderNumber} de "${order.customerName}" fue liquidado (${formatCurrency(numericAmount)} en ${paymentMethod}) y entregado satisfactoriamente en ${pickupBranchName}.${isCross ? ` (Originado en: ${originBranchName}).` : ""}`
-            : isCross
-            ? `Se cobró abono de ${formatCurrency(numericAmount)} (${paymentMethod}) en ${paymentBranchName}. Pedido originado en ${originBranchName}. ${isFullPayment ? "Listo para entrega final." : `Saldo restante: ${formatCurrency(newRemaining)}.`}`
-            : `Se cobró abono de ${formatCurrency(numericAmount)} (${paymentMethod}). Pedido: ${order.description}. ${isFullPayment ? "Listo para entrega final." : `Saldo restante: ${formatCurrency(newRemaining)}.`}`;
+            ? `${baseItemsDesc}El pedido ${order.orderNumber} de "${order.customerName}" fue liquidado (${formatCurrency(numericAmount)} en ${paymentMethod}) y entregado satisfactoriamente en ${pickupBranchName}.${isCross ? ` (Originado en: ${originBranchName}).` : ""}`
+            : isFullPayment
+            ? `✅ El cliente ya pagó el total (${formatCurrency(order.total)} • Último abono: ${formatCurrency(numericAmount)} en ${paymentMethod}). ${baseItemsDesc}${deliverySummary}`
+            : `💰 El cliente abonó ${formatCurrency(numericAmount)} (${paymentMethod}) • Total pagado: ${formatCurrency(newTotalPaid)} • Resta: ${formatCurrency(newRemaining)}. ${baseItemsDesc}${deliverySummary}`;
 
           const notifSender = isDeliveredNow
             ? `📦 Pedido Entregado (${pickupBranchName})`
+            : isCross
+            ? `🎂 ${originBranchName} ➔ ${pickupBranchName}`
             : isFullPayment
-            ? `🎂 Pedido Liquidado (${paymentBranchName})`
-            : `💰 Abono Recibido (${paymentBranchName})`;
+            ? `✅ Pedido Liquidado (${paymentBranchName})`
+            : `💰 Abono de Pedido (${paymentBranchName})`;
 
           addNotification({
-            id: isDeliveredNow ? `notif-order-status-${order.id}-entregado` : `notif-order-pay-${order.id}-${Date.now()}`,
+            id: `notif-order-${order.id}`,
             timestamp: Date.now(),
             senderName: notifSender,
-            senderAvatar: isDeliveredNow ? "📦" : isFullPayment ? "🎂" : "💰",
+            senderAvatar: isDeliveredNow ? "📦" : "🎂",
             badgeIcon: "pastel",
             title: notifTitle,
             highlightText: notifHighlight,
@@ -292,10 +300,26 @@ export default function OrderPaymentModal({
             )}
           </div>
 
-          {/* Selector de Modo: Abonar Poco a Poco vs Liquidar Todo */}
+          {/* Selector de Modo: Liquidar Total vs Abonar Poco a Poco */}
           <div className="space-y-1.5">
             <span className="text-xs font-black text-stone-800 block">¿Qué deseas registrar?</span>
             <div className="grid grid-cols-2 gap-2 p-1 bg-stone-100 rounded-2xl border border-stone-200">
+              <button
+                type="button"
+                onClick={() => handleSelectMode("liquidar")}
+                className={`py-2 px-3 rounded-xl font-black text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                  paymentMode === "liquidar"
+                    ? "bg-emerald-600 text-white shadow-sm"
+                    : "text-stone-600 hover:text-stone-900"
+                }`}
+              >
+                <span>★ Liquidar Total</span>
+                <span className={`text-[10px] font-mono font-bold hidden sm:inline ${
+                  paymentMode === "liquidar" ? "text-emerald-100" : "text-stone-400"
+                }`}>
+                  ({formatCurrency(order.remainingBalance)})
+                </span>
+              </button>
               <button
                 type="button"
                 onClick={() => handleSelectMode("abono")}
@@ -308,20 +332,6 @@ export default function OrderPaymentModal({
                 <span>💰 Registrar Abono</span>
                 <span className="text-[10px] font-bold text-stone-400 font-sans hidden sm:inline">(Poco a poco)</span>
               </button>
-              <button
-                type="button"
-                onClick={() => handleSelectMode("liquidar")}
-                className={`py-2 px-3 rounded-xl font-black text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-                  paymentMode === "liquidar"
-                    ? "bg-emerald-600 text-white shadow-sm"
-                    : "text-stone-600 hover:text-stone-900"
-                }`}
-              >
-                <span>★ Liquidar Total</span>
-                <span className="text-[10px] font-mono font-bold text-emerald-100 hidden sm:inline">
-                  ({formatCurrency(order.remainingBalance)})
-                </span>
-              </button>
             </div>
           </div>
 
@@ -329,7 +339,9 @@ export default function OrderPaymentModal({
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <label className="text-xs font-bold text-stone-800">
-                Monto que el cliente entrega para abonar ($ MXN):
+                {paymentMode === "liquidar"
+                  ? "Monto total a liquidar ($ MXN):"
+                  : "Monto que el cliente entrega para abonar ($ MXN):"}
               </label>
               {paymentMode === "abono" && (
                 <button
