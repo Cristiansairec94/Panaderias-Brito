@@ -1366,8 +1366,8 @@ export default function PedidosPage() {
         );
       case "listo":
         return (
-          <span className="bg-emerald-50 text-emerald-800 border border-emerald-200 px-2.5 py-0.5 rounded-full font-bold text-[11px] inline-flex items-center gap-1 shadow-2xs">
-            <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Listo en Sucursal
+          <span className="bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600 text-white border border-amber-300 px-2.5 py-0.5 rounded-full font-black text-[11px] inline-flex items-center gap-1 shadow-xs ring-1 ring-emerald-400/50">
+            <Store className="w-3 h-3 text-amber-200" /> ¡YA EN SUCURSAL!
           </span>
         );
       case "entregado":
@@ -3304,27 +3304,25 @@ export default function PedidosPage() {
                       {/* Nivel 1: Acciones Operativas Principales */}
                       {!isConcludedOrHistory && (
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-                          {/* Botón: Marcar como Listo / Listo en Sucursal */}
+                          {/* Botón de uso único: Marcar Listo -> Se retira y cambia a "¡YA EN SUCURSAL!" */}
                           {order.status !== "listo" ? (
                             <button
                               type="button"
                               onClick={() => handleMarkAsReady(order)}
                               className="w-full py-2 px-2.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-black text-xs rounded-xl shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap"
-                              title="Marcar que el pedido ya llegó físicamente y está listo en sucursal"
+                              title="Marcar que el pedido ya llegó físicamente y está listo en sucursal (uso único)"
                             >
                               <CheckCircle2 className="w-4 h-4" />
                               <span>Marcar Listo</span>
                             </button>
                           ) : (
-                            <button
-                              type="button"
-                              onClick={() => handleToggleReady(order)}
-                              className="w-full py-2 px-2.5 bg-emerald-50 hover:bg-emerald-100 active:scale-95 text-emerald-900 border border-emerald-300 font-black text-xs rounded-xl shadow-2xs transition-all flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap"
-                              title="Este pedido ya está listo en sucursal. Haz clic si deseas regresarlo a 'En preparación'."
+                            <div
+                              className="w-full py-2 px-2.5 bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600 text-white border border-amber-300 ring-2 ring-amber-300/80 font-black text-xs rounded-xl shadow-md shadow-emerald-500/25 flex items-center justify-center gap-1.5 whitespace-nowrap select-none"
+                              title="Este pedido ya fue marcado como listo y ya se encuentra en sucursal"
                             >
-                              <Check className="w-4 h-4 text-emerald-600" />
-                              <span>Listo en Tienda</span>
-                            </button>
+                              <Store className="w-4 h-4 text-amber-200 shrink-0 animate-bounce" />
+                              <span className="tracking-wide uppercase">¡YA EN SUCURSAL!</span>
+                            </div>
                           )}
 
                           {/* Botón: Pagar Restante si tiene saldo pendiente */}
@@ -3673,28 +3671,26 @@ export default function PedidosPage() {
                           onClick={(e) => e.stopPropagation()}
                         >
                           <div className="flex items-center justify-end gap-1.5 flex-nowrap">
-                            {/* Botón: Marcar como Listo / Listo en Sucursal */}
+                            {/* Botón de uso único: Marcar como Listo -> Se retira y cambia a "¡YA EN SUCURSAL!" */}
                             {!isConcludedOrHistory && (
                               order.status !== "listo" ? (
                                 <button
                                   type="button"
                                   onClick={() => handleMarkAsReady(order)}
                                   className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-black text-xs rounded-xl shadow-xs transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
-                                  title="Marcar que el pedido ya llegó físicamente y está listo en sucursal"
+                                  title="Marcar que el pedido ya llegó físicamente y está listo en sucursal (uso único)"
                                 >
                                   <CheckCircle2 className="w-3.5 h-3.5" />
-                                  <span>Marcar como Listo</span>
+                                  <span>Marcar Listo</span>
                                 </button>
                               ) : (
-                                <button
-                                  type="button"
-                                  onClick={() => handleToggleReady(order)}
-                                  className="px-2.5 py-1.5 bg-emerald-100 hover:bg-emerald-200 active:scale-95 text-emerald-900 border border-emerald-300 font-black text-xs rounded-xl shadow-2xs transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
-                                  title="Este pedido ya está listo en sucursal. Haz clic si deseas regresarlo a 'En preparación'."
+                                <div
+                                  className="px-3 py-1.5 bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600 text-white border border-amber-300 ring-2 ring-amber-300/80 font-black text-xs rounded-xl shadow-md shadow-emerald-500/25 flex items-center gap-1.5 whitespace-nowrap select-none"
+                                  title="Este pedido ya fue marcado como listo y ya se encuentra en sucursal"
                                 >
-                                  <Check className="w-3.5 h-3.5 text-emerald-700" />
-                                  <span>✓ Listo en Sucursal</span>
-                                </button>
+                                  <Store className="w-3.5 h-3.5 text-amber-200 shrink-0 animate-bounce" />
+                                  <span className="tracking-wide uppercase">¡YA EN SUCURSAL!</span>
+                                </div>
                               )
                             )}
 
@@ -3952,14 +3948,25 @@ export default function PedidosPage() {
 
       <OrderPaymentModal
         isOpen={!!selectedOrderForPayment}
-        onClose={() => setSelectedOrderForPayment(null)}
+        onClose={() => {
+          const currentOrd = selectedOrderForPayment
+            ? getStoredOrders().find((item) => item.id === selectedOrderForPayment.id) || selectedOrderForPayment
+            : null;
+          setSelectedOrderForPayment(null);
+          if (currentOrd && currentOrd.status !== "entregado" && currentOrd.status !== "cancelado") {
+            setSelectedOrderForDetail(currentOrd);
+          } else {
+            setSelectedOrderForDetail(null);
+          }
+        }}
         order={selectedOrderForPayment}
         onPaymentSuccess={() => {
           loadOrders();
-          if (selectedOrderForDetail) {
-            const updated = getStoredOrders().find((item) => item.id === selectedOrderForDetail.id);
+          const targetId = selectedOrderForPayment?.id || selectedOrderForDetail?.id;
+          if (targetId) {
+            const updated = getStoredOrders().find((item) => item.id === targetId);
             if (updated) {
-              if (updated.status === "entregado") {
+              if (updated.status === "entregado" || updated.status === "cancelado") {
                 setSelectedOrderForDetail(null);
               } else {
                 setSelectedOrderForDetail(updated);
@@ -3971,13 +3978,29 @@ export default function PedidosPage() {
 
       <OrderReceiptModal
         isOpen={!!selectedOrderForReceipt}
-        onClose={() => setSelectedOrderForReceipt(null)}
+        onClose={() => {
+          const currentOrd = selectedOrderForReceipt
+            ? getStoredOrders().find((item) => item.id === selectedOrderForReceipt.id) || selectedOrderForReceipt
+            : null;
+          setSelectedOrderForReceipt(null);
+          if (currentOrd && !selectedOrderForDetail) {
+            setSelectedOrderForDetail(currentOrd);
+          }
+        }}
         order={selectedOrderForReceipt}
       />
 
       <EditOrderModal
         isOpen={!!selectedOrderForEdit}
-        onClose={() => setSelectedOrderForEdit(null)}
+        onClose={() => {
+          const currentOrd = selectedOrderForEdit
+            ? getStoredOrders().find((item) => item.id === selectedOrderForEdit.id) || selectedOrderForEdit
+            : null;
+          setSelectedOrderForEdit(null);
+          if (currentOrd && currentOrd.status !== "entregado" && currentOrd.status !== "cancelado") {
+            setSelectedOrderForDetail(currentOrd);
+          }
+        }}
         order={selectedOrderForEdit}
         onOrderUpdated={() => {
           loadOrders();
@@ -3985,7 +4008,7 @@ export default function PedidosPage() {
       />
 
       <OrderDetailModal
-        isOpen={!!selectedOrderForDetail}
+        isOpen={!!selectedOrderForDetail && !selectedOrderForPayment && !selectedOrderForEdit && !selectedOrderForReceipt}
         onClose={() => setSelectedOrderForDetail(null)}
         order={selectedOrderForDetail}
         isHistoryMode={
@@ -3998,9 +4021,11 @@ export default function PedidosPage() {
           setSelectedOrderForReceipt(o);
         }}
         onOpenPayment={(o) => {
+          setSelectedOrderForDetail(o);
           setSelectedOrderForPayment(o);
         }}
         onOpenEdit={isAdmin ? (o) => {
+          setSelectedOrderForDetail(o);
           setSelectedOrderForEdit(o);
         } : undefined}
         onAdvanceStatus={(o) => {

@@ -2134,7 +2134,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
 
       {/* MODAL GLOBAL DE DETALLES COMPLETOS DEL PEDIDO */}
       <OrderDetailModal
-        isOpen={!!selectedOrderForDetail}
+        isOpen={!!selectedOrderForDetail && !selectedOrderForPayment && !selectedOrderForReceipt}
         onClose={() => setSelectedOrderForDetail(null)}
         order={selectedOrderForDetail}
         isHistoryMode={selectedOrderForDetail?.status === "entregado" || selectedOrderForDetail?.status === "cancelado"}
@@ -2142,6 +2142,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
           setSelectedOrderForReceipt(o);
         }}
         onOpenPayment={(o) => {
+          setSelectedOrderForDetail(o);
           setSelectedOrderForPayment(o);
         }}
         onAdvanceStatus={(o) => {
@@ -2149,43 +2150,31 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
             alert("Este pedido pertenece al historial y no puede ser modificado.");
             return;
           }
-          const nextStatus = o.status === "pendiente" ? "en_horno" : o.status === "en_horno" ? "listo" : "entregado";
-          const updated = updateOrderStatus(o.id, nextStatus) || getStoredOrders().find((item) => item.id === o.id);
+          if (o.status === "listo") {
+            return;
+          }
+          const updated = updateOrderStatus(o.id, "listo") || getStoredOrders().find((item) => item.id === o.id);
           if (updated) {
-            if (updated.status === "entregado") {
-              setSelectedOrderForDetail(null);
-            } else {
-              setSelectedOrderForDetail(updated);
-            }
-            if (updated.status === "listo" || updated.status === "entregado") {
-              const totalNum = Number(updated.total) || 0;
-              const isDelivered = updated.status === "entregado";
-              const isCross = updated.operatingBranchName && updated.branchName && updated.operatingBranchName !== updated.branchName;
-              addNotification({
-                id: `notif-order-status-${updated.id}-${updated.status}`,
-                senderName: isDelivered
-                  ? `📦 Pedido Entregado (${updated.branchName || "Sucursal"})`
-                  : `🎂 Listo en Sucursal (${updated.branchName || "Sucursal"})`,
-                senderAvatar: isDelivered ? "📦" : "🎂",
-                badgeIcon: "pastel",
-                title: isDelivered
-                  ? `Pedido Entregado con Éxito: ${updated.orderNumber}${totalNum ? ` • Total $${totalNum.toFixed(2)}` : ""}`
-                  : `El producto ya está en sucursal: ${updated.orderNumber}${totalNum ? ` • Total $${totalNum.toFixed(2)}` : ""}`,
-                highlightText: `${updated.customerName} • ${isDelivered ? "Entregado al Cliente" : "Listo en Sucursal"}`,
-                description: isDelivered
-                  ? `${updated.description ? `${updated.description}. ` : ""}El pedido ${updated.orderNumber} de "${updated.customerName}" fue entregado satisfactoriamente en ${updated.branchName || "sucursal"}.${isCross ? ` (Originado en: ${updated.operatingBranchName}).` : ""}`
-                  : `${updated.description ? `${updated.description}. ` : ""}El pedido ${updated.orderNumber} de "${updated.customerName}" ya está LISTO en ${updated.branchName || "sucursal"} para entrega.`,
-                category: "pedidos",
-                orderId: updated.id,
-                orderData: updated,
-                branchId: updated.branchId,
-                branchName: updated.branchName,
-                operatingBranchId: updated.operatingBranchId,
-                operatingBranchName: updated.operatingBranchName,
-                actionLabel: isDelivered ? "Ver Pedido Entregado" : "Ver Detalle",
-                actionLink: "/pedidos",
-              });
-            }
+            setSelectedOrderForDetail(updated);
+            const totalNum = Number(updated.total) || 0;
+            addNotification({
+              id: `notif-order-status-${updated.id}-listo`,
+              senderName: `🏪 ¡Ya en Sucursal! (${updated.branchName || "Sucursal"})`,
+              senderAvatar: "🎂",
+              badgeIcon: "pastel",
+              title: `¡Ya en Sucursal!: ${updated.orderNumber}${totalNum ? ` • Total $${totalNum.toFixed(2)}` : ""}`,
+              highlightText: `${updated.customerName} • ¡Ya en Sucursal!`,
+              description: `${updated.description ? `${updated.description}. ` : ""}El pedido ${updated.orderNumber} de "${updated.customerName}" ya está en ${updated.branchName || "sucursal"} listo para entrega.`,
+              category: "pedidos",
+              orderId: updated.id,
+              orderData: updated,
+              branchId: updated.branchId,
+              branchName: updated.branchName,
+              operatingBranchId: updated.operatingBranchId,
+              operatingBranchName: updated.operatingBranchName,
+              actionLabel: (updated.remainingBalance || 0) > 0 ? `Cobrar $${Number(updated.remainingBalance).toFixed(2)}` : "Ver Detalle",
+              actionLink: "/pedidos",
+            });
           }
           if (typeof window !== "undefined") {
             window.dispatchEvent(new Event("brito_orders_updated"));
@@ -2286,16 +2275,27 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       {/* MODAL GLOBAL DE COBRO / LIQUIDACIÓN DE PEDIDO */}
       <OrderPaymentModal
         isOpen={!!selectedOrderForPayment}
-        onClose={() => setSelectedOrderForPayment(null)}
+        onClose={() => {
+          const currentOrd = selectedOrderForPayment
+            ? getStoredOrders().find((o) => o.id === selectedOrderForPayment.id) || selectedOrderForPayment
+            : null;
+          setSelectedOrderForPayment(null);
+          if (currentOrd && currentOrd.status !== "entregado" && currentOrd.status !== "cancelado") {
+            setSelectedOrderForDetail(currentOrd);
+          } else {
+            setSelectedOrderForDetail(null);
+          }
+        }}
         order={selectedOrderForPayment}
         onPaymentSuccess={() => {
           if (typeof window !== "undefined") {
             window.dispatchEvent(new Event("brito_orders_updated"));
           }
-          if (selectedOrderForDetail) {
-            const updated = getStoredOrders().find((o) => o.id === selectedOrderForDetail.id);
+          const targetId = selectedOrderForPayment?.id || selectedOrderForDetail?.id;
+          if (targetId) {
+            const updated = getStoredOrders().find((o) => o.id === targetId);
             if (updated) {
-              if (updated.status === "entregado") {
+              if (updated.status === "entregado" || updated.status === "cancelado") {
                 setSelectedOrderForDetail(null);
               } else {
                 setSelectedOrderForDetail(updated);
@@ -2308,7 +2308,15 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       {/* MODAL GLOBAL DE TICKET / COMPROBANTE DE PEDIDO */}
       <OrderReceiptModal
         isOpen={!!selectedOrderForReceipt}
-        onClose={() => setSelectedOrderForReceipt(null)}
+        onClose={() => {
+          const currentOrd = selectedOrderForReceipt
+            ? getStoredOrders().find((o) => o.id === selectedOrderForReceipt.id) || selectedOrderForReceipt
+            : null;
+          setSelectedOrderForReceipt(null);
+          if (currentOrd && !selectedOrderForDetail) {
+            setSelectedOrderForDetail(currentOrd);
+          }
+        }}
         order={selectedOrderForReceipt}
       />
 

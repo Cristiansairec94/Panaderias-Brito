@@ -119,8 +119,8 @@ export default function OrderDetailModal({
         );
       case "listo":
         return (
-          <span className="bg-emerald-400/20 text-emerald-300 border border-emerald-400/40 px-2.5 py-0.5 rounded-full font-bold text-xs inline-flex items-center gap-1.5 shadow-2xs">
-            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" /> Listo en Sucursal
+          <span className="bg-gradient-to-r from-emerald-400 via-teal-300 to-amber-300 text-stone-950 border-2 border-white/90 px-3 py-0.5 rounded-full font-black text-xs inline-flex items-center gap-1.5 shadow-md shadow-emerald-500/30 ring-2 ring-emerald-400/60">
+            <Store className="w-3.5 h-3.5 text-emerald-950 stroke-[2.5]" /> ¡YA EN SUCURSAL!
           </span>
         );
       case "entregado":
@@ -155,7 +155,6 @@ export default function OrderDetailModal({
         `⛔ No se puede entregar el pedido #${order.orderNumber}.\n\nEl pedido aún tiene un saldo pendiente de ${formatCurrency(order.remainingBalance)}.\n\nPara poder entregarlo, primero debe estar 100% pagado sin faltante.`
       );
       if (onOpenPayment) {
-        onClose();
         onOpenPayment(order);
       }
       return;
@@ -528,7 +527,6 @@ export default function OrderDetailModal({
                     <button
                       type="button"
                       onClick={() => {
-                        onClose();
                         onOpenPayment(order);
                       }}
                       className="w-full mt-2 py-2 px-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 active:scale-95 text-white font-black text-xs rounded-xl shadow transition-all flex items-center justify-center gap-1.5 cursor-pointer"
@@ -628,7 +626,6 @@ export default function OrderDetailModal({
               <button
                 type="button"
                 onClick={() => {
-                  onClose();
                   onOpenPayment(order);
                 }}
                 className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-lg shadow-xs transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
@@ -639,19 +636,30 @@ export default function OrderDetailModal({
               </button>
             )}
 
-            {/* Botón Marcar Listo */}
-            {!isHistoryOrder && onAdvanceStatus && (order.status === "pendiente" || order.status === "en_horno") && (
+            {/* Botón Marcar Listo (Uso único) -> Al marcarse se retira y cambia al distintivo llamativo "¡YA EN SUCURSAL!" */}
+            {!isHistoryOrder && (order.status === "pendiente" || order.status === "en_horno") && onAdvanceStatus && (
               <button
                 type="button"
                 onClick={() => {
                   onAdvanceStatus(order);
                 }}
-                className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-lg shadow-xs transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
-                title="Marcar como listo para entrega en sucursal"
+                className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-black text-xs rounded-lg shadow-xs transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
+                title="Marcar como listo en sucursal (este botón solo se puede usar una vez)"
               >
                 <CheckCircle2 className="w-3.5 h-3.5" />
                 <span>Marcar Listo</span>
               </button>
+            )}
+
+            {!isHistoryOrder && order.status === "listo" && (
+              <div
+                className="px-3.5 py-1.5 bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600 text-white font-black text-xs rounded-lg shadow-md shadow-emerald-500/30 ring-2 ring-amber-300 border border-emerald-200 flex items-center gap-1.5 select-none"
+                title="Este pedido ya fue marcado como listo y ya se encuentra en sucursal"
+              >
+                <Store className="w-4 h-4 text-amber-200 shrink-0 animate-bounce" />
+                <span className="tracking-wide uppercase">¡YA EN SUCURSAL!</span>
+                <Sparkles className="w-3.5 h-3.5 text-amber-200 shrink-0" />
+              </div>
             )}
 
             {/* Botón Entregado */}
@@ -684,7 +692,6 @@ export default function OrderDetailModal({
               <button
                 type="button"
                 onClick={() => {
-                  onClose();
                   onOpenEdit(order);
                 }}
                 className="px-3 py-1.5 bg-white hover:bg-stone-100 text-stone-700 border border-stone-200 font-bold text-xs rounded-lg transition-all flex items-center gap-1.5 cursor-pointer"
