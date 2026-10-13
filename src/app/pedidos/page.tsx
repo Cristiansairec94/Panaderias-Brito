@@ -65,6 +65,7 @@ import OrderReceiptModal from "@/components/pedidos/OrderReceiptModal";
 import EditOrderModal from "@/components/pedidos/EditOrderModal";
 import OrderDetailModal from "@/components/pedidos/OrderDetailModal";
 import OrderHistoryDashboardModal from "@/components/pedidos/OrderHistoryDashboardModal";
+import DeliverOrderConfirmModal from "@/components/pedidos/DeliverOrderConfirmModal";
 
 // Helper functions for date and time calculations in local timezone
 const getLocalDateISO = (d: Date = new Date()): string => {
@@ -189,6 +190,7 @@ export default function PedidosPage() {
   const [selectedOrderForReceipt, setSelectedOrderForReceipt] = useState<CustomOrder | null>(null);
   const [selectedOrderForEdit, setSelectedOrderForEdit] = useState<CustomOrder | null>(null);
   const [selectedOrderForDetail, setSelectedOrderForDetail] = useState<CustomOrder | null>(null);
+  const [orderToDeliver, setOrderToDeliver] = useState<CustomOrder | null>(null);
   const [isHistoryDashboardOpen, setIsHistoryDashboardOpen] = useState(false);
   const [historyDashboardTab, setHistoryDashboardTab] = useState<"todos" | "entregados" | "cancelados">("todos");
 
@@ -1067,7 +1069,7 @@ export default function PedidosPage() {
     const totalNum = Number(updatedOrd.total) || 0;
     const baseItemsDesc = updatedOrd.description ? `${updatedOrd.description}. ` : "";
     addNotification({
-      id: `notif-order-status-${updatedOrd.id}-listo`,
+      id: `notif-order-${updatedOrd.id}`,
       title: `El producto ya está en sucursal: ${updatedOrd.orderNumber}${totalNum ? ` • Total $${totalNum.toFixed(2)}` : ""}`,
       description: `${baseItemsDesc}El pedido ${updatedOrd.orderNumber} de "${updatedOrd.customerName}" ha sido marcado como LISTO en sucursal.`,
       senderName: `🎂 Listo en Sucursal (${updatedOrd.branchName || "Sucursal"})`,
@@ -1097,7 +1099,7 @@ export default function PedidosPage() {
         loadOrders();
         const baseItemsDesc = updatedOrd.description ? `${updatedOrd.description}. ` : "";
         addNotification({
-          id: `notif-order-status-${updatedOrd.id}-pendiente`,
+          id: `notif-order-${updatedOrd.id}`,
           title: `Estado Actualizado: ${updatedOrd.orderNumber}`,
           description: `${baseItemsDesc}El pedido ${updatedOrd.orderNumber} de "${updatedOrd.customerName}" regresó a "En Preparación".`,
           senderName: `👨‍🍳 ${updatedOrd.branchName || "Control de Pedidos"}`,
@@ -1132,31 +1134,34 @@ export default function PedidosPage() {
       setSelectedOrderForPayment(order);
       return;
     }
-    if (confirm(`¿Entregar el pedido #${order.orderNumber} a "${order.customerName}"?\n\nAl marcarlo como entregado, el pedido se completará y se trasladará al Historial de Pedidos.`)) {
-      const updatedOrd = updateOrderStatus(order.id, "entregado") || { ...order, status: "entregado" as const };
-      loadOrders();
-      setSelectedOrderForDetail(null);
-      const totalNum = Number(updatedOrd.total) || 0;
-      const baseItemsDesc = updatedOrd.description ? `${updatedOrd.description}. ` : "";
-      addNotification({
-        id: `notif-order-status-${updatedOrd.id}-entregado`,
-        title: `Pedido Entregado con Éxito: ${updatedOrd.orderNumber}${totalNum ? ` • Total $${totalNum.toFixed(2)}` : ""}`,
-        description: `${baseItemsDesc}El pedido ${updatedOrd.orderNumber} de "${updatedOrd.customerName}" fue entregado satisfactoriamente.`,
-        senderName: `📦 Pedido Entregado (${updatedOrd.branchName || "Sucursal"})`,
-        senderAvatar: "📦",
-        highlightText: `${updatedOrd.customerName} • Entregado al Cliente`,
-        category: "pedidos",
-        badgeIcon: "pastel",
-        orderId: updatedOrd.id,
-        orderData: updatedOrd,
-        branchId: updatedOrd.branchId,
-        branchName: updatedOrd.branchName,
-        operatingBranchId: updatedOrd.operatingBranchId,
-        operatingBranchName: updatedOrd.operatingBranchName,
-        actionLabel: "Ver Pedido Entregado",
-        actionLink: "/pedidos",
-      });
-    }
+    setOrderToDeliver(order);
+  };
+
+  const handleConfirmDeliverOrder = (order: CustomOrder) => {
+    setOrderToDeliver(null);
+    const updatedOrd = updateOrderStatus(order.id, "entregado") || { ...order, status: "entregado" as const };
+    loadOrders();
+    setSelectedOrderForDetail(null);
+    const totalNum = Number(updatedOrd.total) || 0;
+    const baseItemsDesc = updatedOrd.description ? `${updatedOrd.description}. ` : "";
+    addNotification({
+      id: `notif-order-${updatedOrd.id}`,
+      title: `Pedido Entregado con Éxito: ${updatedOrd.orderNumber}${totalNum ? ` • Total $${totalNum.toFixed(2)}` : ""}`,
+      description: `${baseItemsDesc}El pedido ${updatedOrd.orderNumber} de "${updatedOrd.customerName}" fue entregado satisfactoriamente.`,
+      senderName: `📦 Pedido Entregado (${updatedOrd.branchName || "Sucursal"})`,
+      senderAvatar: "📦",
+      highlightText: `${updatedOrd.customerName} • Entregado al Cliente`,
+      category: "pedidos",
+      badgeIcon: "pastel",
+      orderId: updatedOrd.id,
+      orderData: updatedOrd,
+      branchId: updatedOrd.branchId,
+      branchName: updatedOrd.branchName,
+      operatingBranchId: updatedOrd.operatingBranchId,
+      operatingBranchName: updatedOrd.operatingBranchName,
+      actionLabel: "Ver Pedido Entregado",
+      actionLink: "/pedidos",
+    });
   };
 
   const handleAdvanceStatus = (order: CustomOrder) => {
@@ -1188,7 +1193,7 @@ export default function PedidosPage() {
         const totalNum = Number(updatedOrd.total) || 0;
         const baseItemsDesc = updatedOrd.description ? `${updatedOrd.description}. ` : "";
         addNotification({
-          id: `notif-order-status-${updatedOrd.id}-listo`,
+          id: `notif-order-${updatedOrd.id}`,
           title: `El producto ya está en sucursal: ${updatedOrd.orderNumber}${totalNum ? ` • Total $${totalNum.toFixed(2)}` : ""}`,
           description: `${baseItemsDesc}El pedido ${updatedOrd.orderNumber} de "${updatedOrd.customerName}" ha sido marcado como LISTO en sucursal.`,
           senderName: `🎂 Listo en Sucursal (${updatedOrd.branchName || "Sucursal"})`,
@@ -1209,7 +1214,7 @@ export default function PedidosPage() {
         const totalNum = Number(updatedOrd.total) || 0;
         const baseItemsDesc = updatedOrd.description ? `${updatedOrd.description}. ` : "";
         addNotification({
-          id: `notif-order-status-${updatedOrd.id}-entregado`,
+          id: `notif-order-${updatedOrd.id}`,
           title: `Pedido Entregado con Éxito: ${updatedOrd.orderNumber}${totalNum ? ` • Total $${totalNum.toFixed(2)}` : ""}`,
           description: `${baseItemsDesc}El pedido ${updatedOrd.orderNumber} de "${updatedOrd.customerName}" fue entregado satisfactoriamente.`,
           senderName: `📦 Pedido Entregado (${updatedOrd.branchName || "Sucursal"})`,
@@ -1243,7 +1248,7 @@ export default function PedidosPage() {
       loadOrders();
       setSelectedOrderForDetail(null);
       addNotification({
-        id: `notif-order-cancelled-${orderId}`,
+        id: `notif-order-${orderId}`,
         title: `Pedido Cancelado / Eliminado: ${orderNumber || ""}`,
         description: `El pedido ${orderNumber || ""} de "${customerName || "Cliente"}" ha sido eliminado permanentemente del sistema.`,
         senderName: "🗑️ Pedido Cancelado",
@@ -1272,7 +1277,7 @@ export default function PedidosPage() {
         loadOrders();
         setSelectedOrderForDetail(null);
         addNotification({
-          id: `notif-order-cancelled-${order.id}`,
+          id: `notif-order-${order.id}`,
           title: `Pedido Cancelado / Dado de Baja: ${order.orderNumber}${totalNum ? ` • Total $${totalNum.toFixed(2)}` : ""}`,
           description: `${baseItemsDesc}El pedido ${order.orderNumber} de "${order.customerName}" ha sido eliminado permanentemente del registro.`,
           senderName: `🗑️ Pedido Cancelado (${order.branchName || "Sucursal"})`,
@@ -1302,7 +1307,7 @@ export default function PedidosPage() {
         }, 120);
 
         addNotification({
-          id: `notif-order-status-${updatedOrd.id}-cancelado`,
+          id: `notif-order-${updatedOrd.id}`,
           title: `Pedido Cancelado / Dado de Baja: ${updatedOrd.orderNumber}${totalNum ? ` • Total $${totalNum.toFixed(2)}` : ""}`,
           description: `${baseItemsDesc}El pedido ${updatedOrd.orderNumber} de "${updatedOrd.customerName}" se dio de baja y se mandó al historial de productos dados de baja.`,
           senderName: `🗑️ Pedido Cancelado (${updatedOrd.branchName || "Sucursal"})`,
@@ -2959,7 +2964,7 @@ export default function PedidosPage() {
                         )}
 
                         {/* Fila 2: Botonera Secundaria Cuadrada y Uniforme */}
-                        <div className={`grid ${isAdmin ? "grid-cols-4" : "grid-cols-3"} gap-1.5`}>
+                        <div className={`grid ${isAdmin && order.status !== "entregado" ? "grid-cols-4" : "grid-cols-3"} gap-1.5`}>
                           <button
                             type="button"
                             onClick={() => setSelectedOrderForReceipt(order)}
@@ -2990,7 +2995,7 @@ export default function PedidosPage() {
                             <span>Ver</span>
                           </button>
 
-                          {isAdmin && (
+                          {isAdmin && order.status !== "entregado" && (
                             !isConcludedOrHistory ? (
                               <button
                                 type="button"
@@ -4014,7 +4019,7 @@ export default function PedidosPage() {
         isHistoryMode={
           classificationFilter === "historial" ||
           (selectedOrderForDetail
-            ? selectedOrderForDetail.status === "cancelado"
+            ? selectedOrderForDetail.status === "entregado" || selectedOrderForDetail.status === "cancelado"
             : false)
         }
         onPrintReceipt={(o) => {
@@ -4058,7 +4063,7 @@ export default function PedidosPage() {
           const totalNum = Number(updated.total) || 0;
           const baseItemsDesc = updated.description ? `${updated.description}. ` : "";
           addNotification({
-            id: `notif-order-status-${updated.id}-entregado`,
+            id: `notif-order-${updated.id}`,
             title: `Pedido Entregado con Éxito: ${updated.orderNumber}${totalNum ? ` • Total $${totalNum.toFixed(2)}` : ""}`,
             description: `${baseItemsDesc}El pedido ${updated.orderNumber} de "${updated.customerName}" ha sido marcado como entregado exitosamente.`,
             senderName: `📦 Pedido Entregado (${updated.branchName || "Sucursal"})`,
@@ -4079,7 +4084,7 @@ export default function PedidosPage() {
         onSendWhatsApp={(o) => {
           handleSendWhatsApp(o);
         }}
-        onDarDeBaja={isAdmin ? (o) => {
+        onDarDeBaja={isAdmin && selectedOrderForDetail?.status !== "entregado" ? (o) => {
           handleDarDeBaja(o);
         } : undefined}
       />
@@ -4111,7 +4116,7 @@ export default function PedidosPage() {
             const totalNum = Number(updatedOrd.total) || 0;
             const baseItemsDesc = updatedOrd.description ? `${updatedOrd.description}. ` : "";
             addNotification({
-              id: `notif-order-status-${updatedOrd.id}-listo`,
+              id: `notif-order-${updatedOrd.id}`,
               title: `El producto ya está en sucursal: ${updatedOrd.orderNumber}${totalNum ? ` • Total $${totalNum.toFixed(2)}` : ""}`,
               description: `${baseItemsDesc}El pedido ${updatedOrd.orderNumber} de "${updatedOrd.customerName}" ha regresado a la sección de pedidos activos (Listo en Sucursal).`,
               senderName: `🎂 Listo en Sucursal (${updatedOrd.branchName || "Sucursal"})`,
@@ -4254,6 +4259,18 @@ export default function PedidosPage() {
           </div>
         </div>
       )}
+
+      {/* Modal Centrado y Animado de Confirmación de Entrega Segura estilo Panadería Brito */}
+      <DeliverOrderConfirmModal
+        isOpen={Boolean(orderToDeliver)}
+        order={orderToDeliver}
+        onClose={() => setOrderToDeliver(null)}
+        onConfirm={() => {
+          if (orderToDeliver) {
+            handleConfirmDeliverOrder(orderToDeliver);
+          }
+        }}
+      />
     </div>
   );
 }

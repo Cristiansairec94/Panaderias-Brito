@@ -1,6 +1,7 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect } from "react";
+import DeliverOrderConfirmModal from "./DeliverOrderConfirmModal";
 import { 
   X, 
   Cake, 
@@ -141,12 +142,20 @@ export default function OrderDetailModal({
   const isLiquidado = order.remainingBalance <= 0;
   const isHistoryOrder = Boolean(
     isHistoryMode ||
+    order.status === "entregado" ||
     order.status === "cancelado"
   );
   const deliveryFormatted = formatDeliveryDate(order.deliveryDate);
   const { originName, cleanNotes, isCrossBranch } = extractOrderOriginAndNotes(order);
   const pickupBranch = order.branchName || "Sucursal Matriz (Centro)";
   const orderCreation = formatOrderCreation(order);
+  const [showDeliverConfirm, setShowDeliverConfirm] = useState(false);
+
+  useEffect(() => {
+    if (!isOpen) {
+      setShowDeliverConfirm(false);
+    }
+  }, [isOpen]);
 
   const handleDeliver = () => {
     if (!order) return;
@@ -160,8 +169,12 @@ export default function OrderDetailModal({
       return;
     }
 
-    const ok = confirm(`¿Confirmas marcar el pedido #${order.orderNumber} de "${order.customerName}" como ENTREGADO?`);
-    if (!ok) return;
+    setShowDeliverConfirm(true);
+  };
+
+  const handleConfirmDeliver = () => {
+    if (!order) return;
+    setShowDeliverConfirm(false);
 
     if (onDeliverOrder) {
       onDeliverOrder(order);
@@ -701,8 +714,8 @@ export default function OrderDetailModal({
               </button>
             )}
 
-            {/* Botón Eliminar / Dar de Baja */}
-            {isAdmin && onDarDeBaja && (
+            {/* Botón Eliminar / Dar de Baja (no disponible si el pedido ya fue entregado) */}
+            {isAdmin && onDarDeBaja && order.status !== "entregado" && (
               <button
                 type="button"
                 onClick={() => onDarDeBaja(order)}
@@ -724,6 +737,13 @@ export default function OrderDetailModal({
           </button>
         </div>
       </div>
+
+      <DeliverOrderConfirmModal
+        isOpen={showDeliverConfirm}
+        order={order}
+        onClose={() => setShowDeliverConfirm(false)}
+        onConfirm={handleConfirmDeliver}
+      />
     </div>
   );
 }
