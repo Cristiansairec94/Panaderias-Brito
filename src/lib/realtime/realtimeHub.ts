@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase/client";
 import { FBNotification } from "@/context/NotificationContext";
 import { BranchCashMovement, CustomOrder, Branch, ShiftCutRecord } from "@/types";
+import { CLEAN_SLATE_EPOCH } from "@/lib/wipeOperationalData";
 
 export interface RealtimeBranchPayload {
   action: "create" | "update" | "delete";
@@ -136,7 +137,7 @@ class RealtimeHub {
   private channel: any = null;
   private status: RealtimeStatus = "disconnected";
   private initialized = false;
-  private lastSyncTimestamp: number = Date.now() - 1000 * 60 * 60;
+  private lastSyncTimestamp: number = Math.max(CLEAN_SLATE_EPOCH, Date.now() - 1000 * 60 * 60);
 
   private notificationListeners = new Set<NotificationListener>();
   private saleListeners = new Set<SaleListener>();
@@ -390,7 +391,7 @@ class RealtimeHub {
     const payload = {
       ...notif,
       senderDeviceId: this.getDeviceId(),
-      timestamp: new Date().toISOString(),
+      timestamp: typeof notif.timestamp === "number" && notif.timestamp > 0 ? notif.timestamp : Date.now(),
     };
 
     // 1. WebSocket Broadcast inmediato
@@ -544,9 +545,10 @@ class RealtimeHub {
   public async fetchCatchupEvents() {
     if (typeof window === "undefined") return;
     try {
-      const lastTs = this.lastSyncTimestamp
+      const rawLastTs = this.lastSyncTimestamp
         ? Math.max(0, this.lastSyncTimestamp - 30000)
         : (Date.now() - 1000 * 60 * 60);
+      const lastTs = Math.max(CLEAN_SLATE_EPOCH, rawLastTs);
       const res = await fetch(`/api/realtime/sync?since=${lastTs}`);
       if (!res.ok) return;
 
@@ -554,14 +556,15 @@ class RealtimeHub {
       if (!data) return;
 
       if (data.serverTime) {
-        this.lastSyncTimestamp = data.serverTime;
+        this.lastSyncTimestamp = Math.max(CLEAN_SLATE_EPOCH, data.serverTime);
       } else {
-        this.lastSyncTimestamp = Date.now();
+        this.lastSyncTimestamp = Math.max(CLEAN_SLATE_EPOCH, Date.now());
       }
 
       if (!Array.isArray(data.events) || data.events.length === 0) return;
 
       for (const item of data.events) {
+        if ((item.timestamp || 0) < CLEAN_SLATE_EPOCH) continue;
         if (item.type === "user_session_revoked") continue;
         if (item.senderTabId && item.senderTabId === this.tabId) continue;
         if (item.payload?.senderTabId && item.payload.senderTabId === this.tabId) continue;

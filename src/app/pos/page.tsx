@@ -84,7 +84,7 @@ import PrinterConfigModal from "@/components/pos/PrinterConfigModal";
 import CreateOrderModal from "@/components/pedidos/CreateOrderModal";
 import OrderReceiptModal from "@/components/pedidos/OrderReceiptModal";
 import OrderPaymentModal from "@/components/pedidos/OrderPaymentModal";
-import { getStoredOrders } from "@/lib/orders";
+import { getStoredOrders, syncOrdersWithServer } from "@/lib/orders";
 import { recordPosSaleIncome, removePosSaleIncome, getStoredIncomes, cleanDuplicateIncomes } from "@/lib/incomes";
 import { getStoredPrinterConfig, PrinterConfig } from "@/lib/printer";
 
@@ -1144,13 +1144,18 @@ export default function POSPage() {
   const [shiftVersion, setShiftVersion] = useState(0);
 
   useEffect(() => {
+    syncOrdersWithServer().catch(() => {});
     const handleShiftUpdated = () => {
       setShiftVersion((v) => v + 1);
     };
     window.addEventListener("brito_shift_cuts_updated", handleShiftUpdated);
+    window.addEventListener("brito_orders_updated", handleShiftUpdated);
+    window.addEventListener("brito_caja_updated", handleShiftUpdated);
     window.addEventListener("storage", handleShiftUpdated);
     return () => {
       window.removeEventListener("brito_shift_cuts_updated", handleShiftUpdated);
+      window.removeEventListener("brito_orders_updated", handleShiftUpdated);
+      window.removeEventListener("brito_caja_updated", handleShiftUpdated);
       window.removeEventListener("storage", handleShiftUpdated);
     };
   }, []);
@@ -2180,43 +2185,39 @@ export default function POSPage() {
     let posCash = (currentShiftSales || [])
       .filter((s) => s && s.paymentMethod === "efectivo")
       .reduce((sum, s) => sum + (Number(s.total) || 0), 0);
-    const branchDeskCash = Number(activeBranch?.todayDeskSales ?? activeBranch?.currentShift?.cashSales ?? 0);
+    const branchDeskCash = Number(activeBranch?.todayDeskSales ?? (activeBranch?.todaySales && (activeBranch?.todayOrdersDeposit ?? 0) === 0 ? activeBranch.todaySales : 0));
     if (branchDeskCash > 0 && posCash === 0) {
       posCash = branchDeskCash;
     }
-    // Para el conteo de efectivo en cajón, sumar anticipos cobrados en efectivo en este turno y sucursal
+    // Para el conteo de efectivo en cajón, sumar anticipos cobrados en efectivo en este turno y sucursal operativa
     const allShiftOrdersForCash = getStoredOrders().filter((o) => {
-      if (!o) return false;
+      if (!o || o.status === "cancelado") return false;
       if (activeBranch && activeBranch.id !== "all") {
         const bId = activeBranch.id.toLowerCase().trim();
-        const bName = (activeBranch.name || "").toLowerCase().trim();
-        const bShort = (activeBranch.shortName || "").toLowerCase().trim();
-        const oPickupId = String(o.branchId || (o as any).branch_id || "").toLowerCase().trim();
-        const oPickupName = String(o.branchName || (o as any).branch_name || "").toLowerCase().trim();
-        const oOperatingId = String((o as any).operatingBranchId || (o as any).operating_branch_id || "").toLowerCase().trim();
-        const oOperatingName = String((o as any).operatingBranchName || (o as any).operating_branch_name || "").toLowerCase().trim();
-
-        const match = (oPickupId && (oPickupId === bId || bId.includes(oPickupId) || oPickupId.includes(bId))) ||
-                      (oPickupName && ((bName && (oPickupName === bName || oPickupName.includes(bName) || bName.includes(oPickupName))) ||
-                                      (bShort && (oPickupName.includes(bShort) || bShort.includes(oPickupName))))) ||
-                      (oOperatingId && (oOperatingId === bId || bId.includes(oOperatingId) || oOperatingId.includes(bId))) ||
-                      (oOperatingName && ((bName && (oOperatingName === bName || oOperatingName.includes(bName) || bName.includes(oOperatingName))) ||
-                                          (bShort && (oOperatingName.includes(bShort) || bShort.includes(oOperatingName)))));
-        const cashierMatches = Boolean(
-          (activeBranch.currentShift?.cashier && o.cashier && matchesCashier(o.cashier, activeBranch.currentShift.cashier)) ||
-          (o.cashier && resolveBranchId("", o.cashier) === bId)
-        );
-        if (!match && !cashierMatches) {
+        const rawNotes = String(o.notes || "");
+        const originMatch = rawNotes.match(/\[Origen:\s*([^\|\]\r\n]+)(?:\|([^\]\r\n]+))?\]/);
+        const originBranchId = originMatch && originMatch[1] ? originMatch[1].trim() : undefined;
+        const opId = (o as any).operatingBranchId || (o as any).operating_branch_id;
+        const pId = o.branchId || (o as any).branch_id;
+        const cashierBranchId = o.cashier && !/don toño|admin|carlos/i.test(String(o.cashier))
+          ? resolveBranchId(undefined, o.cashier)
+          : undefined;
+        const cashBranchId = originBranchId
+          ? resolveBranchId(originBranchId, o.cashier)
+          : opId
+          ? resolveBranchId(opId, o.cashier)
+          : (cashierBranchId || resolveBranchId(pId, o.cashier));
+        if (cashBranchId !== bId) {
           return false;
         }
       }
-      const t = parseDateTimeSafe(o.timestamp || o.createdAt || (o as any).date);
+      const t = parseDateTimeSafe(o.timestamp || o.createdAt || (o as any).created_at || (o as any).date);
       if (shiftStartBoundary > 0 && (!t || t < shiftStartBoundary)) return false;
       return (o.paymentMethod === "efectivo" || !o.paymentMethod) && !(currentShiftSales || []).some((s) => s.id === o.orderNumber || s.id === o.id);
     });
     const ordersCashCalc = allShiftOrdersForCash.reduce((sum, o) => sum + (Number(o.deposit) || 0), 0);
     const branchOrdersDeposit = Number(activeBranch?.todayOrdersDeposit ?? 0);
-    const ordersCash = branchOrdersDeposit > 0 && ordersCashCalc === 0 ? branchOrdersDeposit : ordersCashCalc;
+    const ordersCash = ordersCashCalc > 0 ? ordersCashCalc : (branchOrdersDeposit > 0 ? branchOrdersDeposit : 0);
     const baseCash = posCash + ordersCash;
     const targetBranchCash = Number(activeBranch?.cashInDrawer ?? 0);
     const targetFund = Number(initialCashFund || 0);
@@ -2239,9 +2240,11 @@ export default function POSPage() {
     })
     .reduce((sum, i) => sum + (Number(i.amount) || 0), 0);
   const calculatedNetCashInDrawer = (Number(initialCashFund) || 0) + totalCashSales + totalExtraInCash - totalExpenses;
-  const netCashInDrawer = activeBranch?.cashInDrawer !== undefined && Number(activeBranch.cashInDrawer) > 0
-    ? Number(activeBranch.cashInDrawer)
-    : calculatedNetCashInDrawer;
+  const netCashInDrawer = (totalCashSales > 0 || totalExtraInCash > 0 || totalExpenses > 0)
+    ? Math.max(Number(activeBranch?.cashInDrawer || 0), calculatedNetCashInDrawer)
+    : (activeBranch?.cashInDrawer !== undefined && Number(activeBranch.cashInDrawer) > 0
+        ? Number(activeBranch.cashInDrawer)
+        : calculatedNetCashInDrawer);
   const totalStockValue = (products || []).reduce((sum, p) => sum + ((Number(p?.stock) || 0) * (Number(p?.price) || 0)), 0);
 
   const handleQuickCash = (amount: number) => {

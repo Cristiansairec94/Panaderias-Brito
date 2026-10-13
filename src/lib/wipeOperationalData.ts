@@ -3,7 +3,7 @@
 import { createClient } from "@/lib/supabase/client";
 
 // Epoch timestamp for clean slate: all operational data (notifications, orders, sales, expenses) before this epoch is discarded
-export const CLEAN_SLATE_EPOCH = 1791836100000; // 2026-10-12T20:15:00.000Z
+export const CLEAN_SLATE_EPOCH = 1791929999000; // 2026-10-13T22:19:59.000Z
 export const WIPE_VERSION_KEY = `brito_clean_slate_epoch_${CLEAN_SLATE_EPOCH}`;
 
 // Ejecución sincrónica en el cliente en cuanto el módulo se carga en el navegador
@@ -49,7 +49,12 @@ if (typeof window !== "undefined") {
       localStorage.removeItem("brito_current_shift_start_timestamp");
       for (let i = localStorage.length - 1; i >= 0; i--) {
         const k = localStorage.key(i);
-        if (k && (k.startsWith("brito_shift_start_") || k.startsWith("brito_pos_initial_fund_"))) {
+        if (
+          k &&
+          (k.startsWith("brito_shift_start_") ||
+            k.startsWith("brito_pos_initial_fund_") ||
+            k.startsWith("brito_dismissed_terminal_orders_"))
+        ) {
           localStorage.removeItem(k);
         }
       }
@@ -122,7 +127,12 @@ export async function executeCompleteOperationalWipe(options: { wipeSupabase?: b
   try {
     for (let i = localStorage.length - 1; i >= 0; i--) {
       const k = localStorage.key(i);
-      if (k && (k.startsWith("brito_shift_start_") || k.startsWith("brito_pos_initial_fund_"))) {
+      if (
+        k &&
+        (k.startsWith("brito_shift_start_") ||
+          k.startsWith("brito_pos_initial_fund_") ||
+          k.startsWith("brito_dismissed_terminal_orders_"))
+      ) {
         localStorage.removeItem(k);
       }
     }

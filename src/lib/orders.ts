@@ -1425,24 +1425,48 @@ export function updateOrderStatus(orderId: string, status: CustomOrder["status"]
     const statusMap: Record<string, string> = {
       pendiente: "Pendiente ⏳",
       en_horno: "En Horno 🔥",
-      listo: "Listo para Entrega 🎂",
+      listo: "Listo en Sucursal 🎂",
       entregado: "Entregado al Cliente ✅",
-      cancelado: "Cancelado ❌",
+      cancelado: "Dado de Baja ❌",
     };
     const isDelivered = status === "entregado";
+    const isCancelled = status === "cancelado";
+    const isReady = status === "listo";
     const ord = current[idx];
+    const totalNum = Number(ord.total) || 0;
     const isCross = ord.operatingBranchName && ord.branchName && ord.operatingBranchName !== ord.branchName;
+    const baseItemsDesc = ord.description ? `${ord.description}. ` : "";
 
     realtimeHub.broadcastNotification({
       id: `notif-order-status-${ord.id}-${status}`,
-      senderName: isDelivered ? `📦 ${ord.branchName}` : `👨‍🍳 ${ord.branchName}`,
-      senderAvatar: isDelivered ? "📦" : "👨‍🍳",
+      senderName: isDelivered
+        ? `📦 Pedido Entregado (${ord.branchName})`
+        : isCancelled
+        ? `🗑️ Pedido Cancelado (${ord.branchName})`
+        : isReady
+        ? `🎂 Listo en Sucursal (${ord.branchName})`
+        : `👨‍🍳 ${ord.branchName}`,
+      senderAvatar: isDelivered ? "📦" : isCancelled ? "🗑️" : isReady ? "🎂" : "👨‍🍳",
       badgeIcon: "pastel",
-      title: isDelivered ? `Pedido Entregado con Éxito: ${ord.orderNumber}` : "Estado de Pedido Actualizado",
-      highlightText: isDelivered ? `${ord.customerName} • Entregado al Cliente` : `${ord.orderNumber}: Ahora está "${statusMap[status] || status}"`,
+      title: isDelivered
+        ? `Pedido Entregado con Éxito: ${ord.orderNumber}${totalNum ? ` • Total $${totalNum.toFixed(2)}` : ""}`
+        : isCancelled
+        ? `Pedido Cancelado / Dado de Baja: ${ord.orderNumber}${totalNum ? ` • Total $${totalNum.toFixed(2)}` : ""}`
+        : isReady
+        ? `El producto ya está en sucursal: ${ord.orderNumber}${totalNum ? ` • Total $${totalNum.toFixed(2)}` : ""}`
+        : `Estado de Pedido Actualizado: ${ord.orderNumber}`,
+      highlightText: isDelivered
+        ? `${ord.customerName} • Entregado al Cliente`
+        : isCancelled
+        ? `${ord.customerName} • Dado de Baja`
+        : `${ord.customerName} • ${statusMap[status] || status}`,
       description: isDelivered
-        ? `El pedido ${ord.orderNumber} de "${ord.customerName}" fue entregado satisfactoriamente en ${ord.branchName}.${isCross ? ` (Originado en: ${ord.operatingBranchName}).` : ""}`
-        : `Cliente: ${ord.customerName} • Entrega: ${ord.deliveryDate} ${ord.deliveryTime}${isCross ? ` • Origen: ${ord.operatingBranchName}` : ""}`,
+        ? `${baseItemsDesc}El pedido ${ord.orderNumber} de "${ord.customerName}" fue entregado satisfactoriamente en ${ord.branchName}.${isCross ? ` (Originado en: ${ord.operatingBranchName}).` : ""}`
+        : isCancelled
+        ? `${baseItemsDesc}El pedido ${ord.orderNumber} de "${ord.customerName}" fue dado de baja.`
+        : isReady
+        ? `${baseItemsDesc}El pedido ${ord.orderNumber} de "${ord.customerName}" ya está LISTO en ${ord.branchName} para entrega.`
+        : `${baseItemsDesc}Cliente: ${ord.customerName} • Entrega: ${ord.deliveryDate} ${ord.deliveryTime}${isCross ? ` • Origen: ${ord.operatingBranchName}` : ""}`,
       timeAgo: formatNotificationHour(Date.now()),
       timestamp: Date.now(),
       group: "recientes",
@@ -1453,7 +1477,7 @@ export function updateOrderStatus(orderId: string, status: CustomOrder["status"]
       branchName: ord.branchName,
       operatingBranchId: ord.operatingBranchId,
       operatingBranchName: ord.operatingBranchName,
-      actionLabel: "Ver Detalle",
+      actionLabel: isDelivered ? "Ver Pedido Entregado" : isCancelled ? "Ver Pedido Cancelado" : "Ver Detalle",
       actionLink: "/pedidos",
       orderData: ord,
     });

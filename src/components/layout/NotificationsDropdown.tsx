@@ -26,7 +26,8 @@ import {
   ShieldCheck,
   PackageCheck,
   XCircle,
-  User
+  User,
+  Eye
 } from "lucide-react";
 import { 
   useNotifications, 
@@ -278,12 +279,24 @@ export default function NotificationsDropdown() {
       })
     : notifications;
 
-  const cortesCount = notifications.filter((n) => n.category === "caja").length;
-  const pedidosCount = visibleNotifications.filter((n) => n.category === "pedidos" || Boolean(n.orderId)).length;
-  const unreadVisibleCount = visibleNotifications.filter((n) => !n.read && (n.category === "pedidos" || Boolean(n.orderId))).length;
-  const effectiveUnreadCount = isAdmin ? unreadCount : unreadVisibleCount;
+  const seenOrderKeys = new Set<string>();
+  const deduplicatedVisibleNotifications = visibleNotifications.filter((n) => {
+    const isOrderNotif = n.category === "pedidos" || Boolean(n.orderId) || n.title.toLowerCase().includes("pedido");
+    if (!isOrderNotif) return true;
+    const parsed = parseOrderNotification(n);
+    const key = (parsed?.folio || parsed?.storedOrder?.id || n.orderId || "").toUpperCase().trim();
+    if (!key) return true;
+    if (seenOrderKeys.has(key)) return false;
+    seenOrderKeys.add(key);
+    return true;
+  });
 
-  const filtered = visibleNotifications.filter((n) => {
+  const cortesCount = notifications.filter((n) => n.category === "caja").length;
+  const pedidosCount = deduplicatedVisibleNotifications.filter((n) => n.category === "pedidos" || Boolean(n.orderId)).length;
+  const unreadVisibleCount = deduplicatedVisibleNotifications.filter((n) => !n.read && (n.category === "pedidos" || Boolean(n.orderId))).length;
+  const effectiveUnreadCount = isAdmin ? deduplicatedVisibleNotifications.filter((n) => !n.read).length : unreadVisibleCount;
+
+  const filtered = deduplicatedVisibleNotifications.filter((n) => {
     if (!isAdmin || showOnlyPedidos) {
       return n.category === "pedidos" || Boolean(n.orderId);
     }
@@ -396,18 +409,6 @@ export default function NotificationsDropdown() {
                         </span>
                         <span className="text-[10px] font-bold text-stone-400">{soundEnabled ? "Activado" : "Mudo"}</span>
                       </button>
-                      {isAdmin && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            clearAll();
-                            setShowOptionsMenu(false);
-                          }}
-                          className="w-full text-left px-3 py-2 rounded-xl hover:bg-rose-50 flex items-center gap-2 text-rose-600 cursor-pointer"
-                        >
-                          <Trash2 className="w-4 h-4" /> Limpiar todas
-                        </button>
-                      )}
                     </div>
                   )}
                 </div>
@@ -604,14 +605,18 @@ function parseOrderNotification(notif: FBNotification) {
   }
   if (!storedOrder?.customerName) {
     customer = customer
-      .replace(/\s*-\s*Anticipo.*$/i, "")
-      .replace(/\s*-\s*Total.*$/i, "")
-      .replace(/\s*-\s*Resta.*$/i, "")
-      .replace(/\s*-\s*100%.*$/i, "")
+      .replace(/\s*[•\-]\s*Anticipo.*$/i, "")
+      .replace(/\s*[•\-]\s*Total.*$/i, "")
+      .replace(/\s*[•\-]\s*Resta.*$/i, "")
+      .replace(/\s*[•\-]\s*100%.*$/i, "")
+      .replace(/\s*[•\-]\s*Entregad[oa].*$/i, "")
+      .replace(/\s*[•\-]\s*Cancelad[oa].*$/i, "")
+      .replace(/\s*[•\-]\s*Dad[oa] de baja.*$/i, "")
+      .replace(/\s*[•\-]\s*Listo.*$/i, "")
       .replace(/^PED-\d+\s*/i, "")
       .trim();
 
-    if (customer.startsWith("$")) {
+    if (customer.startsWith("$") || !customer) {
       const descNameMatch = notif.description.match(/(?:de|cliente)\s+["']?([A-Za-zÁÉÍÓÚáéíóúñÑ\s]+)["']?/i);
       if (descNameMatch && descNameMatch[1]) {
         customer = descNameMatch[1].trim();
@@ -630,8 +635,8 @@ function parseOrderNotification(notif: FBNotification) {
   const remaining = remainingMatch ? `$${remainingMatch[1].replace(/^\$/, "")}` : (storedOrder?.remainingBalance !== undefined ? formatCurrency(storedOrder.remainingBalance) : null);
 
   // 4. Cross-Branch Route
-  let originBranch = notif.operatingBranchName || "";
-  let destBranch = notif.branchName || "";
+  let originBranch = notif.operatingBranchName || storedOrder?.operatingBranchName || "";
+  let destBranch = notif.branchName || storedOrder?.branchName || "";
 
   if (!originBranch || !destBranch) {
     const routeMatch = notif.title.match(/Sucursal\s+([^➔•\)]+)\s*➔\s*Sucursal\s+([^•\)]+)/i);
@@ -666,7 +671,7 @@ function parseOrderNotification(notif: FBNotification) {
     cleanDesc = notif.description;
   }
 
-  // 6. Flags de Pago, Entrega y Cancelación
+  // 6. Flags de Pago, Listo, Entrega y Cancelación
   const isPaid =
     storedOrder?.paymentStatus === "liquidado" ||
     combined.toLowerCase().includes("liquidado") ||
@@ -675,13 +680,19 @@ function parseOrderNotification(notif: FBNotification) {
     (notif.title && notif.title.toLowerCase().includes("pagado")) ||
     (remainingMatch && (remainingMatch[1] === "0" || remainingMatch[1] === "0.00"));
 
+  const isReady =
+    storedOrder?.status === "listo" ||
+    (notif.id.includes("order-status") && notif.id.includes("listo")) ||
+    (notif.title && /ya est[áa] en sucursal|listo en sucursal/i.test(notif.title)) ||
+    (notif.highlightText && /listo en sucursal|listo para entrega/i.test(notif.highlightText));
+
   const isDelivered =
     storedOrder?.status === "entregado" ||
     notif.id.includes("order-delivered") ||
     (notif.id.includes("order-status") && notif.id.includes("entregado")) ||
     (notif.title && /\bentregad[oa]s?\b/i.test(notif.title)) ||
     (notif.highlightText && /\bentregad[oa]s?\b/i.test(notif.highlightText)) ||
-    /fue entregado|ha sido entregado|entregado al cliente|entregado con éxito/i.test(notif.description);
+    /fue entregado|ha sido entregado|entregado al cliente|entregado satisfactoriamente|entregado con éxito|marcado como entregado/i.test(notif.description);
 
   const isCancelled =
     storedOrder?.status === "cancelado" ||
@@ -689,7 +700,7 @@ function parseOrderNotification(notif: FBNotification) {
     notif.id.includes("cancelado") ||
     (notif.title && (/\bcancelad[oa]s?\b/i.test(notif.title) || /\bdad[oa] de baja\b/i.test(notif.title))) ||
     (notif.highlightText && (/\bcancelad[oa]s?\b/i.test(notif.highlightText) || /\bdad[oa] de baja\b/i.test(notif.highlightText))) ||
-    /dado de baja|fue cancelado|ha sido cancelado/i.test(notif.description);
+    /dado de baja|fue cancelado|ha sido cancelado|eliminado permanentemente/i.test(notif.description);
 
   const isPaymentEvent =
     (notif.id && notif.id.includes("order-pay")) ||
@@ -708,6 +719,7 @@ function parseOrderNotification(notif: FBNotification) {
     isCross,
     cleanDesc,
     isPaid,
+    isReady,
     isDelivered,
     isCancelled,
     isPaymentEvent,
@@ -787,6 +799,9 @@ function NotificationCardItem({
       onClick={() => {
         markAsRead(notif.id);
         if (isOrder) {
+          if (isOrderDelivered || isOrderCancelled) {
+            deleteNotification(notif.id);
+          }
           onCloseDropdown();
           openOrderDetail(notif);
         } else if (isShiftCut) {
@@ -843,6 +858,10 @@ function NotificationCardItem({
               ) : isOrderDelivered ? (
                 <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-sky-100 text-sky-900 border border-sky-300 shadow-2xs">
                   <PackageCheck className="w-3 h-3 text-sky-700" /> 📦 PEDIDO ENTREGADO
+                </span>
+              ) : parsedOrder?.isReady ? (
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-900 border border-emerald-300 shadow-2xs">
+                  🎂 LISTO EN SUCURSAL
                 </span>
               ) : parsedOrder?.isPaid ? (
                 <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-900 border border-emerald-300 shadow-2xs">
@@ -1139,47 +1158,36 @@ function NotificationCardItem({
             <span className="w-2.5 h-2.5 rounded-full bg-[#c25425] shrink-0 shadow-xs" title="No leída" />
           )}
 
-          <div className="relative">
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                setActiveItemMenu(isMenuOpen ? null : notif.id);
-              }}
-              className="w-6 h-6 rounded-full hover:bg-stone-100 text-stone-400 hover:text-stone-700 flex items-center justify-center transition-colors cursor-pointer"
-              title="Opciones de notificación"
-            >
-              <MoreHorizontal className="w-3.5 h-3.5" />
-            </button>
+          {isOrder && (isOrderDelivered || isOrderCancelled) && (
+            <div className="relative">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setActiveItemMenu(isMenuOpen ? null : notif.id);
+                }}
+                className="w-6 h-6 rounded-full hover:bg-stone-100 text-stone-400 hover:text-stone-700 flex items-center justify-center transition-colors cursor-pointer"
+                title="Opciones de notificación"
+              >
+                <MoreHorizontal className="w-3.5 h-3.5" />
+              </button>
 
-            {isMenuOpen && (
-              <div className="absolute right-0 mt-1 w-44 bg-white rounded-xl shadow-xl border border-stone-200 p-1.5 z-50 text-xs font-semibold space-y-0.5 animate-in fade-in zoom-in-95">
-                {notif.read ? (
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      markAsUnread(notif.id);
-                      setActiveItemMenu(null);
-                    }}
-                    className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-stone-100 flex items-center gap-2 text-stone-700 cursor-pointer"
-                  >
-                    <Check className="w-3.5 h-3.5" /> Marcar como no leída
-                  </button>
-                ) : (
+              {isMenuOpen && (
+                <div className="absolute right-0 mt-1 w-48 bg-white rounded-xl shadow-xl border border-stone-200 p-1.5 z-50 text-xs font-semibold space-y-0.5 animate-in fade-in zoom-in-95">
                   <button
                     type="button"
                     onClick={(e) => {
                       e.stopPropagation();
                       markAsRead(notif.id);
+                      deleteNotification(notif.id);
                       setActiveItemMenu(null);
+                      onCloseDropdown();
+                      openOrderDetail(notif);
                     }}
-                    className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-stone-100 flex items-center gap-2 text-stone-700 cursor-pointer"
+                    className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-sky-50 flex items-center gap-2 text-sky-800 cursor-pointer font-bold"
                   >
-                    <Check className="w-3.5 h-3.5 text-emerald-600" /> Marcar como leída
+                    <Eye className="w-3.5 h-3.5 text-sky-600" /> Ver pedido (Ocultar aviso)
                   </button>
-                )}
-                {isAdmin && (
                   <button
                     type="button"
                     onClick={(e) => {
@@ -1189,12 +1197,12 @@ function NotificationCardItem({
                     }}
                     className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-rose-50 flex items-center gap-2 text-rose-600 cursor-pointer"
                   >
-                    <Trash2 className="w-3.5 h-3.5" /> Eliminar
+                    <Trash2 className="w-3.5 h-3.5" /> Quitar notificación
                   </button>
-                )}
-              </div>
-            )}
-          </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
@@ -1289,31 +1297,28 @@ function NotificationCardItem({
           <span className="text-sm font-bold leading-none ml-0.5">➔</span>
         </button>
       ) : isOrder && (isOrderDelivered || isOrderCancelled) ? (
-        /* Full-width status action button for Delivered or Cancelled orders */
+        /* Full-width "Ver" action button for Delivered or Cancelled orders that removes the notification once viewed */
         <button
           type="button"
           onClick={(e) => {
             e.stopPropagation();
             markAsRead(notif.id);
+            deleteNotification(notif.id);
             onCloseDropdown();
             openOrderDetail(notif);
           }}
-          className={`w-full text-white font-bold text-xs sm:text-[13px] py-2.5 px-4 rounded-xl flex items-center justify-center gap-2 shadow-xs transition-all cursor-pointer active:scale-98 ${
+          className={`w-full text-white font-black text-xs sm:text-[13px] py-2.5 px-4 rounded-xl flex items-center justify-center gap-2 shadow-xs transition-all cursor-pointer active:scale-98 ${
             isOrderCancelled
               ? "bg-gradient-to-r from-rose-600 via-red-600 to-rose-700 hover:from-rose-500 hover:to-red-500 shadow-rose-200"
               : "bg-gradient-to-r from-sky-600 via-blue-600 to-sky-700 hover:from-sky-500 hover:to-blue-500 shadow-sky-200"
           }`}
+          title="Al ver este pedido concluido, la notificación desaparecerá de tu bandeja"
         >
+          <Eye className="w-4 h-4 shrink-0" />
           {isOrderCancelled ? (
-            <>
-              <XCircle className="w-4 h-4 shrink-0" />
-              <span>Ver Detalle de Baja</span>
-            </>
+            <span>Ver Pedido Cancelado</span>
           ) : (
-            <>
-              <PackageCheck className="w-4 h-4 shrink-0" />
-              <span>Ver Detalle del Pedido</span>
-            </>
+            <span>Ver Pedido Entregado</span>
           )}
           <span className="text-sm font-bold leading-none ml-1">➔</span>
         </button>

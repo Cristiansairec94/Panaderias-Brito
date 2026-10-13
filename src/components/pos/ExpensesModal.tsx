@@ -60,7 +60,7 @@ import { useSync } from "@/context/SyncContext";
 import { useBranch } from "@/context/BranchContext";
 import { realtimeHub } from "@/lib/realtime/realtimeHub";
 import { recordCashOutflowAsExpense } from "@/lib/expenses";
-import { getStoredOrders, updateOrderStatus, deleteCustomOrder } from "@/lib/orders";
+import { getStoredOrders, syncOrdersWithServer, normalizeOrder, updateOrderStatus, deleteCustomOrder } from "@/lib/orders";
 import { getStoredIncomes, cleanDuplicateIncomes } from "@/lib/incomes";
 import { markRecordIdsAsSynced } from "@/lib/sync/syncService";
 import TicketModal from "@/components/pos/TicketModal";
@@ -470,6 +470,25 @@ export default function ExpensesModal({
     return false;
   }, [activeBranch]);
 
+  const isOrderCashInBranch = useCallback((o: any) => {
+    if (!activeBranch?.id || activeBranch.id === "all") return true;
+    const bId = activeBranch.id.toLowerCase().trim();
+    const rawNotes = String(o.notes || "");
+    const originMatch = rawNotes.match(/\[Origen:\s*([^\|\]\r\n]+)(?:\|([^\]\r\n]+))?\]/);
+    const originBranchId = originMatch && originMatch[1] ? originMatch[1].trim() : undefined;
+    const opId = o.operatingBranchId || o.operating_branch_id;
+    const pId = o.branchId || o.branch_id;
+    const cashierBranchId = o.cashier && !/don toño|admin|carlos/i.test(String(o.cashier))
+      ? resolveBranchId(undefined, o.cashier)
+      : undefined;
+    const cashBranchId = originBranchId
+      ? resolveBranchId(originBranchId, o.cashier)
+      : opId
+      ? resolveBranchId(opId, o.cashier)
+      : (cashierBranchId || resolveBranchId(pId, o.cashier));
+    return cashBranchId === bId;
+  }, [activeBranch]);
+
   const [activeTab, setActiveTab] = useState<"tickets" | "register" | "list">(
     initialTab || "register"
   );
@@ -723,23 +742,41 @@ export default function ExpensesModal({
   const [expandedSaleId, setExpandedSaleId] = useState<string | null>(null);
   const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
 
-  // Sincronizar pedidos especiales en memoria y desde almacenamiento (excluyendo solo cancelados)
-  const [internalOrders, setInternalOrders] = useState<CustomOrder[]>(() => {
-    const raw = Array.isArray(orders) ? orders : getStoredOrders();
-    return raw.filter((o) => o && o.status !== "cancelado");
-  });
+  // Sincronizar pedidos especiales en memoria, desde almacenamiento local y con el servidor (excluyendo solo cancelados)
+  const mergeOrdersList = useCallback((propOrders?: CustomOrder[], extraOrders?: CustomOrder[]): CustomOrder[] => {
+    const map = new Map<string, CustomOrder>();
+    const stored = getStoredOrders();
+    [...(propOrders || []), ...(extraOrders || []), ...stored].forEach((raw) => {
+      if (!raw) return;
+      const norm = normalizeOrder(raw);
+      if (norm.status === "cancelado") return;
+      const key = norm.orderNumber || norm.id;
+      if (key) map.set(key, norm);
+    });
+    return Array.from(map.values());
+  }, []);
+
+  const [internalOrders, setInternalOrders] = useState<CustomOrder[]>(() => mergeOrdersList(orders));
 
   useEffect(() => {
-    const raw = Array.isArray(orders) ? orders : getStoredOrders();
-    setInternalOrders(raw.filter((o) => o && o.status !== "cancelado"));
-  }, [orders, isOpen]);
+    setInternalOrders(mergeOrdersList(orders));
+    if (isOpen) {
+      syncOrdersWithServer()
+        .then((fresh) => {
+          if (Array.isArray(fresh)) {
+            setInternalOrders(mergeOrdersList(orders, fresh));
+          }
+        })
+        .catch(() => {});
+    }
+  }, [orders, isOpen, mergeOrdersList]);
 
   const [ordersVersion, setOrdersVersion] = useState(0);
 
   useEffect(() => {
     const handleOrdersUpdated = () => {
       setOrdersVersion((v) => v + 1);
-      setInternalOrders(getStoredOrders().filter((o) => o && o.status !== "cancelado"));
+      setInternalOrders(mergeOrdersList(orders));
     };
     window.addEventListener("brito_orders_updated", handleOrdersUpdated);
     window.addEventListener("storage", handleOrdersUpdated);
@@ -747,7 +784,7 @@ export default function ExpensesModal({
       window.removeEventListener("brito_orders_updated", handleOrdersUpdated);
       window.removeEventListener("storage", handleOrdersUpdated);
     };
-  }, []);
+  }, [orders, mergeOrdersList]);
 
   // Sincronizar ventas de mostrador en memoria y desde almacenamiento local
   const [internalSales, setInternalSales] = useState<Sale[]>(() => {
@@ -1006,17 +1043,12 @@ export default function ExpensesModal({
   // Pedidos especiales del turno (anticipos y liquidaciones de pedidos creados en el turno activo)
   const relevantOrders = useMemo(() => {
     const boundary = shiftStartBoundary > 0 ? shiftStartBoundary : getStoredShiftStartBoundary(activeBranch?.id);
-    const rawList = Array.isArray(orders) && orders.length > 0 ? orders : (internalOrders || []);
-    const stored = getStoredOrders();
-    const sourceOrders = rawList.map((o) => {
-      const match = stored.find((s) => s.id === o.id || s.orderNumber === o.orderNumber);
-      return match || o;
-    });
+    const sourceOrders = mergeOrdersList(orders, internalOrders);
     return sourceOrders.filter((o) => {
       if (!o) return false;
-      if (o.status === "entregado" || o.status === "cancelado") return false;
-      if (!isOrderInBranch(o)) return false;
-      const oTime = parseDateTimeSafe(o.timestamp || o.createdAt || (o as any).date);
+      if (o.status === "cancelado") return false;
+      if (!isOrderCashInBranch(o)) return false;
+      const oTime = parseDateTimeSafe(o.timestamp || o.createdAt || (o as any).created_at || (o as any).date);
       if (boundary > 0) {
         if (!oTime || oTime < boundary) {
           return false;
@@ -1027,7 +1059,7 @@ export default function ExpensesModal({
       }
       return true;
     });
-  }, [orders, internalOrders, isOrderInBranch, shiftStartBoundary, shiftVersion, ordersVersion]);
+  }, [orders, internalOrders, mergeOrdersList, isOrderCashInBranch, shiftStartBoundary, shiftVersion, ordersVersion, activeBranch?.id]);
 
   const effectiveOrders = relevantOrders;
 
@@ -1099,18 +1131,18 @@ export default function ExpensesModal({
     const calculated = effectiveSales
       .filter((s) => !s.isCustomOrder)
       .reduce((acc, s) => acc + (Number(s.total) || 0), 0);
-    const branchDeskTotal = Number(activeBranch?.todayDeskSales ?? activeBranch?.todaySales ?? 0);
+    const branchDeskTotal = Number(activeBranch?.todayDeskSales ?? (activeBranch?.todaySales && (activeBranch?.todayOrdersDeposit ?? 0) === 0 ? activeBranch.todaySales : 0));
     return branchDeskTotal > 0 && calculated === 0 ? branchDeskTotal : calculated > 0 ? calculated : branchDeskTotal;
-  }, [effectiveSales, activeBranch?.todayDeskSales, activeBranch?.todaySales]);
+  }, [effectiveSales, activeBranch?.todayDeskSales, activeBranch?.todaySales, activeBranch?.todayOrdersDeposit]);
 
   // Ventas de mostrador puras en efectivo (excluyendo pedidos) - Para el balance contable del cajón
   const shiftPurePosCash = useMemo(() => {
     const calculated = effectiveSales
       .filter((s) => s.paymentMethod === "efectivo" && !s.isCustomOrder)
       .reduce((acc, s) => acc + (Number(s.total) || 0), 0);
-    const branchDeskCash = Number(activeBranch?.todayDeskSales ?? activeBranch?.currentShift?.cashSales ?? activeBranch?.todaySales ?? 0);
+    const branchDeskCash = Number(activeBranch?.todayDeskSales ?? (activeBranch?.todaySales && (activeBranch?.todayOrdersDeposit ?? 0) === 0 ? activeBranch.todaySales : 0));
     return branchDeskCash > 0 && calculated === 0 ? branchDeskCash : calculated > 0 ? calculated : branchDeskCash;
-  }, [effectiveSales, activeBranch?.currentShift?.cashSales, activeBranch?.todayDeskSales, activeBranch?.todaySales]);
+  }, [effectiveSales, activeBranch?.todayDeskSales, activeBranch?.todaySales, activeBranch?.todayOrdersDeposit]);
 
   // Pedidos especiales del turno (todas las formas de pago: efectivo, tarjeta, transferencia)
   const shiftOrdersTotal = useMemo(() => {
@@ -1161,7 +1193,9 @@ export default function ExpensesModal({
     : Number(activeBranch?.cashInDrawer ?? 0);
 
   const calculatedCashInDrawer = Math.max(0, effectiveFund + totalShiftCashSales + totalIncomesInCash - totalExpenses);
-  const netCashInDrawer = targetBranchCash > 0 ? targetBranchCash : calculatedCashInDrawer;
+  const netCashInDrawer = (totalShiftCashSales > 0 || totalIncomesInCash > 0 || totalExpenses > 0)
+    ? Math.max(targetBranchCash, calculatedCashInDrawer)
+    : (targetBranchCash > 0 ? targetBranchCash : calculatedCashInDrawer);
 
   // Reconciliación contable exacta: Si netCashInDrawer viene de la sucursal activa (p.ej. $3,467 de San Benito)
   // garantizamos que Fondo + Ventas + Pedidos + Entradas - Salidas sea matemáticamente idéntico y gemelo a Corte de Caja

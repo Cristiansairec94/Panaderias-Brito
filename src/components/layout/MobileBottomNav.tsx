@@ -189,11 +189,25 @@ export default function MobileBottomNav() {
       })
     : notifications;
 
-  const cortesCount = notifications.filter((n) => n.category === "caja").length;
-  const pedidosCount = visibleNotifications.filter((n) => n.category === "pedidos" || Boolean(n.orderId)).length;
-  const unreadVisibleCount = visibleNotifications.filter((n) => !n.read && (n.category === "pedidos" || Boolean(n.orderId))).length;
+  const seenOrderKeys = new Set<string>();
+  const deduplicatedVisibleNotifications = visibleNotifications.filter((n) => {
+    const isOrderNotif = n.category === "pedidos" || Boolean(n.orderId) || n.title.toLowerCase().includes("pedido");
+    if (!isOrderNotif) return true;
+    const storedOrder = findOrderForNotification(n);
+    const combined = `${n.title} ${n.highlightText} ${n.description}`;
+    const folioMatch = combined.match(/PED-\d+/i);
+    const key = (storedOrder?.orderNumber || (folioMatch ? folioMatch[0] : "") || storedOrder?.id || n.orderId || "").toUpperCase().trim();
+    if (!key) return true;
+    if (seenOrderKeys.has(key)) return false;
+    seenOrderKeys.add(key);
+    return true;
+  });
 
-  const filtered = visibleNotifications.filter((n) => {
+  const cortesCount = notifications.filter((n) => n.category === "caja").length;
+  const pedidosCount = deduplicatedVisibleNotifications.filter((n) => n.category === "pedidos" || Boolean(n.orderId)).length;
+  const unreadVisibleCount = deduplicatedVisibleNotifications.filter((n) => !n.read && (n.category === "pedidos" || Boolean(n.orderId))).length;
+
+  const filtered = deduplicatedVisibleNotifications.filter((n) => {
     if (!isAdmin || showOnlyPedidos) {
       return n.category === "pedidos" || Boolean(n.orderId);
     }
@@ -288,18 +302,6 @@ export default function MobileBottomNav() {
                           </span>
                           <span className="text-[10px] font-bold text-stone-400">{soundEnabled ? "Activo" : "Mudo"}</span>
                         </button>
-                        {isAdmin && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              clearAll();
-                              setShowOptionsMenu(false);
-                            }}
-                            className="w-full text-left px-3 py-2 rounded-xl hover:bg-rose-50 flex items-center gap-2 text-rose-600 cursor-pointer"
-                          >
-                            <Trash2 className="w-4 h-4" /> Limpiar todas
-                          </button>
-                        )}
                       </div>
                     )}
                   </div>

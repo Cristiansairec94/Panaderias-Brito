@@ -1058,26 +1058,31 @@ export default function PedidosPage() {
       alert("Este pedido pertenece al historial y no puede ser modificado.");
       return;
     }
-    updateOrderStatus(order.id, "listo");
+    const updatedOrd = updateOrderStatus(order.id, "listo") || { ...order, status: "listo" as const };
     loadOrders();
-    setReadyNotificationOrder(order);
+    setReadyNotificationOrder(updatedOrd);
     try {
       playScanBeep(true);
     } catch (e) {}
+    const totalNum = Number(updatedOrd.total) || 0;
+    const baseItemsDesc = updatedOrd.description ? `${updatedOrd.description}. ` : "";
     addNotification({
-      id: `notif-order-status-${order.id}-listo`,
-      title: "El producto ya está en sucursal",
-      description: `El pedido ${order.orderNumber} de "${order.customerName}" ha sido marcado como LISTO en sucursal.`,
-      senderName: "Control de Pedidos",
+      id: `notif-order-status-${updatedOrd.id}-listo`,
+      title: `El producto ya está en sucursal: ${updatedOrd.orderNumber}${totalNum ? ` • Total $${totalNum.toFixed(2)}` : ""}`,
+      description: `${baseItemsDesc}El pedido ${updatedOrd.orderNumber} de "${updatedOrd.customerName}" ha sido marcado como LISTO en sucursal.`,
+      senderName: `🎂 Listo en Sucursal (${updatedOrd.branchName || "Sucursal"})`,
       senderAvatar: "🎂",
-      highlightText: order.orderNumber,
+      highlightText: `${updatedOrd.customerName} • Listo en Sucursal`,
       category: "pedidos",
       badgeIcon: "pastel",
-      orderId: order.id,
-      branchId: order.branchId,
-      branchName: order.branchName,
-      operatingBranchId: order.operatingBranchId,
-      operatingBranchName: order.operatingBranchName,
+      orderId: updatedOrd.id,
+      orderData: updatedOrd,
+      branchId: updatedOrd.branchId,
+      branchName: updatedOrd.branchName,
+      operatingBranchId: updatedOrd.operatingBranchId,
+      operatingBranchName: updatedOrd.operatingBranchName,
+      actionLabel: (updatedOrd.remainingBalance || 0) > 0 ? `Cobrar $${Number(updatedOrd.remainingBalance).toFixed(2)}` : "Ver Detalle",
+      actionLink: "/pedidos",
     });
   };
 
@@ -1088,22 +1093,26 @@ export default function PedidosPage() {
     }
     if (order.status === "listo") {
       if (confirm(`El pedido ${order.orderNumber} ya está marcado como "Listo en Sucursal".\n\n¿Deseas regresarlo a "En Preparación"?`)) {
-        updateOrderStatus(order.id, "pendiente");
+        const updatedOrd = updateOrderStatus(order.id, "pendiente") || { ...order, status: "pendiente" as const };
         loadOrders();
+        const baseItemsDesc = updatedOrd.description ? `${updatedOrd.description}. ` : "";
         addNotification({
-          id: `notif-order-status-${order.id}-pendiente`,
-          title: "Estado Actualizado",
-          description: `El pedido ${order.orderNumber} regresó a "En Preparación".`,
-          senderName: "Control de Pedidos",
+          id: `notif-order-status-${updatedOrd.id}-pendiente`,
+          title: `Estado Actualizado: ${updatedOrd.orderNumber}`,
+          description: `${baseItemsDesc}El pedido ${updatedOrd.orderNumber} de "${updatedOrd.customerName}" regresó a "En Preparación".`,
+          senderName: `👨‍🍳 ${updatedOrd.branchName || "Control de Pedidos"}`,
           senderAvatar: "👨‍🍳",
-          highlightText: order.orderNumber,
+          highlightText: `${updatedOrd.customerName} • En Preparación`,
           category: "pedidos",
           badgeIcon: "pastel",
-          orderId: order.id,
-          branchId: order.branchId,
-          branchName: order.branchName,
-          operatingBranchId: order.operatingBranchId,
-          operatingBranchName: order.operatingBranchName,
+          orderId: updatedOrd.id,
+          orderData: updatedOrd,
+          branchId: updatedOrd.branchId,
+          branchName: updatedOrd.branchName,
+          operatingBranchId: updatedOrd.operatingBranchId,
+          operatingBranchName: updatedOrd.operatingBranchName,
+          actionLabel: "Ver Detalle",
+          actionLink: "/pedidos",
         });
       }
     } else {
@@ -1124,23 +1133,28 @@ export default function PedidosPage() {
       return;
     }
     if (confirm(`¿Entregar el pedido #${order.orderNumber} a "${order.customerName}"?\n\nAl marcarlo como entregado, el pedido se completará y se trasladará al Historial de Pedidos.`)) {
-      updateOrderStatus(order.id, "entregado");
+      const updatedOrd = updateOrderStatus(order.id, "entregado") || { ...order, status: "entregado" as const };
       loadOrders();
       setSelectedOrderForDetail(null);
+      const totalNum = Number(updatedOrd.total) || 0;
+      const baseItemsDesc = updatedOrd.description ? `${updatedOrd.description}. ` : "";
       addNotification({
-        id: `notif-order-status-${order.id}-entregado`,
-        title: "Pedido Entregado con Éxito",
-        description: `El pedido ${order.orderNumber} de "${order.customerName}" fue entregado satisfactoriamente.`,
-        senderName: "Control de Pedidos",
+        id: `notif-order-status-${updatedOrd.id}-entregado`,
+        title: `Pedido Entregado con Éxito: ${updatedOrd.orderNumber}${totalNum ? ` • Total $${totalNum.toFixed(2)}` : ""}`,
+        description: `${baseItemsDesc}El pedido ${updatedOrd.orderNumber} de "${updatedOrd.customerName}" fue entregado satisfactoriamente.`,
+        senderName: `📦 Pedido Entregado (${updatedOrd.branchName || "Sucursal"})`,
         senderAvatar: "📦",
-        highlightText: order.orderNumber,
+        highlightText: `${updatedOrd.customerName} • Entregado al Cliente`,
         category: "pedidos",
         badgeIcon: "pastel",
-        orderId: order.id,
-        branchId: order.branchId,
-        branchName: order.branchName,
-        operatingBranchId: order.operatingBranchId,
-        operatingBranchName: order.operatingBranchName,
+        orderId: updatedOrd.id,
+        orderData: updatedOrd,
+        branchId: updatedOrd.branchId,
+        branchName: updatedOrd.branchName,
+        operatingBranchId: updatedOrd.operatingBranchId,
+        operatingBranchName: updatedOrd.operatingBranchName,
+        actionLabel: "Ver Pedido Entregado",
+        actionLink: "/pedidos",
       });
     }
   };
@@ -1164,27 +1178,53 @@ export default function PedidosPage() {
     }
 
     if (nextStatus !== order.status) {
-      updateOrderStatus(order.id, nextStatus);
+      const updatedOrd = updateOrderStatus(order.id, nextStatus) || { ...order, status: nextStatus };
       loadOrders();
       if (nextStatus === "listo") {
-        setReadyNotificationOrder(order);
+        setReadyNotificationOrder(updatedOrd);
         try {
           playScanBeep(true);
         } catch (e) {}
+        const totalNum = Number(updatedOrd.total) || 0;
+        const baseItemsDesc = updatedOrd.description ? `${updatedOrd.description}. ` : "";
         addNotification({
-          id: `notif-order-status-${order.id}-listo`,
-          title: "El producto ya está en sucursal",
-          description: `El pedido ${order.orderNumber} de "${order.customerName}" ha sido marcado como LISTO en sucursal.`,
-          senderName: "Control de Pedidos",
+          id: `notif-order-status-${updatedOrd.id}-listo`,
+          title: `El producto ya está en sucursal: ${updatedOrd.orderNumber}${totalNum ? ` • Total $${totalNum.toFixed(2)}` : ""}`,
+          description: `${baseItemsDesc}El pedido ${updatedOrd.orderNumber} de "${updatedOrd.customerName}" ha sido marcado como LISTO en sucursal.`,
+          senderName: `🎂 Listo en Sucursal (${updatedOrd.branchName || "Sucursal"})`,
           senderAvatar: "🎂",
-          highlightText: order.orderNumber,
+          highlightText: `${updatedOrd.customerName} • Listo en Sucursal`,
           category: "pedidos",
           badgeIcon: "pastel",
-          orderId: order.id,
-          branchId: order.branchId,
-          branchName: order.branchName,
-          operatingBranchId: order.operatingBranchId,
-          operatingBranchName: order.operatingBranchName,
+          orderId: updatedOrd.id,
+          orderData: updatedOrd,
+          branchId: updatedOrd.branchId,
+          branchName: updatedOrd.branchName,
+          operatingBranchId: updatedOrd.operatingBranchId,
+          operatingBranchName: updatedOrd.operatingBranchName,
+          actionLabel: (updatedOrd.remainingBalance || 0) > 0 ? `Cobrar $${Number(updatedOrd.remainingBalance).toFixed(2)}` : "Ver Detalle",
+          actionLink: "/pedidos",
+        });
+      } else if (nextStatus === "entregado") {
+        const totalNum = Number(updatedOrd.total) || 0;
+        const baseItemsDesc = updatedOrd.description ? `${updatedOrd.description}. ` : "";
+        addNotification({
+          id: `notif-order-status-${updatedOrd.id}-entregado`,
+          title: `Pedido Entregado con Éxito: ${updatedOrd.orderNumber}${totalNum ? ` • Total $${totalNum.toFixed(2)}` : ""}`,
+          description: `${baseItemsDesc}El pedido ${updatedOrd.orderNumber} de "${updatedOrd.customerName}" fue entregado satisfactoriamente.`,
+          senderName: `📦 Pedido Entregado (${updatedOrd.branchName || "Sucursal"})`,
+          senderAvatar: "📦",
+          highlightText: `${updatedOrd.customerName} • Entregado al Cliente`,
+          category: "pedidos",
+          badgeIcon: "pastel",
+          orderId: updatedOrd.id,
+          orderData: updatedOrd,
+          branchId: updatedOrd.branchId,
+          branchName: updatedOrd.branchName,
+          operatingBranchId: updatedOrd.operatingBranchId,
+          operatingBranchName: updatedOrd.operatingBranchName,
+          actionLabel: "Ver Pedido Entregado",
+          actionLink: "/pedidos",
         });
       }
     }
@@ -1203,14 +1243,17 @@ export default function PedidosPage() {
       loadOrders();
       setSelectedOrderForDetail(null);
       addNotification({
-        title: "Pedido Eliminado",
-        description: `El pedido ${orderNumber || ""} ha sido eliminado permanentemente del sistema.`,
-        senderName: "Control de Pedidos",
+        id: `notif-order-cancelled-${orderId}`,
+        title: `Pedido Cancelado / Eliminado: ${orderNumber || ""}`,
+        description: `El pedido ${orderNumber || ""} de "${customerName || "Cliente"}" ha sido eliminado permanentemente del sistema.`,
+        senderName: "🗑️ Pedido Cancelado",
         senderAvatar: "🗑️",
-        highlightText: orderNumber || "",
+        highlightText: `${customerName || orderNumber || "Pedido"} • Dado de Baja`,
         category: "pedidos",
         badgeIcon: "pastel",
         orderId: orderId,
+        actionLabel: "Ver Pedido Cancelado",
+        actionLink: "/pedidos",
       });
     }
   };
@@ -1222,26 +1265,32 @@ export default function PedidosPage() {
       : `¿Estás seguro de DAR DE BAJA el pedido ${order.orderNumber} de "${order.customerName}"?\n\nEl pedido se marcará como dado de baja y te mandaremos directo al historial de "Productos que se dieron de baja".`;
 
     if (confirm(confirmMsg)) {
+      const totalNum = Number(order.total) || 0;
+      const baseItemsDesc = order.description ? `${order.description}. ` : "";
       if (isPermanent) {
         deleteCustomOrder(order.id);
         loadOrders();
         setSelectedOrderForDetail(null);
         addNotification({
-          title: "Pedido Eliminado",
-          description: `El pedido ${order.orderNumber} ha sido eliminado permanentemente del registro.`,
-          senderName: "Control de Pedidos",
+          id: `notif-order-cancelled-${order.id}`,
+          title: `Pedido Cancelado / Dado de Baja: ${order.orderNumber}${totalNum ? ` • Total $${totalNum.toFixed(2)}` : ""}`,
+          description: `${baseItemsDesc}El pedido ${order.orderNumber} de "${order.customerName}" ha sido eliminado permanentemente del registro.`,
+          senderName: `🗑️ Pedido Cancelado (${order.branchName || "Sucursal"})`,
           senderAvatar: "🗑️",
-          highlightText: order.orderNumber,
+          highlightText: `${order.customerName} • Dado de Baja`,
           category: "pedidos",
           badgeIcon: "pastel",
           orderId: order.id,
+          orderData: { ...order, status: "cancelado" },
           branchId: order.branchId,
           branchName: order.branchName,
           operatingBranchId: order.operatingBranchId,
           operatingBranchName: order.operatingBranchName,
+          actionLabel: "Ver Pedido Cancelado",
+          actionLink: "/pedidos",
         });
       } else {
-        updateOrderStatus(order.id, "cancelado");
+        const updatedOrd = updateOrderStatus(order.id, "cancelado") || { ...order, status: "cancelado" as const };
         loadOrders();
         setSelectedOrderForDetail(null);
 
@@ -1253,18 +1302,22 @@ export default function PedidosPage() {
         }, 120);
 
         addNotification({
-          title: "Pedido Dado de Baja",
-          description: `El pedido ${order.orderNumber} se dio de baja y se mandó directo al historial de productos que se dieron de baja.`,
-          senderName: "Control de Pedidos",
+          id: `notif-order-status-${updatedOrd.id}-cancelado`,
+          title: `Pedido Cancelado / Dado de Baja: ${updatedOrd.orderNumber}${totalNum ? ` • Total $${totalNum.toFixed(2)}` : ""}`,
+          description: `${baseItemsDesc}El pedido ${updatedOrd.orderNumber} de "${updatedOrd.customerName}" se dio de baja y se mandó al historial de productos dados de baja.`,
+          senderName: `🗑️ Pedido Cancelado (${updatedOrd.branchName || "Sucursal"})`,
           senderAvatar: "🗑️",
-          highlightText: order.orderNumber,
+          highlightText: `${updatedOrd.customerName} • Dado de Baja`,
           category: "pedidos",
           badgeIcon: "pastel",
-          orderId: order.id,
-          branchId: order.branchId,
-          branchName: order.branchName,
-          operatingBranchId: order.operatingBranchId,
-          operatingBranchName: order.operatingBranchName,
+          orderId: updatedOrd.id,
+          orderData: updatedOrd,
+          branchId: updatedOrd.branchId,
+          branchName: updatedOrd.branchName,
+          operatingBranchId: updatedOrd.operatingBranchId,
+          operatingBranchName: updatedOrd.operatingBranchName,
+          actionLabel: "Ver Pedido Cancelado",
+          actionLink: "/pedidos",
         });
       }
     }
@@ -1333,7 +1386,7 @@ export default function PedidosPage() {
   };
 
   return (
-    <div className="w-full max-w-[1800px] mx-auto px-2 sm:px-4 lg:px-6 pt-1 sm:pt-2 pb-24 md:pb-8 flex flex-col space-y-2">
+    <div className="w-full max-w-[1800px] min-h-[calc(100vh+6rem)] mx-auto px-2 sm:px-4 lg:px-6 pt-1 sm:pt-2 pb-32 flex flex-col space-y-2">
       {/* 1. ZONA SUPERIOR: Header, Métricas, Buscador y Paleta de Clasificación */}
       <div className="space-y-1.5 sm:space-y-2">
         {/* Header */}
@@ -3955,24 +4008,29 @@ export default function PedidosPage() {
             setSelectedOrderForPayment(o);
             return;
           }
-          updateOrderStatus(o.id, "entregado");
+          const updatedOrd = updateOrderStatus(o.id, "entregado") || { ...o, status: "entregado" as const };
           loadOrders();
-          const updated = getStoredOrders().find((item) => item.id === o.id);
+          const updated = getStoredOrders().find((item) => item.id === o.id) || updatedOrd;
           if (updated) setSelectedOrderForDetail(updated);
+          const totalNum = Number(updated.total) || 0;
+          const baseItemsDesc = updated.description ? `${updated.description}. ` : "";
           addNotification({
-            id: `notif-order-status-${o.id}-entregado`,
-            title: "Pedido Entregado",
-            description: `El pedido ${o.orderNumber} (${o.customerName}) ha sido marcado como entregado exitosamente.`,
-            senderName: "Control de Pedidos",
+            id: `notif-order-status-${updated.id}-entregado`,
+            title: `Pedido Entregado con Éxito: ${updated.orderNumber}${totalNum ? ` • Total $${totalNum.toFixed(2)}` : ""}`,
+            description: `${baseItemsDesc}El pedido ${updated.orderNumber} de "${updated.customerName}" ha sido marcado como entregado exitosamente.`,
+            senderName: `📦 Pedido Entregado (${updated.branchName || "Sucursal"})`,
             senderAvatar: "📦",
-            highlightText: o.orderNumber,
+            highlightText: `${updated.customerName} • Entregado al Cliente`,
             category: "pedidos",
             badgeIcon: "pastel",
-            orderId: o.id,
-            branchId: o.branchId,
-            branchName: o.branchName,
-            operatingBranchId: o.operatingBranchId,
-            operatingBranchName: o.operatingBranchName,
+            orderId: updated.id,
+            orderData: updated,
+            branchId: updated.branchId,
+            branchName: updated.branchName,
+            operatingBranchId: updated.operatingBranchId,
+            operatingBranchName: updated.operatingBranchName,
+            actionLabel: "Ver Pedido Entregado",
+            actionLink: "/pedidos",
           });
         }}
         onSendWhatsApp={(o) => {
@@ -4005,22 +4063,27 @@ export default function PedidosPage() {
         onRestoreOrder={(order) => {
           const confirmMsg = `¿Deseas reactivar el pedido ${order.orderNumber} (${order.customerName}) y regresarlo a la sección de pedidos activos?`;
           if (confirm(confirmMsg)) {
-            updateOrderStatus(order.id, "listo");
+            const updatedOrd = updateOrderStatus(order.id, "listo") || { ...order, status: "listo" as const };
             loadOrders();
+            const totalNum = Number(updatedOrd.total) || 0;
+            const baseItemsDesc = updatedOrd.description ? `${updatedOrd.description}. ` : "";
             addNotification({
-              id: `notif-order-status-${order.id}-listo`,
-              title: "Pedido Reactivado",
-              description: `El pedido ${order.orderNumber} ha regresado a la sección de pedidos activos.`,
-              senderName: "Control de Pedidos",
-              senderAvatar: "🔄",
-              highlightText: order.orderNumber,
+              id: `notif-order-status-${updatedOrd.id}-listo`,
+              title: `El producto ya está en sucursal: ${updatedOrd.orderNumber}${totalNum ? ` • Total $${totalNum.toFixed(2)}` : ""}`,
+              description: `${baseItemsDesc}El pedido ${updatedOrd.orderNumber} de "${updatedOrd.customerName}" ha regresado a la sección de pedidos activos (Listo en Sucursal).`,
+              senderName: `🎂 Listo en Sucursal (${updatedOrd.branchName || "Sucursal"})`,
+              senderAvatar: "🎂",
+              highlightText: `${updatedOrd.customerName} • Listo en Sucursal`,
               category: "pedidos",
               badgeIcon: "pastel",
-              orderId: order.id,
-              branchId: order.branchId,
-              branchName: order.branchName,
-              operatingBranchId: order.operatingBranchId,
-              operatingBranchName: order.operatingBranchName,
+              orderId: updatedOrd.id,
+              orderData: updatedOrd,
+              branchId: updatedOrd.branchId,
+              branchName: updatedOrd.branchName,
+              operatingBranchId: updatedOrd.operatingBranchId,
+              operatingBranchName: updatedOrd.operatingBranchName,
+              actionLabel: "Ver Detalle",
+              actionLink: "/pedidos",
             });
           }
         }}

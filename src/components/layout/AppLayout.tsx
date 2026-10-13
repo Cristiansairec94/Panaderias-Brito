@@ -75,16 +75,16 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <BranchProvider>
       <SidebarProvider>
-        <div className="flex h-screen max-h-screen w-full max-w-full overflow-hidden bg-stone-50/60 text-stone-900 antialiased selection:bg-amber-500 selection:text-stone-950">
+        <div className="flex h-screen max-h-screen w-full overflow-hidden bg-stone-50/60 text-stone-900 antialiased selection:bg-amber-500 selection:text-stone-950">
         <Sidebar />
-        <div className="flex-1 flex flex-col min-w-0 w-full max-w-full max-h-screen overflow-x-hidden overflow-y-hidden">
+        <div className="flex-1 flex flex-col min-w-0 max-h-screen overflow-hidden">
           <Header />
-          <main className={`flex-1 min-w-0 w-full max-w-full overflow-x-hidden ${
+          <main className={`flex-1 min-w-0 overflow-x-hidden ${
             pathname === "/pos"
               ? "overflow-hidden p-0"
               : pathname.startsWith("/pedidos")
-              ? "overflow-y-auto flex flex-col p-0 bg-stone-50/60"
-              : "overflow-y-auto bg-stone-50/60 px-3 sm:px-5 lg:px-6 pt-3 sm:pt-5 pb-24 md:pb-6"
+              ? "overflow-y-scroll p-0 bg-stone-50/60"
+              : "overflow-y-scroll bg-stone-50/60 px-3 sm:px-5 lg:px-6 pt-3 sm:pt-5 pb-24 md:pb-6"
           }`}>
             {isAllowed ? (
               children

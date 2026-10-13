@@ -1,5 +1,6 @@
 import fs from "fs";
 import path from "path";
+import { CLEAN_SLATE_EPOCH } from "@/lib/wipeOperationalData";
 
 export interface StoredRealtimeEvent {
   id: string;
@@ -29,6 +30,7 @@ export function ensureDataDirectory() {
 
 export function loadStoredEvents(): StoredRealtimeEvent[] {
   if (isInitialized && eventBuffer.length > 0) {
+    eventBuffer = eventBuffer.filter((e) => (e.timestamp || 0) >= CLEAN_SLATE_EPOCH);
     return eventBuffer;
   }
 
@@ -38,7 +40,7 @@ export function loadStoredEvents(): StoredRealtimeEvent[] {
       const content = fs.readFileSync(EVENTS_FILE, "utf-8");
       const parsed = JSON.parse(content);
       if (Array.isArray(parsed)) {
-        eventBuffer = parsed;
+        eventBuffer = parsed.filter((e: any) => (Number(e?.timestamp) || 0) >= CLEAN_SLATE_EPOCH);
         isInitialized = true;
         return eventBuffer;
       }

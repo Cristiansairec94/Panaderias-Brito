@@ -927,19 +927,10 @@ export default function CreateOrderModal({
         shiftName: shiftName || activeBranch?.currentShift?.name || undefined,
       });
 
-      // 3. REGISTRAR EL DINERO INGRESADO EN LA CAJA Y SUCURSAL (CON RESGUARDO)
-      if (numericDeposit > 0) {
-        try {
-          registerRealSale(
-            finalOperatingBranch?.id || activeBranch?.id || "branch-matriz",
-            numericDeposit,
-            paymentMethod,
-            cashierName || user?.name || finalOperatingBranch?.currentShift?.cashier || activeBranch?.currentShift?.cashier || "Cajero en Turno",
-            `Anticipo Pedido ${newOrder.orderNumber} - ${customerName.trim()} (Recoge en ${finalPickupBranch?.name})`
-          );
-        } catch (saleErr) {
-          console.warn("Could not record in registerRealSale:", saleErr);
-        }
+      // 3. NOTIFICAR ACTUALIZACIÓN DE CAJA Y PEDIDOS (addCustomOrder ya registra el ingreso y el pedido en caja)
+      if (numericDeposit > 0 && typeof window !== "undefined") {
+        window.dispatchEvent(new Event("brito_orders_updated"));
+        window.dispatchEvent(new Event("brito_caja_updated"));
       }
 
       // 4. NOTIFICACIÓN AUDITIVA Y VISUAL CON CHIME Y BANNER (CON RESGUARDO)

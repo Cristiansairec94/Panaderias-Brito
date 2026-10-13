@@ -959,15 +959,28 @@ function resolveBranchParam(param: string | null): string | null {
             }
           });
 
-          // 2. Agregar pedidos especiales (anticipos y liquidaciones)
+          // 2. Agregar pedidos especiales (anticipos y liquidaciones en la sucursal donde se cobró)
+          const countedOrderNums = new Set<string>();
           dbOrders.forEach((o: any) => {
-            const bId = resolveBranchForRecord(o.branch_id, o.cashier);
+            const rawNotes = String(o.notes || "");
+            const originMatch = rawNotes.match(/\[Origen:\s*([^\|\]]+)(?:\|([^\]]+))?\]/);
+            const originBranchId = originMatch && originMatch[1] ? originMatch[1].trim() : undefined;
+            const cashierBranchId = o.cashier && !/don toño|admin|carlos/i.test(String(o.cashier)) ? resolveBranchId(undefined, o.cashier) : undefined;
+            const bId = originBranchId
+              ? resolveBranchId(originBranchId, o.cashier)
+              : (o.operating_branch_id || o.operatingBranchId)
+              ? resolveBranchId(o.operating_branch_id || o.operatingBranchId, o.cashier)
+              : (cashierBranchId || resolveBranchForRecord(o.branch_id, o.cashier));
+
+            if (o.order_number) countedOrderNums.add(String(o.order_number).toUpperCase());
+            if (o.id) countedOrderNums.add(String(o.id).toUpperCase());
+
             let cur = branchAgg.get(bId);
             if (!cur) {
               cur = initBranchAgg();
               branchAgg.set(bId, cur);
             }
-            if (o.branch_name) cur.branchName = o.branch_name;
+            if (o.branch_name && !originBranchId) cur.branchName = o.branch_name;
             const dep = Number(o.deposit) || 0;
             const tot = Number(o.total) || 0;
             const orderTime = parseDateTimeSafe(o.created_at);
@@ -989,15 +1002,36 @@ function resolveBranchParam(param: string | null): string | null {
             }
           });
 
-          // 3. Movimientos de caja (aportes / retiros fuera de ventas y de cortes)
+          // 3. Movimientos de caja (aportes / retiros fuera de ventas y de cortes, y respaldo de abono_pedido)
           dbMovs.forEach((m: any) => {
+            if (m.category === "abono_pedido" || m.category === "pedido" || m.movement_type === "pedido" || m.movementType === "pedido") {
+              const pedMatch = String(m.reason || "").match(/PED-\d+/i);
+              const pedKey = pedMatch ? pedMatch[0].toUpperCase() : "";
+              if (!pedKey || !countedOrderNums.has(pedKey)) {
+                if (pedKey) countedOrderNums.add(pedKey);
+                const bId = resolveBranchForRecord(m.branch_id, m.authorized_by);
+                let cur = branchAgg.get(bId);
+                if (!cur) {
+                  cur = initBranchAgg();
+                  branchAgg.set(bId, cur);
+                }
+                const amt = Number(m.amount) || 0;
+                const movTime = parseDateTimeSafe(m.created_at);
+                const cutLimit = cutTimestampByBranch.get(bId) || 0;
+                if (amt > 0) cur.dayAccumulatedOrdersDeposit += amt;
+                if (movTime > cutLimit && amt > 0) {
+                  cur.orderTotal += amt;
+                  cur.orderCount += 1;
+                  cur.orderTotalCobrado += amt;
+                  cur.orderCash += amt;
+                  if (m.authorized_by && !cur.lastCashier) cur.lastCashier = m.authorized_by;
+                }
+              }
+              return;
+            }
             if (
               m.category === "venta_mostrador" ||
-              m.category === "corte_caja" ||
-              m.category === "abono_pedido" ||
-              m.category === "pedido" ||
-              m.movement_type === "pedido" ||
-              m.movementType === "pedido"
+              m.category === "corte_caja"
             ) return;
             if (m.id && (String(m.id).startsWith("order-") || String(m.id).includes("PED-"))) return;
             const rLower = (m.reason || "").toLowerCase();
@@ -1892,8 +1926,16 @@ function resolveBranchParam(param: string | null): string | null {
           const { action, order } = payload;
           const deposit = Number(order.deposit) || 0;
           if (deposit > 0 && (action === "create" || action === "payment")) {
-            const bId = order.branchId || "branch-matriz";
-            const bName = order.branchName || "Sucursal";
+            const rawNotes = String(order.notes || "");
+            const originMatch = rawNotes.match(/\[Origen:\s*([^\|\]]+)(?:\|([^\]]+))?\]/);
+            const originBranchId = originMatch && originMatch[1] ? originMatch[1].trim() : undefined;
+            const cashierBranchId = order.cashier && !/don toño|admin|carlos/i.test(String(order.cashier)) ? resolveBranchId(undefined, order.cashier) : undefined;
+            const bId = originBranchId
+              ? resolveBranchId(originBranchId, order.cashier)
+              : order.operatingBranchId
+              ? resolveBranchId(order.operatingBranchId, order.cashier)
+              : (cashierBranchId || resolveBranchId(order.branchId, order.cashier));
+            const bName = order.operatingBranchName || order.branchName || "Sucursal";
             const orderMov: BranchCashMovement = {
               id: `order-${order.id}-${payload.timestamp || Date.now()}`,
               branchId: bId,
@@ -1920,19 +1962,26 @@ function resolveBranchParam(param: string | null): string | null {
               return next;
             });
 
-            // Si fue en efectivo, sumar al dinero en gaveta de esa sucursal
-            if (order.paymentMethod === "efectivo" || !order.paymentMethod) {
-              setBranches((prev) => {
-                const updated = prev.map((b) => {
-                  if (b.id !== bId) return b;
-                  return { ...b, cashInDrawer: b.cashInDrawer + deposit };
-                });
-                try {
-                  localStorage.setItem("brito_branches_data", JSON.stringify(updated));
-                } catch {}
-                return updated;
+            // Actualizar métricas de pedidos y dinero en gaveta de la sucursal operativa
+            setBranches((prev) => {
+              const isCash = order.paymentMethod === "efectivo" || !order.paymentMethod;
+              const updated = prev.map((b) => {
+                if (b.id !== bId) return b;
+                return {
+                  ...b,
+                  todaySales: (Number(b.todaySales) || 0) + deposit,
+                  todayTickets: (Number(b.todayTickets) || 0) + (action === "create" ? 1 : 0),
+                  todayOrdersDeposit: (Number(b.todayOrdersDeposit) || 0) + deposit,
+                  todayOrdersTotal: (Number(b.todayOrdersTotal) || 0) + (action === "create" ? (Number(order.total) || deposit) : 0),
+                  todayOrdersCount: (Number(b.todayOrdersCount) || 0) + (action === "create" ? 1 : 0),
+                  cashInDrawer: isCash ? (Number(b.cashInDrawer) || 0) + deposit : b.cashInDrawer,
+                };
               });
-            }
+              try {
+                localStorage.setItem("brito_branches_data", JSON.stringify(updated));
+              } catch {}
+              return updated;
+            });
 
             try {
               window.dispatchEvent(new Event("brito_caja_updated"));

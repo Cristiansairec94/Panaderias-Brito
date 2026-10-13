@@ -33,7 +33,7 @@ import {
 } from "lucide-react";
 import { Product, Sale, CashExpense, CashIncome, ShiftCutRecord, CustomOrder } from "@/types";
 import { formatCurrency, onlyNumbersKeyDown, cleanDecimalNumbers, formatDateTimeSafe, parseDateTimeSafe, matchesCashier, getStoredShiftStartBoundary, resolveBranchId } from "@/lib/utils";
-import { getStoredOrders } from "@/lib/orders";
+import { getStoredOrders, syncOrdersWithServer, normalizeOrder } from "@/lib/orders";
 import { useNotifications, FBNotification } from "@/context/NotificationContext";
 import { useBranch } from "@/context/BranchContext";
 import { useAuth } from "@/context/AuthContext";
@@ -345,17 +345,38 @@ export default function CashDrawerShiftModal({
     return getShiftType(incomingProfile, incomingCashier);
   }, [incomingProfile, incomingCashier]);
 
+  const [syncedOrders, setSyncedOrders] = useState<CustomOrder[]>(() => getStoredOrders());
+
+  useEffect(() => {
+    if (!isOpen) return;
+    setSyncedOrders(getStoredOrders());
+    syncOrdersWithServer()
+      .then((fresh) => {
+        if (Array.isArray(fresh)) setSyncedOrders(fresh);
+      })
+      .catch(() => {});
+    const handleOrdUpdate = () => setSyncedOrders(getStoredOrders());
+    window.addEventListener("brito_orders_updated", handleOrdUpdate);
+    return () => window.removeEventListener("brito_orders_updated", handleOrdUpdate);
+  }, [isOpen]);
+
   useEffect(() => {
     if (branchUsers.length === 0) return;
 
     const morningCashier = branchUsers.find((u) => getShiftType(u) === "Turno Matutino") || branchUsers[0];
     const afternoonCashier = branchUsers.find((u) => getShiftType(u) === "Turno Vespertino") || branchUsers[1] || branchUsers[0];
+    const activeBranchObj = (branchId ? branches.find((b) => b.id === branchId) : null) || currentBranch;
+    const branchActiveCashier = activeBranchObj?.currentShift?.cashier || "";
 
     // Verificar si el cajero activo en caja es del turno de la tarde o de la mañana
     let isAfternoonActive = false;
     if (cashierName && matchesCashier(afternoonCashier.name, cashierName)) {
       isAfternoonActive = true;
     } else if (cashierName && matchesCashier(morningCashier.name, cashierName)) {
+      isAfternoonActive = false;
+    } else if (branchActiveCashier && matchesCashier(afternoonCashier.name, branchActiveCashier)) {
+      isAfternoonActive = true;
+    } else if (branchActiveCashier && matchesCashier(morningCashier.name, branchActiveCashier)) {
       isAfternoonActive = false;
     } else {
       // Si es administrador o no coincide, usar la hora del día (>= 14:00 turno tarde)
@@ -371,7 +392,7 @@ export default function CashDrawerShiftModal({
       setIncomingCashier(afternoonCashier.name);
       setNextShiftName("Turno Vespertino (14:00 - 22:00)");
     }
-  }, [branchUsers, cashierName]);
+  }, [branchUsers, cashierName, branchId, branches, currentBranch]);
 
   useEffect(() => {
     if (isOpen) {
@@ -401,16 +422,17 @@ export default function CashDrawerShiftModal({
   const validLastCut = (lastCutTimestamp && lastCutTimestamp > 0 && lastCutTimestamp <= Date.now()) 
     ? lastCutTimestamp 
     : (activeCutTs > 0 && activeCutTs <= Date.now() ? activeCutTs : 0);
-  const shiftStartBoundary = Math.max(validLastCut, getStoredShiftStartBoundary(currentBranch?.id));
+  const shiftStartBoundary = Math.max(validLastCut, getStoredShiftStartBoundary(effectiveBranchId || currentBranch?.id));
 
-  // 1. Cálculos de Ventas del Turno (todas las ventas de mostrador del turno en esta terminal)
+  // 1. Cálculos de Ventas del Turno (todas las ventas de mostrador del turno en esta sucursal)
   const shiftSales = (sales || []).filter((s) => {
     if (!s) return false;
-    if (currentBranch && currentBranch.id && currentBranch.id !== "all") {
-      const sBranch = resolveBranchId((s as any).branchId || (s as any).branch_id, s.cashier);
-      if (sBranch !== currentBranch.id) return false;
+    const sBranch = resolveBranchId((s as any).branchId || (s as any).branch_id, s.cashier);
+    if (effectiveBranchId && effectiveBranchId !== "all") {
+      if (sBranch !== effectiveBranchId) return false;
     }
-    if (outgoingCashier && s.cashier && !matchesCashier(s.cashier, outgoingCashier)) {
+    const belongsToBranchStaff = branchUsers.some((u) => s.cashier && matchesCashier(s.cashier, u.name));
+    if (outgoingCashier && s.cashier && !matchesCashier(s.cashier, outgoingCashier) && !belongsToBranchStaff && sBranch !== effectiveBranchId) {
       return false;
     }
     const sTime = parseDateTimeSafe(s.timestamp || s.createdAt || s.date);
@@ -423,20 +445,45 @@ export default function CashDrawerShiftModal({
   });
   const effectiveSales = shiftSales;
 
-  // Pedidos especiales del turno (anticipos y liquidaciones de pedidos en efectivo)
-  const shiftOrders = (orders || []).filter((o) => {
-    if (!o) return false;
-    if (currentBranch && currentBranch.id && currentBranch.id !== "all") {
-      const oBranch = resolveBranchId(
-        (o as any).operatingBranchId || (o as any).pickupBranchId || (o as any).branchId || (o as any).branch_id,
-        o.cashier
-      );
-      if (oBranch !== currentBranch.id) return false;
+  // Unificar pedidos pasados por props con los sincronizados de localStorage y Supabase
+  const allOrdersPool = (() => {
+    const map = new Map<string, CustomOrder>();
+    (syncedOrders || []).forEach((o) => {
+      if (!o) return;
+      const norm = normalizeOrder(o);
+      const key = norm.orderNumber || norm.id;
+      if (key) map.set(key, norm);
+    });
+    (orders || []).forEach((o) => {
+      if (!o) return;
+      const norm = normalizeOrder(o);
+      const key = norm.orderNumber || norm.id;
+      if (key && !map.has(key)) map.set(key, norm);
+    });
+    return Array.from(map.values());
+  })();
+
+  // Pedidos especiales del turno (anticipos y liquidaciones de pedidos en efectivo cobrados en esta sucursal)
+  const shiftOrders = allOrdersPool.filter((o) => {
+    if (!o || o.status === "cancelado") return false;
+    const rawNotes = String(o.notes || "");
+    const originMatch = rawNotes.match(/\[Origen:\s*([^\|\]]+)(?:\|([^\]]+))?\]/);
+    const originBranchId = originMatch && originMatch[1] ? originMatch[1].trim() : undefined;
+    const cashierBranchId = o.cashier && !/don toño|admin|carlos/i.test(String(o.cashier)) ? resolveBranchId(undefined, o.cashier) : undefined;
+    const oBranch = originBranchId
+      ? resolveBranchId(originBranchId, o.cashier)
+      : (o as any).operatingBranchId || (o as any).operating_branch_id
+      ? resolveBranchId((o as any).operatingBranchId || (o as any).operating_branch_id, o.cashier)
+      : (cashierBranchId || resolveBranchId((o as any).branchId || (o as any).branch_id, o.cashier));
+
+    if (effectiveBranchId && effectiveBranchId !== "all") {
+      if (oBranch !== effectiveBranchId) return false;
     }
-    if (outgoingCashier && o.cashier && !matchesCashier(o.cashier, outgoingCashier)) {
+    const belongsToBranchStaff = branchUsers.some((u) => o.cashier && matchesCashier(o.cashier, u.name));
+    if (outgoingCashier && o.cashier && !matchesCashier(o.cashier, outgoingCashier) && !belongsToBranchStaff && oBranch !== effectiveBranchId) {
       return false;
     }
-    const oTime = parseDateTimeSafe(o.timestamp || o.createdAt || (o as any).date);
+    const oTime = parseDateTimeSafe(o.timestamp || o.createdAt || (o as any).created_at || (o as any).date);
     if (!oTime || oTime < CLEAN_SLATE_EPOCH) return false;
     if (shiftStartBoundary > 0) {
       if (!oTime || oTime < shiftStartBoundary) return false;
@@ -464,7 +511,7 @@ export default function CashDrawerShiftModal({
 
   const ordersInSalesCash = effectiveSales.filter((s) => s.paymentMethod === "efectivo" && s.isCustomOrder).reduce((sum, s) => sum + s.total, 0);
   const calculatedOrdersCash = ordersCash + ordersInSalesCash;
-  const totalOrdersCash = calculatedOrdersCash > 0 ? calculatedOrdersCash : 0;
+  const totalOrdersCash = calculatedOrdersCash > 0 ? calculatedOrdersCash : (branchOrdersDeposit > 0 ? branchOrdersDeposit : 0);
 
   const rawPosCash = rawPurePosCash + totalOrdersCash;
 
@@ -525,7 +572,9 @@ export default function CashDrawerShiftModal({
 
   // 3. Dinero esperado en caja (Cajón: Fondo Inicial + Ventas Efectivo + Entradas Efectivo - Gastos Efectivo)
   const rawCalculatedExpectedCash = Math.max(0, effectiveInitialFund + rawPosCash + totalIncomesInCash - totalExpenses);
-  const expectedCashInDrawer = targetBranchCash > 0 ? targetBranchCash : rawCalculatedExpectedCash;
+  const expectedCashInDrawer = (rawPosCash > 0 || totalIncomesInCash > 0 || totalExpenses > 0)
+    ? Math.max(targetBranchCash, rawCalculatedExpectedCash)
+    : (targetBranchCash > 0 ? targetBranchCash : rawCalculatedExpectedCash);
 
   const netNonFundCash = Math.max(0, expectedCashInDrawer - effectiveInitialFund - totalIncomesInCash + totalExpenses);
   const posCash = (rawPosCash > 0 && Math.abs(effectiveInitialFund + rawPosCash + totalIncomesInCash - totalExpenses - expectedCashInDrawer) < 0.01)
