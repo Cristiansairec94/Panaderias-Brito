@@ -617,7 +617,7 @@ export default function PedidosPage() {
     for (const o of branchFiltered) {
       const oDate = normalizeDateStr(o.deliveryDate);
       if (o.status !== "entregado" && o.status !== "cancelado") activos++;
-      if (oDate === todayStr && o.status !== "cancelado") hoy++;
+      if (oDate === todayStr && o.status !== "cancelado" && o.status !== "entregado") hoy++;
       if (checkIsPending(o)) pendientes++;
       if (checkIsUnpaid(o)) porPagar++;
       if (checkIsPaid(o)) {
@@ -637,7 +637,7 @@ export default function PedidosPage() {
     }
 
     return {
-      all: branchFiltered.filter((o) => o.status !== "cancelado").length,
+      all: activos,
       activos,
       hoy,
       pendientes,
@@ -664,10 +664,7 @@ export default function PedidosPage() {
         if (historialSubFilter === "cancelados") return o.status === "cancelado";
         return o.status === "entregado" || o.status === "cancelado";
       }
-      if (classificationFilter === "activos") {
-        return o.status !== "entregado" && o.status !== "cancelado";
-      }
-      return o.status !== "cancelado";
+      return o.status !== "entregado" && o.status !== "cancelado";
     });
 
     let todos = baseOrders.length;
@@ -728,17 +725,14 @@ export default function PedidosPage() {
           // Si historialSubFilter === "todos", mostrar concluidos (entregados y cancelados)
           if (order.status !== "entregado" && order.status !== "cancelado") return false;
         }
-      } else if (classificationFilter === "activos") {
-        // En vista 'activos', excluir pedidos entregados o cancelados
-        if (order.status === "entregado" || order.status === "cancelado") {
-          return false;
-        }
       } else if (classificationFilter === "entregados") {
         if (order.status !== "entregado") return false;
       } else {
-        // En vistas generales ('all', 'hoy', etc.): SOLO excluir cancelados (dados de baja).
-        // Los pedidos entregados NO deben desaparecer de la lista principal
-        if (order.status === "cancelado") {
+        // En todas las vistas de trabajo activo ('all' / Todos, 'hoy', 'por_pagar', 'pagados', 'no_llevados', etc.):
+        // Alojar ÚNICAMENTE pedidos pendientes por entregar (por cobrar, por recoger, en horno, listos, etc.).
+        // Los pedidos entregados se alojan exclusivamente en el botón "Pedidos entregados con éxito".
+        // Los pedidos cancelados se alojan exclusivamente en "Productos que se dieron de baja".
+        if (order.status === "entregado" || order.status === "cancelado") {
           return false;
         }
       }

@@ -70,8 +70,8 @@ export default function SpecialOrdersDrawer({
   // Filtered orders for this branch
   const filteredOrders = useMemo(() => {
     return orders.filter((order) => {
-      // Solo excluir pedidos cancelados. Los pedidos entregados NO desaparecen
-      if (order.status === "cancelado") return false;
+      // Excluir pedidos cancelados y pedidos ya entregados con éxito
+      if (order.status === "cancelado" || order.status === "entregado") return false;
 
       // Branch filter if specified (visible en sucursal que levanta y sucursal que entrega)
       if (branchId && branchId !== "all") {
