@@ -36,18 +36,22 @@ export default function SessionRevokedModal() {
         try {
           const d = new Date(revokedSessionInfo.timestamp);
           const isToday = d.toDateString() === new Date().toDateString();
-          const time = d.toLocaleTimeString("es-MX", {
-            hour: "2-digit",
-            minute: "2-digit",
-            second: "2-digit",
-            hour12: true,
-          });
+          const h = String(d.getHours()).padStart(2, "0");
+          const m = String(d.getMinutes()).padStart(2, "0");
+          const s = String(d.getSeconds()).padStart(2, "0");
+          const time = `${h}:${m}:${s}`;
           return isToday ? `${time} (Hoy)` : `${time} (${d.toLocaleDateString("es-MX", { day: "2-digit", month: "short" })})`;
         } catch {
           return revokedSessionInfo.timestamp;
         }
       })()
-    : new Date().toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: true });
+    : (() => {
+        const now = new Date();
+        const h = String(now.getHours()).padStart(2, "0");
+        const m = String(now.getMinutes()).padStart(2, "0");
+        const s = String(now.getSeconds()).padStart(2, "0");
+        return `${h}:${m}:${s}`;
+      })();
 
   const isSameDeviceWindow =
     deviceName.toLowerCase().includes("pestaña") ||

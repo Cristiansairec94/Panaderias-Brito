@@ -79,7 +79,8 @@ export default function OrderDetailModal({
         year: "numeric",
         hour: "2-digit",
         minute: "2-digit",
-        hour12: true,
+        hour12: false,
+        hourCycle: "h23",
       });
     } catch {
       return dateStr;

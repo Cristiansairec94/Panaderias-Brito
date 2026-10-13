@@ -16,7 +16,7 @@ interface DeleteBranchModalProps {
   onClose: () => void;
   branchToDelete: Branch | null;
   branches: Branch[];
-  onConfirmDelete: (branchId: string) => void;
+  onConfirmDelete: (branchId: string) => void | Promise<void>;
   onSelectBranchToDelete?: (branch: Branch) => void;
 }
 
@@ -29,8 +29,10 @@ export default function DeleteBranchModal({
   onSelectBranchToDelete,
 }: DeleteBranchModalProps) {
   const [selectedBranchId, setSelectedBranchId] = useState<string>("");
+  const [isDeleting, setIsDeleting] = useState<boolean>(false);
 
   useEffect(() => {
+    setIsDeleting(false);
     const active = branchToDelete || (branches.length > 0 ? branches[0] : null);
     if (active) {
       setSelectedBranchId(active.id);
@@ -50,10 +52,17 @@ export default function DeleteBranchModal({
     }
   };
 
-  const handleDelete = () => {
-    if (!currentBranch || isOnlyBranch) return;
-    onConfirmDelete(currentBranch.id);
-    onClose();
+  const handleDelete = async () => {
+    if (!currentBranch || isOnlyBranch || isDeleting) return;
+    setIsDeleting(true);
+    try {
+      await onConfirmDelete(currentBranch.id);
+      onClose();
+    } catch (err) {
+      console.error("[DeleteBranchModal] Error deleting branch:", err);
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   return (
@@ -182,10 +191,20 @@ export default function DeleteBranchModal({
             <button
               type="button"
               onClick={handleDelete}
-              className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-700 hover:to-red-700 text-white font-black text-xs shadow-lg shadow-rose-600/30 transition-all active:scale-95 flex items-center gap-1.5"
+              disabled={isDeleting}
+              className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-700 hover:to-red-700 disabled:opacity-60 text-white font-black text-xs shadow-lg shadow-rose-600/30 transition-all active:scale-95 flex items-center gap-1.5 cursor-pointer disabled:cursor-not-allowed"
             >
-              <Trash2 className="w-4 h-4" />
-              <span>Sí, Eliminar Sucursal</span>
+              {isDeleting ? (
+                <>
+                  <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  <span>Eliminando sucursal...</span>
+                </>
+              ) : (
+                <>
+                  <Trash2 className="w-4 h-4" />
+                  <span>Sí, Eliminar Sucursal</span>
+                </>
+              )}
             </button>
           )}
         </div>

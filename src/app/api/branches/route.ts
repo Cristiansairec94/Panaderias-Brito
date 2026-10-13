@@ -199,7 +199,7 @@ export async function DELETE(req: NextRequest) {
     deletedBranchIdsSet.add(id);
 
     const currentBranches = readStoredBranches();
-    if (currentBranches.length <= 1) {
+    if (currentBranches.length === 1 && currentBranches[0]?.id === id) {
       deletedBranchIdsSet.delete(id);
       return NextResponse.json(
         { success: false, error: "No se puede eliminar la única sucursal activa" },

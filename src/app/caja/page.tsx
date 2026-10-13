@@ -78,11 +78,7 @@ function getShiftSuggestionByCurrentTime(date = new Date()) {
   const minutes = date.getMinutes();
   const decimal = hours + minutes / 60;
 
-  const cutTimeStr = date.toLocaleTimeString("es-MX", {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: true,
-  });
+  const cutTimeStr = `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
 
   if (decimal >= 5 && decimal < 14.5) {
     // Corte matutino (05:00 a 14:30) -> Entra el turno vespertino
@@ -179,7 +175,10 @@ function formatLiveTime(timestamp: number | string) {
   const ts = parseDateTimeSafe(timestamp);
   if (!ts) return "Reciente";
   const d = new Date(ts);
-  return d.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: true });
+  const h = String(d.getHours()).padStart(2, "0");
+  const m = String(d.getMinutes()).padStart(2, "0");
+  const s = String(d.getSeconds()).padStart(2, "0");
+  return `${h}:${m}:${s}`;
 }
 
 function isRecentlyCreated(timestamp: number | string) {

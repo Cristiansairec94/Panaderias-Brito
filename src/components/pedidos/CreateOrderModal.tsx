@@ -965,6 +965,7 @@ export default function CreateOrderModal({
           description: `${newOrder.description ? `${newOrder.description}. ` : ""}${isCross ? `[Levantado en: ${newOrder.operatingBranchName} • Entrega en: ${newOrder.branchName}] ` : (newOrder.deliveryType === "domicilio" ? `A domicilio: ${newOrder.deliveryAddress || "Dirección registrada"}. ` : `Recoge en: ${finalPickupBranch?.name || newOrder.branchName}. `)}Entrega: ${newOrder.deliveryDate} a las ${newOrder.deliveryTime} hrs. Saldo restante: ${formatCurrency(remaining)}.`,
           category: "pedidos",
           orderId: newOrder.id,
+          orderData: newOrder,
           branchId: newOrder.branchId,
           branchName: newOrder.branchName,
           operatingBranchId: newOrder.operatingBranchId,

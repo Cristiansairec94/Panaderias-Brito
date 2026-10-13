@@ -298,6 +298,162 @@ export function normalizeOrder(order: any): CustomOrder {
   };
 }
 
+/**
+ * Extrae o reconstruye un CustomOrder completo a partir de los datos enriquecidos de una notificación,
+ * garantizando que el historial de pedidos y las notificaciones estén 100% vinculados y sincronizados.
+ */
+export function extractOrderFromNotification(notif: any): CustomOrder | null {
+  if (!notif) return null;
+
+  try {
+    // 1. Si la notificación ya contiene el objeto de pedido completo incrustado
+    if (notif.orderData && (notif.orderData.id || notif.orderData.orderNumber)) {
+      return normalizeOrder(notif.orderData);
+    }
+
+    const fullText = `${notif.id || ""} ${notif.title || ""} ${notif.highlightText || ""} ${notif.description || ""} ${notif.senderName || ""}`;
+    const fullTextLower = fullText.toLowerCase();
+
+    const isPedido =
+      notif.category === "pedidos" ||
+      Boolean(notif.orderId) ||
+      fullTextLower.includes("ped-") ||
+      fullTextLower.includes("pedido") ||
+      fullTextLower.includes("liquidado") ||
+      fullTextLower.includes("anticipo") ||
+      fullTextLower.includes("abono");
+
+    if (!isPedido) return null;
+
+    // Folio (ej. "PED-101")
+    const folioMatch = fullText.match(/PED[-_]?(\d+)/i);
+    const folio = folioMatch ? `PED-${folioMatch[1]}` : (notif.orderId || "PED-101");
+
+    // Montos: Total, Anticipo, Saldo Restante
+    const totalMatch = fullText.match(/Total\s*\$?([\d,]+(?:\.\d+)?)/i);
+    const depositMatch = fullText.match(/Anticipo:\s*\$?([\d,]+(?:\.\d+)?)/i);
+    const balanceMatch = fullText.match(/(?:Saldo restante|Resta)[:\s]*\$?([\d,]+(?:\.\d+)?)/i);
+
+    let total = totalMatch ? parseFloat(totalMatch[1].replace(/,/g, "")) : 0;
+    let deposit = depositMatch ? parseFloat(depositMatch[1].replace(/,/g, "")) : 0;
+    let balance = balanceMatch ? parseFloat(balanceMatch[1].replace(/,/g, "")) : Math.max(0, total - deposit);
+
+    const isLiquidado =
+      fullTextLower.includes("liquidado") ||
+      fullTextLower.includes("100% pagado") ||
+      balance === 0 ||
+      (deposit >= total && total > 0);
+
+    if (isLiquidado) {
+      if (total === 0 && deposit > 0) total = deposit;
+      if (deposit === 0 && total > 0) deposit = total;
+      balance = 0;
+    } else if (deposit === 0 && balance > 0 && total > balance) {
+      deposit = total - balance;
+    } else if (total === 0 && (deposit > 0 || balance > 0)) {
+      total = deposit + balance;
+    }
+
+    // Nombre de cliente: extraer texto antes de viñeta • o guion -
+    let customerName = "Cliente";
+    if (notif.highlightText) {
+      const parts = notif.highlightText.split(/[•\-]/);
+      const cand = parts[0]?.trim();
+      if (cand && cand.length > 1 && !cand.toLowerCase().startsWith("pedido") && !cand.toLowerCase().startsWith("corte")) {
+        customerName = cand;
+      }
+    }
+
+    // Rutas y sucursales (Origen y Destino/Recogida)
+    // Ej: "🎂 Sucursal San Juan ➔ Sucursal San Ildefonso"
+    // Ej: "[Levantado en: Sucursal San Juan • Entrega en: Sucursal San Ildefonso]"
+    const routeMatch = fullText.match(/(?:🎂\s*)?([^\➔\-]+)\s*[➔\-]\s*([^\]\.\,\(]+)/);
+    const originMatch = fullText.match(/Levantado en:\s*([^•\]]+)/i);
+    const destMatch = fullText.match(/(?:Entrega en|Recoge en):\s*([^\]\.\,]+)/i);
+
+    const rawOrigin = originMatch ? originMatch[1].trim() : routeMatch ? routeMatch[1].trim() : notif.operatingBranchName || notif.branchName;
+    const rawDest = destMatch ? destMatch[1].trim() : routeMatch ? routeMatch[2].trim() : notif.branchName;
+
+    const pickupBranchId = notif.branchId || resolveBranchId(rawDest, undefined) || "branch-matriz";
+    const pickupBranchName = notif.branchName || CANONICAL_BRANCH_NAMES[pickupBranchId] || rawDest || "Sucursal Matriz (Centro)";
+
+    const operatingBranchId = notif.operatingBranchId || resolveBranchId(rawOrigin, undefined) || pickupBranchId;
+    const operatingBranchName = notif.operatingBranchName || CANONICAL_BRANCH_NAMES[operatingBranchId] || rawOrigin || pickupBranchName;
+
+    // Fecha y hora de entrega
+    const dateMatch = fullText.match(/Entrega:\s*([0-9]{4}-[0-9]{2}-[0-9]{2})/i);
+    const timeMatch = fullText.match(/(?:a las|hrs)[:\s]*([0-9]{1,2}:[0-9]{2})/i);
+
+    const deliveryDate = dateMatch ? dateMatch[1] : new Date(Date.now() + 86400000).toISOString().split("T")[0];
+    const deliveryTime = timeMatch ? timeMatch[1] : "16:00";
+
+    // Estado operativo
+    let status: CustomOrder["status"] = "pendiente";
+    if (fullTextLower.includes("entregad")) {
+      status = "entregado";
+    } else if (fullTextLower.includes("listo en sucursal") || fullTextLower.includes("producto listo")) {
+      status = "listo";
+    } else if (fullTextLower.includes("cancelad") || fullTextLower.includes("dado de baja")) {
+      status = "cancelado";
+    }
+
+    // Descripción
+    let description = notif.description || `Pedido Especial ${folio}`;
+    const cleanDescMatch = description.match(/^([^\[\.]+)/);
+    const itemDesc = cleanDescMatch ? cleanDescMatch[1].trim() : description;
+
+    const ts = notif.timestamp || (notif.createdAt ? new Date(notif.createdAt).getTime() : Date.now());
+
+    return normalizeOrder({
+      id: notif.orderId || folio,
+      orderNumber: folio,
+      customerName,
+      phone: "55 1234 5678",
+      branchId: pickupBranchId,
+      branchName: pickupBranchName,
+      operatingBranchId: operatingBranchId,
+      operatingBranchName: operatingBranchName,
+      description: itemDesc || `Pedido Especial ${folio}`,
+      deliveryDate,
+      deliveryTime,
+      deliveryType: fullTextLower.includes("domicilio") ? "domicilio" : "sucursal",
+      status,
+      total,
+      deposit,
+      remainingBalance: balance,
+      paymentStatus: isLiquidado ? "liquidado" : deposit > 0 ? "anticipo" : "sin_anticipo",
+      paymentMethod: "efectivo",
+      dedication: "",
+      notes: `[Origen: ${operatingBranchId}|${operatingBranchName}] ${notif.description || ""}`.trim(),
+      createdAt: new Date(ts).toISOString(),
+      timestamp: ts,
+      cashier: "Don Toño Brito",
+      items: [
+        {
+          name: itemDesc || `Pedido Especial (${folio})`,
+          quantity: 1,
+          unitPrice: total,
+          subtotal: total,
+          notes: isLiquidado ? "Liquidado al 100%" : `Anticipo registrado de $${deposit.toFixed(2)}`,
+        },
+      ],
+      payments: deposit > 0 ? [
+        {
+          id: `PAY-${folio}-0`,
+          date: new Date(ts).toLocaleDateString("es-MX", { dateStyle: "short" }),
+          amount: deposit,
+          paymentMethod: "efectivo",
+          cashier: "Don Toño Brito",
+          notes: isLiquidado ? "Liquidación completa" : "Anticipo inicial",
+        },
+      ] : [],
+    });
+  } catch (err) {
+    console.error("Error reconstruyendo pedido de notificación:", err);
+    return null;
+  }
+}
+
 export function getStoredOrders(): CustomOrder[] {
   if (typeof window === "undefined") {
     return INITIAL_ORDERS;
@@ -306,22 +462,59 @@ export function getStoredOrders(): CustomOrder[] {
   try {
     const isOrdersInit = localStorage.getItem("brito_orders_initialized") === "true";
     const raw = localStorage.getItem(STORAGE_ORDERS_KEY);
-    if (!raw) {
-      if (isOrdersInit) return [];
-      localStorage.setItem(STORAGE_ORDERS_KEY, JSON.stringify(INITIAL_ORDERS));
-      return INITIAL_ORDERS;
+    let epochFiltered: any[] = [];
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        epochFiltered = parsed.filter((o: any) => {
+          const ts = o.timestamp ? Number(o.timestamp) : parseDateTimeSafe(o.createdAt || o.created_at);
+          return ts >= CLEAN_SLATE_EPOCH;
+        });
+      }
     }
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed) || parsed.length === 0) {
-      return [];
+
+    // Sincronización y vinculación 100% garantizada con notificaciones:
+    // Si una notificación de pedido existe en el almacenamiento, debe existir obligatoriamente en el historial
+    let changed = false;
+    try {
+      const notifsRaw = localStorage.getItem("brito_notifications");
+      if (notifsRaw) {
+        const notifs = JSON.parse(notifsRaw);
+        if (Array.isArray(notifs) && notifs.length > 0) {
+          for (const n of notifs) {
+            const isPedido =
+              n.category === "pedidos" ||
+              Boolean(n.orderId) ||
+              (n.title && n.title.toLowerCase().includes("ped-")) ||
+              (n.title && n.title.toLowerCase().includes("pedido"));
+
+            if (isPedido) {
+              const alreadyHas = epochFiltered.some(
+                (o: any) =>
+                  (n.orderId && (o.id === n.orderId || o.orderNumber === n.orderId || o.order_number === n.orderId)) ||
+                  (n.title && o.orderNumber && n.title.includes(o.orderNumber))
+              );
+              if (!alreadyHas) {
+                const recovered = extractOrderFromNotification(n);
+                if (recovered) {
+                  epochFiltered.unshift(recovered);
+                  changed = true;
+                }
+              }
+            }
+          }
+        }
+      }
+    } catch (notifErr) {
+      console.warn("Error reconciliando notificaciones con pedidos en getStoredOrders:", notifErr);
     }
-    const epochFiltered = parsed.filter((o: any) => {
-      const ts = o.timestamp ? Number(o.timestamp) : parseDateTimeSafe(o.createdAt || o.created_at);
-      return ts >= CLEAN_SLATE_EPOCH;
-    });
-    if (epochFiltered.length !== parsed.length) {
+
+    if (changed || (raw && epochFiltered.length !== JSON.parse(raw).length)) {
       localStorage.setItem(STORAGE_ORDERS_KEY, JSON.stringify(epochFiltered));
+    } else if (!raw && !isOrdersInit) {
+      localStorage.setItem(STORAGE_ORDERS_KEY, JSON.stringify(INITIAL_ORDERS));
     }
+
     return epochFiltered.map(normalizeOrder);
   } catch (err) {
     console.error("Error loading stored orders:", err);
@@ -886,6 +1079,7 @@ export function addCustomOrder(data: {
         actionLink: "/pedidos",
         secondaryActionLabel: remaining > 0 ? "Ver Detalle" : undefined,
         secondaryActionLink: remaining > 0 ? "/pedidos" : undefined,
+        orderData: newOrder,
       };
 
       realtimeHub.broadcastNotification(notifPayload);
@@ -1068,6 +1262,7 @@ export function addOrderPayment(
       operatingBranchName: order.operatingBranchName,
       actionLabel: (order.remainingBalance || 0) > 0 ? `Cobrar $${(order.remainingBalance || 0).toFixed(2)}` : "Ver Detalle",
       actionLink: "/pedidos",
+      orderData: order,
     });
   }
 
@@ -1147,6 +1342,7 @@ export function updateOrderStatus(orderId: string, status: CustomOrder["status"]
       operatingBranchName: ord.operatingBranchName,
       actionLabel: "Ver Detalle",
       actionLink: "/pedidos",
+      orderData: ord,
     });
   }
 

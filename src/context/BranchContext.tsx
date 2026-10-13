@@ -39,10 +39,7 @@ export function getDeletedBranchIds(): Set<string> {
     if (raw) {
       const arr = JSON.parse(raw);
       if (Array.isArray(arr)) {
-        const filtered = arr.filter((id) => typeof id === "string" && id.trim().length > 0 && !CANONICAL_BRANCH_IDS.has(id));
-        if (filtered.length !== arr.length) {
-          localStorage.setItem(DELETED_BRANCHES_STORAGE_KEY, JSON.stringify(filtered));
-        }
+        const filtered = arr.filter((id) => typeof id === "string" && id.trim().length > 0);
         return new Set(filtered);
       }
     }
@@ -314,10 +311,11 @@ interface BranchContextType {
   branches: Branch[];
   currentBranch: Branch | null; // null = Todas / Consolidado
   isAllBranches: boolean;
+  isAdmin: boolean;
   switchBranch: (branchId: string | "all") => void;
   addBranch: (newBranch: Branch) => void;
   updateBranch: (branchId: string, updates: Partial<Branch>) => void;
-  deleteBranch: (branchId: string) => void;
+  deleteBranch: (branchId: string) => Promise<void> | void;
   registerRealSale: (
     branchId: string,
     amount: number,
@@ -415,20 +413,43 @@ export function syncBranchWithUsers(branch: Branch, users: any[]): Branch {
 
 const BranchContext = createContext<BranchContextType | undefined>(undefined);
 
+export function isAdministrativeUser(user: any, permissions?: any): boolean {
+  return Boolean(
+    !user || // Sin usuario definido en carga o modo libre: asumir administrador
+    user.role === "admin" ||
+    user.role === "administrador" ||
+    user.role === "auxiliar_admin" ||
+    user.role === "auxiliar_administrativo" ||
+    user.role === "dueño" ||
+    user.role === "dueno" ||
+    user.role === "gerente" ||
+    (user.roleLabel && (
+      user.roleLabel.toLowerCase().includes("admin") ||
+      user.roleLabel.toLowerCase().includes("dueñ") ||
+      user.roleLabel.toLowerCase().includes("duen") ||
+      user.roleLabel.toLowerCase().includes("gerente")
+    )) ||
+    (user.jobTitle && (
+      user.jobTitle.toLowerCase().includes("admin") ||
+      user.jobTitle.toLowerCase().includes("dueñ") ||
+      user.jobTitle.toLowerCase().includes("duen") ||
+      user.jobTitle.toLowerCase().includes("gerente")
+    )) ||
+    user.id === "usr-1" ||
+    user.id === "usr-2" ||
+    user.username === "admin" ||
+    user.username === "paulina" ||
+    (user.username && user.username.toLowerCase().includes("admin")) ||
+    (user.name && user.name.toLowerCase().includes("paulina")) ||
+    (user.name && (user.name.toLowerCase().includes("toño") || user.name.toLowerCase().includes("tono"))) ||
+    (user.email && user.email.toLowerCase().includes("admin")) ||
+    Boolean(permissions?.canAccessConfiguracion || permissions?.canManageUsers)
+  );
+}
+
 export function BranchProvider({ children }: { children: React.ReactNode }) {
   const { user, usersList, permissions } = useAuth();
-  const isAdminUser = Boolean(
-    user && (
-      user.role === "admin" ||
-      user.role === "auxiliar_admin" ||
-      user.id === "usr-1" ||
-      user.id === "usr-2" ||
-      user.username === "admin" ||
-      user.username === "paulina" ||
-      (user.name && user.name.toLowerCase().includes("paulina")) ||
-      (user.name && (user.name.toLowerCase().includes("toño") || user.name.toLowerCase().includes("tono")))
-    )
-  );
+  const isAdminUser = isAdministrativeUser(user, permissions);
   const isBranchProfile = !isAdminUser && Boolean(
     !user ||
     user.role === "cajero" ||
@@ -702,6 +723,13 @@ function resolveBranchParam(param: string | null): string | null {
             ? (cutsRes.value.data || []).filter((c: any) => parseDateTimeSafe(c.opened_at) >= CLEAN_SLATE_EPOCH)
             : [];
           const dbBranches = branchesRes.status === "fulfilled" && !branchesRes.value.error ? branchesRes.value.data || [] : [];
+
+          // Sincronizar sucursales inactivas de Supabase con los tombstones locales
+          dbBranches.forEach((dbB: any) => {
+            if (dbB && dbB.id && dbB.is_active === false) {
+              recordDeletedBranchId(dbB.id);
+            }
+          });
 
           // Recolectar todos los cortes de turno cerrados (Supabase + LocalStorage)
           const allCutsMap = new Map<string, ShiftCutRecord>();
@@ -2289,52 +2317,89 @@ function resolveBranchParam(param: string | null): string | null {
     }
   }, [isAdmin]);
 
-  const deleteBranch = useCallback((branchId: string) => {
-    if (!isAdmin) {
-      console.warn("[BranchContext] Acceso denegado: solo administradores pueden eliminar sucursales");
-      return;
-    }
+  const deleteBranch = useCallback(
+    async (branchId: string) => {
+      if (!isAdmin) {
+        console.warn("[BranchContext] Acceso denegado: solo administradores pueden eliminar sucursales");
+        return;
+      }
 
-    // 1. Guardar permanentemente en lista negra (tombstone)
-    recordDeletedBranchId(branchId);
+      if (!branchId) return;
 
-    let deletedBranch: Branch | null = null;
-    let remainingBranches: Branch[] = [];
+      const targetBranch = branches.find((b) => b.id === branchId) || null;
 
-    setBranches((prev) => {
-      if (prev.length <= 1) return prev;
-      deletedBranch = prev.find((b) => b.id === branchId) || null;
-      remainingBranches = prev.filter((b) => b.id !== branchId);
-      persistBranches(remainingBranches, true);
-      return remainingBranches;
-    });
+      if (branches.length <= 1) {
+        console.warn("[BranchContext] No se puede eliminar la única sucursal activa.");
+        return;
+      }
 
-    if (deletedBranch && realtimeHub.broadcastBranch) {
-      realtimeHub.broadcastBranch("delete", deletedBranch);
-    }
+      // 1. Guardar permanentemente en lista negra (tombstone)
+      recordDeletedBranchId(branchId);
 
-    if (typeof window !== "undefined") {
-      fetch(`/api/branches?id=${encodeURIComponent(branchId)}`, {
-        method: "DELETE",
-      }).catch((e) => console.warn("[BranchContext] Error calling DELETE /api/branches:", e));
+      let remainingBranches: Branch[] = [];
 
+      setBranches((prev) => {
+        if (prev.length <= 1) return prev;
+        remainingBranches = prev.filter((b) => b.id !== branchId);
+        persistBranches(remainingBranches, true);
+        return remainingBranches;
+      });
+
+      // 2. Si la sucursal activa era la eliminada, cambiar a Matriz o la primera disponible
+      setCurrentBranchId((current) => {
+        if (current === branchId) {
+          const nextId = remainingBranches[0]?.id || "branch-matriz";
+          try {
+            localStorage.setItem("brito_current_branch_id", nextId);
+          } catch {}
+          return nextId;
+        }
+        return current;
+      });
+
+      // 3. Transmitir en tiempo real a las demás terminales
+      if (targetBranch && realtimeHub.broadcastBranch) {
+        realtimeHub.broadcastBranch("delete", targetBranch);
+      }
+
+      // 4. Eliminar / Inactivar en Supabase para sincronización permanente entre terminales
       try {
         const supabase = createClient();
-        supabase.from("branches").delete().eq("id", branchId).then(() => {}, () => {});
-      } catch {}
-    }
-
-    setCurrentBranchId((current) => {
-      if (current === branchId) {
-        const nextId = remainingBranches[0]?.id || "branch-matriz";
-        try {
-          localStorage.setItem("brito_current_branch_id", nextId);
-        } catch {}
-        return nextId;
+        const { error: delError } = await supabase.from("branches").delete().eq("id", branchId);
+        if (delError) {
+          console.warn("[BranchContext] Fallback a soft-delete en Supabase:", delError);
+          await supabase.from("branches").update({ is_active: false }).eq("id", branchId);
+        } else {
+          await supabase.from("branches").upsert(
+            {
+              id: branchId,
+              name: targetBranch?.name || "Sucursal Eliminada",
+              short_name: targetBranch?.shortName || "Eliminada",
+              address: targetBranch?.address || "N/A",
+              phone: targetBranch?.phone || null,
+              is_active: false,
+            },
+            { onConflict: "id" }
+          );
+        }
+      } catch (err) {
+        console.warn("[BranchContext] Error syncing branch deletion with Supabase:", err);
       }
-      return current;
-    });
-  }, [isAdmin]);
+
+      // 5. Eliminar en el servidor (/api/branches)
+      if (typeof window !== "undefined") {
+        fetch(`/api/branches?id=${encodeURIComponent(branchId)}`, {
+          method: "DELETE",
+        }).catch((e) => console.warn("[BranchContext] Error calling DELETE /api/branches:", e));
+      }
+
+      try {
+        window.dispatchEvent(new Event("brito_branches_updated"));
+        window.dispatchEvent(new Event("storage"));
+      } catch {}
+    },
+    [isAdmin, branches]
+  );
 
   const registerRealSale = useCallback((
     branchId: string,
@@ -2881,6 +2946,7 @@ function resolveBranchParam(param: string | null): string | null {
         branches,
         currentBranch,
         isAllBranches,
+        isAdmin,
         switchBranch,
         addBranch,
         updateBranch,

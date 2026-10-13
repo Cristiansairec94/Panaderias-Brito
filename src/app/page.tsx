@@ -102,7 +102,10 @@ export default function Home() {
       } else {
         setGreeting("¡Buenas noches");
       }
-      setCurrentTimeStr(now.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit", second: "2-digit" }));
+      const h = String(now.getHours()).padStart(2, "0");
+      const m = String(now.getMinutes()).padStart(2, "0");
+      const s = String(now.getSeconds()).padStart(2, "0");
+      setCurrentTimeStr(`${h}:${m}:${s}`);
     };
     updateTime();
     const interval = setInterval(updateTime, 1000);

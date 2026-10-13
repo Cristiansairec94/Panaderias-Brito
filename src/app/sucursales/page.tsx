@@ -41,7 +41,7 @@ import {
   Edit3,
   Trash2
 } from "lucide-react";
-import { useBranch, SimulatedSale } from "@/context/BranchContext";
+import { useBranch, SimulatedSale, isAdministrativeUser } from "@/context/BranchContext";
 import { useAuth } from "@/context/AuthContext";
 import { Branch, BranchShift } from "@/types";
 import { formatCurrency } from "@/lib/utils";
@@ -53,28 +53,12 @@ import DeleteBranchModal from "@/components/sucursales/DeleteBranchModal";
 import EditShiftModal from "@/components/sucursales/EditShiftModal";
 
 export default function SucursalesPage() {
-  const { user } = useAuth();
-  const isAdmin = Boolean(
-    user && (
-      user.role === "admin" ||
-      user.role === "auxiliar_admin" ||
-      user.id === "usr-1" ||
-      user.id === "usr-2" ||
-      user.username === "admin" ||
-      user.username === "paulina" ||
-      (user.name && user.name.toLowerCase().includes("paulina")) ||
-      (user.name && (user.name.toLowerCase().includes("toño") || user.name.toLowerCase().includes("tono")))
-    )
-  );
-  const isBranchProfile = !isAdmin && Boolean(
-    !user ||
-    Boolean(user.assignedBranchId)
-  );
-
+  const { user, permissions } = useAuth();
   const { 
     branches, 
     currentBranch, 
     isAllBranches, 
+    isAdmin: branchContextIsAdmin,
     switchBranch, 
     addBranch,
     updateBranch,
@@ -83,6 +67,12 @@ export default function SucursalesPage() {
     advanceShift,
     consolidatedMetrics
   } = useBranch();
+
+  const isAdmin = branchContextIsAdmin ?? isAdministrativeUser(user, permissions);
+  const isBranchProfile = !isAdmin && Boolean(
+    !user ||
+    Boolean(user.assignedBranchId)
+  );
 
   const [lastSimulatedSale, setLastSimulatedSale] = useState<SimulatedSale | null>(null);
   const [isCreateBranchOpen, setIsCreateBranchOpen] = useState(false);
@@ -145,7 +135,7 @@ export default function SucursalesPage() {
     setTimeout(() => setBranchSuccessBanner(null), 5000);
   };
 
-  const handleDeleteBranch = (branchId: string) => {
+  const handleDeleteBranch = async (branchId: string) => {
     if (!isAdmin) {
       setBranchSuccessBanner("⚠️ Permiso denegado: Solo el Administrador puede eliminar sucursales.");
       setTimeout(() => setBranchSuccessBanner(null), 5000);
@@ -153,8 +143,12 @@ export default function SucursalesPage() {
     }
     const target = branches.find((b) => b.id === branchId);
     const targetName = target ? target.name : "Sucursal";
-    deleteBranch(branchId);
-    setBranchSuccessBanner(`Sucursal "${targetName}" eliminada de forma permanente de la red.`);
+    try {
+      await deleteBranch(branchId);
+      setBranchSuccessBanner(`Sucursal "${targetName}" eliminada de forma permanente de la red.`);
+    } catch (err: any) {
+      setBranchSuccessBanner(`Error al eliminar sucursal: ${err?.message || "Ocurrió un error inesperado"}`);
+    }
     setTimeout(() => setBranchSuccessBanner(null), 5000);
   };
 

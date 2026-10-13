@@ -4,7 +4,7 @@ import { CLEAN_SLATE_EPOCH } from "@/lib/wipeOperationalData";
 import React, { createContext, useContext, useState, useEffect, useMemo, useRef } from "react";
 import { realtimeHub, RealtimeStatus } from "@/lib/realtime/realtimeHub";
 import { CustomOrder, ShiftCutRecord, AppUser } from "@/types";
-import { getStoredOrders, updateOrderStatus, deleteCustomOrder } from "@/lib/orders";
+import { getStoredOrders, saveStoredOrders, extractOrderFromNotification, updateOrderStatus, deleteCustomOrder } from "@/lib/orders";
 import { useAuth } from "@/context/AuthContext";
 import { useBranch } from "@/context/BranchContext";
 import OrderDetailModal from "@/components/pedidos/OrderDetailModal";
@@ -30,6 +30,7 @@ export interface FBNotification {
   secondaryActionLink?: string;
   category: "inventario" | "pedidos" | "caja" | "produccion" | "clientes";
   orderId?: string;
+  orderData?: CustomOrder;
   shiftCutData?: ShiftCutRecord;
   cutId?: string;
   branchId?: string;
@@ -306,6 +307,7 @@ export function mergeNotifications(existing: FBNotification, incoming: FBNotific
     operatingBranchId: incoming.operatingBranchId || existing.operatingBranchId,
     operatingBranchName: bestOperatingBranchName,
     orderId: incoming.orderId || existing.orderId,
+    orderData: incoming.orderData || existing.orderData,
     actionLabel: incoming.actionLabel || existing.actionLabel,
     actionLink: incoming.actionLink || existing.actionLink,
     secondaryActionLabel: incoming.secondaryActionLabel || existing.secondaryActionLabel,
