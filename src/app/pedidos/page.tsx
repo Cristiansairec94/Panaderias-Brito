@@ -3956,6 +3956,16 @@ export default function PedidosPage() {
         order={selectedOrderForPayment}
         onPaymentSuccess={() => {
           loadOrders();
+          if (selectedOrderForDetail) {
+            const updated = getStoredOrders().find((item) => item.id === selectedOrderForDetail.id);
+            if (updated) {
+              if (updated.status === "entregado") {
+                setSelectedOrderForDetail(null);
+              } else {
+                setSelectedOrderForDetail(updated);
+              }
+            }
+          }
         }}
       />
 
@@ -3995,10 +4005,18 @@ export default function PedidosPage() {
         } : undefined}
         onAdvanceStatus={(o) => {
           handleAdvanceStatus(o);
-          setReadyNotificationOrder(o);
           loadOrders();
           const updated = getStoredOrders().find((item) => item.id === o.id);
-          if (updated) setSelectedOrderForDetail(updated);
+          if (updated) {
+            if (updated.status === "listo") {
+              setReadyNotificationOrder(updated);
+              setSelectedOrderForDetail(updated);
+            } else if (updated.status === "entregado") {
+              setSelectedOrderForDetail(null);
+            } else {
+              setSelectedOrderForDetail(updated);
+            }
+          }
         }}
         onDeliverOrder={(o) => {
           if (o.remainingBalance > 0) {
@@ -4011,7 +4029,7 @@ export default function PedidosPage() {
           const updatedOrd = updateOrderStatus(o.id, "entregado") || { ...o, status: "entregado" as const };
           loadOrders();
           const updated = getStoredOrders().find((item) => item.id === o.id) || updatedOrd;
-          if (updated) setSelectedOrderForDetail(updated);
+          setSelectedOrderForDetail(null);
           const totalNum = Number(updated.total) || 0;
           const baseItemsDesc = updated.description ? `${updated.description}. ` : "";
           addNotification({

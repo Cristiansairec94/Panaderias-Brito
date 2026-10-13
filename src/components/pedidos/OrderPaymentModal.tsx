@@ -115,7 +115,7 @@ export default function OrderPaymentModal({
       // Delivery is strictly allowed ONLY if the remaining balance is fully covered ($0 remaining)
       const isDeliveredNow = Boolean((forceDeliver || markAsDelivered) && isFullPayment);
 
-      addOrderPayment(order.id, {
+      const updatedOrder = addOrderPayment(order.id, {
         amount: numericAmount,
         paymentMethod,
         cashier: user?.name || "Cajero en Turno",
@@ -140,27 +140,38 @@ export default function OrderPaymentModal({
 
         try {
           const isCross = originBranchName.toLowerCase().trim() !== paymentBranchName.toLowerCase().trim();
+          const finalOrder: CustomOrder = updatedOrder || {
+            ...order,
+            deposit: order.deposit + numericAmount,
+            remainingBalance: newRemaining,
+            paymentStatus: isFullPayment ? "liquidado" : "anticipo",
+            status: isDeliveredNow ? "entregado" : order.status,
+          };
 
           const notifTitle = isDeliveredNow
-            ? `Pedido Liquidado y Entregado ${order.orderNumber}: ${formatCurrency(numericAmount)}`
+            ? `Pedido Entregado con Éxito: ${order.orderNumber} • Total ${formatCurrency(order.total)}`
             : isFullPayment
             ? `Pedido Liquidado ${order.orderNumber}: ${formatCurrency(numericAmount)}`
             : `Abono de Pedido ${order.orderNumber}: ${formatCurrency(numericAmount)}`;
 
-          const notifHighlight = `${order.customerName} - ${isFullPayment ? "100% Pagado" : `Resta: ${formatCurrency(newRemaining)}`}${isDeliveredNow ? " • Entregado" : ""}`;
+          const notifHighlight = isDeliveredNow
+            ? `${order.customerName} • Entregado al Cliente`
+            : `${order.customerName} - ${isFullPayment ? "100% Pagado" : `Resta: ${formatCurrency(newRemaining)}`}`;
 
-          const notifDescription = isCross
-            ? `Se cobró abono de ${formatCurrency(numericAmount)} (${paymentMethod}) en ${paymentBranchName}. Pedido originado en ${originBranchName}. ${isDeliveredNow ? "Entregado con éxito al cliente en mostrador." : isFullPayment ? "Listo para entrega final." : `Saldo restante: ${formatCurrency(newRemaining)}.`}`
-            : `Se cobró abono de ${formatCurrency(numericAmount)} (${paymentMethod}). Pedido: ${order.description}. ${isDeliveredNow ? "Entregado con éxito al cliente en mostrador." : isFullPayment ? "Listo para entrega final." : `Saldo restante: ${formatCurrency(newRemaining)}.`}`;
+          const notifDescription = isDeliveredNow
+            ? `${order.description ? `${order.description}. ` : ""}El pedido ${order.orderNumber} de "${order.customerName}" fue liquidado (${formatCurrency(numericAmount)} en ${paymentMethod}) y entregado satisfactoriamente en ${pickupBranchName}.${isCross ? ` (Originado en: ${originBranchName}).` : ""}`
+            : isCross
+            ? `Se cobró abono de ${formatCurrency(numericAmount)} (${paymentMethod}) en ${paymentBranchName}. Pedido originado en ${originBranchName}. ${isFullPayment ? "Listo para entrega final." : `Saldo restante: ${formatCurrency(newRemaining)}.`}`
+            : `Se cobró abono de ${formatCurrency(numericAmount)} (${paymentMethod}). Pedido: ${order.description}. ${isFullPayment ? "Listo para entrega final." : `Saldo restante: ${formatCurrency(newRemaining)}.`}`;
 
           const notifSender = isDeliveredNow
-            ? `📦✅ Pedido Liquidado y Entregado (${paymentBranchName})`
+            ? `📦 Pedido Entregado (${pickupBranchName})`
             : isFullPayment
             ? `🎂 Pedido Liquidado (${paymentBranchName})`
             : `💰 Abono Recibido (${paymentBranchName})`;
 
           addNotification({
-            id: `notif-order-pay-${order.id}-${Date.now()}`,
+            id: isDeliveredNow ? `notif-order-status-${order.id}-entregado` : `notif-order-pay-${order.id}-${Date.now()}`,
             timestamp: Date.now(),
             senderName: notifSender,
             senderAvatar: isDeliveredNow ? "📦" : isFullPayment ? "🎂" : "💰",
@@ -170,14 +181,19 @@ export default function OrderPaymentModal({
             description: notifDescription,
             category: "pedidos",
             orderId: order.id,
+            orderData: finalOrder,
             branchId: pickupBranchId,
             branchName: pickupBranchName,
             operatingBranchId: originBranchId,
             operatingBranchName: originBranchName,
-            actionLabel: newRemaining > 0 ? `Cobrar ${formatCurrency(newRemaining)}` : "Ver Detalle",
+            actionLabel: isDeliveredNow
+              ? "Ver Pedido Entregado"
+              : newRemaining > 0
+              ? `Cobrar ${formatCurrency(newRemaining)}`
+              : "Ver Detalle",
             actionLink: "/pedidos",
-            secondaryActionLabel: newRemaining > 0 ? "Ver Detalle" : undefined,
-            secondaryActionLink: newRemaining > 0 ? "/pedidos" : undefined,
+            secondaryActionLabel: !isDeliveredNow && newRemaining > 0 ? "Ver Detalle" : undefined,
+            secondaryActionLink: !isDeliveredNow && newRemaining > 0 ? "/pedidos" : undefined,
           });
         } catch (notifErr) {
           console.warn("Could not create payment notification:", notifErr);

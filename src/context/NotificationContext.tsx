@@ -137,32 +137,47 @@ export function checkBranchMatch(
 
 function findRealStoredOrderForNotification(n: Partial<FBNotification>): CustomOrder | null {
   try {
-    if (n.orderData && n.orderData.orderNumber) return n.orderData;
     const allOrders = getStoredOrders();
-    if (!Array.isArray(allOrders) || allOrders.length === 0) return null;
-    if (n.orderId) {
-      const matchId = allOrders.find(
-        (o) => o.id === n.orderId || o.orderNumber.toLowerCase() === n.orderId?.toLowerCase()
-      );
-      if (matchId) return matchId;
+    if (Array.isArray(allOrders) && allOrders.length > 0) {
+      const candidateIds = [n.orderId, n.orderData?.id, n.orderData?.orderNumber]
+        .filter(Boolean)
+        .map((s) => String(s).toLowerCase().trim());
+
+      if (candidateIds.length > 0) {
+        const matchId = allOrders.find((o) => {
+          const oId = (o.id || "").toLowerCase().trim();
+          const oNum = (o.orderNumber || "").toLowerCase().trim();
+          return candidateIds.includes(oId) || candidateIds.includes(oNum);
+        });
+        if (matchId) {
+          return n.orderData ? { ...n.orderData, ...matchId } : matchId;
+        }
+      }
+
+      const text = `${n.id || ""} ${n.title || ""} ${n.highlightText || ""} ${n.description || ""} ${n.orderId || ""} ${n.orderData?.orderNumber || ""}`;
+      const folioMatch = text.match(/PED[-_]?(\d+)/i);
+      if (folioMatch) {
+        const rawNumber = folioMatch[1];
+        const matchFolio = allOrders.find((o) => {
+          const oNum = o.orderNumber.replace(/\D/g, "");
+          return oNum === rawNumber || o.orderNumber.toUpperCase() === `PED-${rawNumber}`;
+        });
+        if (matchFolio) {
+          return n.orderData ? { ...n.orderData, ...matchFolio } : matchFolio;
+        }
+      }
+
+      if (n.highlightText) {
+        const highLower = n.highlightText.toLowerCase();
+        const matchCustomer = allOrders.find(
+          (o) => o.customerName && o.customerName.trim().length > 2 && highLower.includes(o.customerName.toLowerCase().trim())
+        );
+        if (matchCustomer) {
+          return n.orderData ? { ...n.orderData, ...matchCustomer } : matchCustomer;
+        }
+      }
     }
-    const text = `${n.id || ""} ${n.title || ""} ${n.highlightText || ""} ${n.description || ""} ${n.orderId || ""}`;
-    const folioMatch = text.match(/PED[-_]?(\d+)/i);
-    if (folioMatch) {
-      const rawNumber = folioMatch[1];
-      const matchFolio = allOrders.find((o) => {
-        const oNum = o.orderNumber.replace(/\D/g, "");
-        return oNum === rawNumber || o.orderNumber.toUpperCase() === `PED-${rawNumber}`;
-      });
-      if (matchFolio) return matchFolio;
-    }
-    if (n.highlightText) {
-      const highLower = n.highlightText.toLowerCase();
-      const matchCustomer = allOrders.find(
-        (o) => o.customerName && o.customerName.trim().length > 2 && highLower.includes(o.customerName.toLowerCase().trim())
-      );
-      if (matchCustomer) return matchCustomer;
-    }
+    if (n.orderData && n.orderData.orderNumber) return n.orderData;
   } catch {}
   return null;
 }
@@ -212,24 +227,23 @@ export type OrderNotificationStage =
   | "created"
   | "other";
 
-export function getOrderNotificationStage(n: Partial<FBNotification>): OrderNotificationStage {
+export function getNotificationIntrinsicStage(n: Partial<FBNotification>): OrderNotificationStage {
   const idStr = (n.id || "").toLowerCase();
   const titleStr = (n.title || "").toLowerCase();
   const highStr = (n.highlightText || "").toLowerCase();
   const descStr = (n.description || "").toLowerCase();
-  const combined = `${idStr} ${titleStr} ${highStr} ${descStr}`;
-
-  const stored = n.orderData || findRealStoredOrderForNotification(n);
+  const actionStr = (n.actionLabel || "").toLowerCase();
+  const combined = `${idStr} ${titleStr} ${highStr} ${descStr} ${actionStr}`;
 
   if (
     idStr.includes("cancelado") ||
     idStr.includes("order-cancelled") ||
+    actionStr.includes("pedido cancelado") ||
     /\bcancelad[oa]s?\b/i.test(titleStr) ||
     /\bcancelad[oa]s?\b/i.test(highStr) ||
     /\bdad[oa] de baja\b/i.test(titleStr) ||
     /\bdad[oa] de baja\b/i.test(highStr) ||
-    /dado de baja|fue cancelado|ha sido cancelado|eliminado permanentemente/i.test(descStr) ||
-    stored?.status === "cancelado"
+    /dado de baja|fue cancelado|ha sido cancelado|eliminado permanentemente/i.test(descStr)
   ) {
     return "cancelled";
   }
@@ -237,10 +251,10 @@ export function getOrderNotificationStage(n: Partial<FBNotification>): OrderNoti
   if (
     idStr.includes("order-delivered") ||
     (idStr.includes("order-status") && idStr.includes("entregado")) ||
+    actionStr.includes("pedido entregado") ||
     /\bentregad[oa]s?\b/i.test(titleStr) ||
     /\bentregad[oa]s?\b/i.test(highStr) ||
-    /fue entregado|ha sido entregado|entregado al cliente|entregado satisfactoriamente|entregado con éxito|marcado como entregado/i.test(descStr) ||
-    stored?.status === "entregado"
+    /fue entregado|ha sido entregado|entregado al cliente|entregado satisfactoriamente|entregado con éxito|marcado como entregado/i.test(descStr)
   ) {
     return "delivered";
   }
@@ -260,7 +274,11 @@ export function getOrderNotificationStage(n: Partial<FBNotification>): OrderNoti
     titleStr.includes("liquidado") ||
     titleStr.includes("abono")
   ) {
-    if (titleStr.includes("liquidado") || highStr.includes("100% pagado") || highStr.includes("liquidado")) {
+    if (
+      titleStr.includes("liquidado") ||
+      highStr.includes("100% pagado") ||
+      highStr.includes("liquidado")
+    ) {
       return "paid";
     }
     return "payment";
@@ -271,6 +289,36 @@ export function getOrderNotificationStage(n: Partial<FBNotification>): OrderNoti
   }
 
   return "other";
+}
+
+export function getOrderNotificationStage(n: Partial<FBNotification>): OrderNotificationStage {
+  const intrinsic = getNotificationIntrinsicStage(n);
+  const stored = findRealStoredOrderForNotification(n);
+
+  if (intrinsic === "cancelled" || stored?.status === "cancelado") {
+    return "cancelled";
+  }
+
+  if (intrinsic === "delivered" || stored?.status === "entregado") {
+    return "delivered";
+  }
+
+  if (intrinsic === "ready" || stored?.status === "listo") {
+    return "ready";
+  }
+
+  if (intrinsic === "paid" || intrinsic === "payment" || stored?.paymentStatus === "liquidado") {
+    if (
+      intrinsic === "paid" ||
+      stored?.paymentStatus === "liquidado" ||
+      stored?.remainingBalance === 0
+    ) {
+      return "paid";
+    }
+    return "payment";
+  }
+
+  return intrinsic;
 }
 
 export function isTerminalOrderNotification(n: Partial<FBNotification>): boolean {
@@ -319,8 +367,8 @@ export function mergeNotifications(existing: FBNotification, incoming: FBNotific
     cancelled: 6,
   };
 
-  const existingStage = getOrderNotificationStage(existing);
-  const incomingStage = getOrderNotificationStage(incoming);
+  const existingStage = getNotificationIntrinsicStage(existing);
+  const incomingStage = getNotificationIntrinsicStage(incoming);
 
   // Determinar cuál notificación representa el estado más reciente del pedido
   const incomingIsNewer =
@@ -330,13 +378,23 @@ export function mergeNotifications(existing: FBNotification, incoming: FBNotific
 
   const primary = incomingIsNewer ? incoming : existing;
   const secondary = incomingIsNewer ? existing : incoming;
-  const activeStage = incomingIsNewer ? incomingStage : existingStage;
 
-  const storedOrder =
-    primary.orderData ||
-    secondary.orderData ||
+  const liveStoredOrder =
     findRealStoredOrderForNotification(primary) ||
     findRealStoredOrderForNotification(secondary);
+
+  const storedOrder: CustomOrder | null = liveStoredOrder
+    ? { ...(secondary.orderData || {}), ...(primary.orderData || {}), ...liveStoredOrder }
+    : (primary.orderData || secondary.orderData || null);
+
+  let activeStage = incomingIsNewer ? incomingStage : existingStage;
+  if (storedOrder?.status === "cancelado") {
+    activeStage = "cancelled";
+  } else if (storedOrder?.status === "entregado") {
+    activeStage = "delivered";
+  } else if (storedOrder?.status === "listo" && stageRank[activeStage] < stageRank.ready) {
+    activeStage = "ready";
+  }
 
   const bestBranchId = primary.branchId || secondary.branchId || storedOrder?.branchId;
   const bestBranchName = primary.branchName || secondary.branchName || storedOrder?.branchName || "";
@@ -440,12 +498,23 @@ export function mergeNotifications(existing: FBNotification, incoming: FBNotific
     }
   }
 
-  const latestTs = Math.max(existingTs, incomingTs, Date.now());
+  const latestTs = Math.max(existingTs, incomingTs, storedOrder?.timestamp || 0) || Date.now();
+  const resolvedOrderId = storedOrder?.id || primary.orderId || secondary.orderId || folio;
+  let mergedId = primary.id || existing.id;
+  if (activeStage === "delivered" && resolvedOrderId) {
+    mergedId = `notif-order-status-${resolvedOrderId}-entregado`;
+  } else if (activeStage === "cancelled" && resolvedOrderId) {
+    mergedId = `notif-order-status-${resolvedOrderId}-cancelado`;
+  } else if (activeStage === "ready" && resolvedOrderId) {
+    mergedId = `notif-order-status-${resolvedOrderId}-listo`;
+  } else if (existing.id.startsWith("notif-order-") && !incoming.id.includes("order-status")) {
+    mergedId = existing.id;
+  }
 
   return {
     ...secondary,
     ...primary,
-    id: existing.id.startsWith("notif-order-") ? existing.id : (incoming.id.startsWith("notif-order-") ? incoming.id : primary.id),
+    id: mergedId,
     title: bestTitle,
     senderName: bestSenderName,
     senderAvatar: bestAvatar,
@@ -591,16 +660,20 @@ export function isNotificationVisibleForUser(
     return false;
   }
 
-  // Identificar el código canónico de la sucursal activa o asignada al usuario
+  // Identificar el código canónico de la sucursal asignada al usuario (prioridad estricta al perfil en no-administradores)
   let targetBranchId = "";
   if (isAndres) {
     targetBranchId = "branch-angeles";
-  } else if (activeBranch?.id && activeBranch.id !== "all") {
-    targetBranchId = activeBranch.id;
   } else if (user?.assignedBranchId) {
     targetBranchId = user.assignedBranchId;
+  } else if (user?.assignedBranchName) {
+    targetBranchId = user.assignedBranchName;
   } else if (user) {
     targetBranchId = resolveBranchId("", user.name || user.username);
+  }
+
+  if (!targetBranchId && activeBranch?.id && activeBranch.id !== "all") {
+    targetBranchId = activeBranch.id;
   }
 
   const cashierBranchCode = getCanonicalBranchCode(targetBranchId);
@@ -633,7 +706,7 @@ function checkBranchMatchesTargetCode(notif: Partial<FBNotification>, targetCode
     }
   }
 
-  // 3. Contrastar con los datos reales del pedido almacenado
+  // 4. Contrastar con los datos reales del pedido almacenado (incluyendo ambas sucursales independientes)
   const order = findOrderForNotification(notif as FBNotification);
   if (order) {
     const orderDestCode = getCanonicalBranchCode(order.branchId || order.branchName);
@@ -665,8 +738,8 @@ function checkBranchMatchesTargetCode(notif: Partial<FBNotification>, targetCode
     }
   }
 
-  // 4. Búsqueda de palabra clave por sucursal en el texto
-  const text = `${notif.title || ""} ${notif.highlightText || ""} ${notif.description || ""} ${notif.senderName || ""}`.toLowerCase();
+  // 5. Búsqueda de palabra clave por sucursal en el texto y metadatos de notas
+  const text = `${notif.title || ""} ${notif.highlightText || ""} ${notif.description || ""} ${notif.senderName || ""} ${order?.notes || ""}`.toLowerCase();
   if (targetCode === "branch-matriz" && (text.includes("matriz") || text.includes("centro"))) return true;
   if (targetCode === "branch-angeles" && (text.includes("angeles") || text.includes("ángeles"))) return true;
   if (targetCode === "branch-sanjuan" && (text.includes("san juan") || text.includes("sanjuan"))) return true;
@@ -681,43 +754,18 @@ const INITIAL_FB_NOTIFICATIONS: FBNotification[] = [];
 
 export function findOrderForNotification(notif: FBNotification): CustomOrder | null {
   try {
-    // 0. Si la notificación ya contiene el pedido estructurado
+    // 0. Buscar primero el estado más reciente en getStoredOrders() para no devolver un snapshot obsoleto
+    const liveStored = findRealStoredOrderForNotification(notif);
+    if (liveStored) {
+      return liveStored;
+    }
+
+    // 1. Si no está en almacenamiento local pero la notificación incluye orderData
     if (notif.orderData) {
       return notif.orderData;
     }
 
-    const allOrders = getStoredOrders();
-
-    // 1. Coincidencia directa por orderId
-    if (notif.orderId) {
-      const found = allOrders.find(
-        (o) => o.id === notif.orderId || o.orderNumber.toLowerCase() === notif.orderId?.toLowerCase()
-      );
-      if (found) return found;
-    }
-
-    // 2. Extraer folio del título, id o texto (ej: "PED-101", "PED-102", "pedido-ped-101")
-    const fullText = `${notif.id} ${notif.title} ${notif.highlightText} ${notif.description}`;
-    const folioMatch = fullText.match(/PED[-_]?(\d+)/i);
-    if (folioMatch) {
-      const rawNumber = folioMatch[1];
-      const found = allOrders.find((o) => {
-        const oNum = o.orderNumber.replace(/\D/g, "");
-        const oId = o.id.replace(/\D/g, "");
-        return oNum === rawNumber || oId === rawNumber || o.orderNumber.toUpperCase() === `PED-${rawNumber}`;
-      });
-      if (found) return found;
-    }
-
-    // 3. Coincidencia por nombre de cliente si existe
-    if (notif.highlightText) {
-      const found = allOrders.find(
-        (o) => o.customerName && notif.highlightText.toLowerCase().includes(o.customerName.toLowerCase())
-      );
-      if (found) return found;
-    }
-
-    // 4. Si no se encontró en almacenamiento local, reconstruir usando el extractor centralizado
+    // 2. Si no se encontró en almacenamiento local, reconstruir usando el extractor centralizado
     const reconstructed = extractOrderFromNotification(notif);
     if (reconstructed) {
       return reconstructed;
@@ -1105,87 +1153,188 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     });
   }, []);
 
-  // Registro por perfil de notificaciones de pedidos entregados/cancelados que ya fueron vistas y por tanto desaparecen del perfil
+  // Clave única por perfil para independencia total de lectura y de pedidos finalizados/entregados ocultados
   const profileKey = useMemo(() => {
     const raw = user?.id || user?.username || user?.name || "anon";
     return raw.toLowerCase().replace(/[^a-z0-9_-]/g, "_");
   }, [user?.id, user?.username, user?.name]);
 
-  const [dismissedTerminalOrders, setDismissedTerminalOrders] = useState<Set<string>>(() => {
-    if (typeof window !== "undefined") {
-      try {
-        const rawKey = (user?.id || user?.username || user?.name || "anon").toLowerCase().replace(/[^a-z0-9_-]/g, "_");
-        const saved = localStorage.getItem(`brito_dismissed_terminal_orders_${rawKey}`);
-        if (saved) {
-          const arr = JSON.parse(saved);
-          if (Array.isArray(arr)) return new Set(arr);
-        }
-      } catch {}
-    }
-    return new Set();
-  });
+  const [profileStateTick, setProfileStateTick] = useState(0);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
+    const handleOrdersOrProfileSync = () => {
+      setProfileStateTick((t) => t + 1);
+    };
+    window.addEventListener("brito_orders_updated", handleOrdersOrProfileSync);
+    return () => {
+      window.removeEventListener("brito_orders_updated", handleOrdersOrProfileSync);
+    };
+  }, []);
+
+  const getDismissedSetForProfile = (pKey: string): Set<string> => {
+    if (typeof window === "undefined") return new Set();
     try {
-      const saved = localStorage.getItem(`brito_dismissed_terminal_orders_${profileKey}`);
+      const saved = localStorage.getItem(`brito_dismissed_terminal_orders_${pKey}`);
       if (saved) {
         const arr = JSON.parse(saved);
-        if (Array.isArray(arr)) {
-          setDismissedTerminalOrders(new Set(arr));
-          return;
+        if (Array.isArray(arr)) return new Set(arr);
+      }
+    } catch {}
+    return new Set();
+  };
+
+  const getReadMapForProfile = (pKey: string): Record<string, string> => {
+    if (typeof window === "undefined") return {};
+    try {
+      const saved = localStorage.getItem(`brito_read_notifs_${pKey}`);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+          return parsed;
         }
       }
     } catch {}
-    setDismissedTerminalOrders(new Set());
-  }, [profileKey]);
+    return {};
+  };
 
-  const dismissTerminalOrderForProfile = (notif: Partial<FBNotification>) => {
+  const getNotificationReadSignature = (notif: Partial<FBNotification>): string => {
+    const stage = getOrderNotificationStage(notif);
+    if (stage === "other") return "read";
+    if (stage === "payment") return `payment:${notif.id || ""}`;
+    return stage;
+  };
+
+  const markNotificationReadForProfile = (notif: Partial<FBNotification>) => {
+    if (typeof window === "undefined") return;
     const keys = getOrderIdentityKeys(notif);
     if (notif.id) keys.push(notif.id.toLowerCase().trim());
     if (keys.length === 0) return;
 
-    setDismissedTerminalOrders((prev) => {
-      const next = new Set(prev);
-      keys.forEach((k) => next.add(k));
-      if (typeof window !== "undefined") {
-        try {
-          localStorage.setItem(`brito_dismissed_terminal_orders_${profileKey}`, JSON.stringify(Array.from(next)));
-        } catch {}
-      }
-      return next;
+    const sig = getNotificationReadSignature(notif);
+    const currentMap = getReadMapForProfile(profileKey);
+    keys.forEach((k) => {
+      currentMap[k] = sig;
     });
+    try {
+      localStorage.setItem(`brito_read_notifs_${profileKey}`, JSON.stringify(currentMap));
+    } catch {}
+    setProfileStateTick((t) => t + 1);
+  };
+
+  const markNotificationUnreadForProfile = (notif: Partial<FBNotification>) => {
+    if (typeof window === "undefined") return;
+    const keys = getOrderIdentityKeys(notif);
+    if (notif.id) keys.push(notif.id.toLowerCase().trim());
+    if (keys.length === 0) return;
+
+    try {
+      const storageKeysToUpdate = new Set<string>([`brito_read_notifs_${profileKey}`]);
+      for (let i = 0; i < localStorage.length; i++) {
+        const sk = localStorage.key(i);
+        if (sk && sk.startsWith("brito_read_notifs_")) {
+          storageKeysToUpdate.add(sk);
+        }
+      }
+      storageKeysToUpdate.forEach((sk) => {
+        try {
+          const saved = localStorage.getItem(sk);
+          if (!saved) return;
+          const parsed = JSON.parse(saved);
+          if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+            let changed = false;
+            keys.forEach((k) => {
+              if (k in parsed) {
+                delete parsed[k];
+                changed = true;
+              }
+            });
+            if (changed) {
+              localStorage.setItem(sk, JSON.stringify(parsed));
+            }
+          }
+        } catch {}
+      });
+    } catch {}
+    setProfileStateTick((t) => t + 1);
+  };
+
+  const isNotificationReadForProfile = (
+    notif: Partial<FBNotification>,
+    readMap: Record<string, string>
+  ): boolean => {
+    const keys = getOrderIdentityKeys(notif);
+    if (notif.id) keys.push(notif.id.toLowerCase().trim());
+    const sig = getNotificationReadSignature(notif);
+    return keys.some((k) => readMap[k] === sig);
+  };
+
+  const dismissTerminalOrderForProfile = (notif: Partial<FBNotification>) => {
+    if (typeof window === "undefined") return;
+    const keys = getOrderIdentityKeys(notif);
+    if (notif.id) keys.push(notif.id.toLowerCase().trim());
+    if (keys.length === 0) return;
+
+    const stage = getOrderNotificationStage(notif);
+    const next = getDismissedSetForProfile(profileKey);
+    keys.forEach((k) => {
+      next.add(`${k}::${stage}`);
+      next.add(k);
+    });
+    try {
+      localStorage.setItem(`brito_dismissed_terminal_orders_${profileKey}`, JSON.stringify(Array.from(next)));
+    } catch {}
+    setProfileStateTick((t) => t + 1);
   };
 
   const undismissOrderForProfile = (notif: Partial<FBNotification>) => {
+    if (typeof window === "undefined") return;
     const keys = getOrderIdentityKeys(notif);
     if (notif.id) keys.push(notif.id.toLowerCase().trim());
     if (keys.length === 0) return;
 
-    setDismissedTerminalOrders((prev) => {
-      let changed = false;
-      const next = new Set(prev);
-      keys.forEach((k) => {
-        if (next.has(k)) {
-          next.delete(k);
-          changed = true;
+    const stage = getOrderNotificationStage(notif);
+    try {
+      const storageKeysToUpdate = new Set<string>([`brito_dismissed_terminal_orders_${profileKey}`]);
+      for (let i = 0; i < localStorage.length; i++) {
+        const sk = localStorage.key(i);
+        if (sk && sk.startsWith("brito_dismissed_terminal_orders_")) {
+          storageKeysToUpdate.add(sk);
         }
-      });
-      if (!changed) return prev;
-      if (typeof window !== "undefined") {
-        try {
-          localStorage.setItem(`brito_dismissed_terminal_orders_${profileKey}`, JSON.stringify(Array.from(next)));
-        } catch {}
       }
-      return next;
-    });
+      storageKeysToUpdate.forEach((sk) => {
+        try {
+          const saved = localStorage.getItem(sk);
+          if (!saved) return;
+          const arr = JSON.parse(saved);
+          if (!Array.isArray(arr)) return;
+          const next = new Set<string>(arr);
+          let changed = false;
+          keys.forEach((k) => {
+            if (next.has(k)) {
+              next.delete(k);
+              changed = true;
+            }
+            if (next.has(`${k}::${stage}`)) {
+              next.delete(`${k}::${stage}`);
+              changed = true;
+            }
+          });
+          if (changed) {
+            localStorage.setItem(sk, JSON.stringify(Array.from(next)));
+          }
+        } catch {}
+      });
+    } catch {}
+    setProfileStateTick((t) => t + 1);
   };
 
   const isDismissedTerminalForProfile = (notif: Partial<FBNotification>, dismissedSet: Set<string>): boolean => {
     if (!isTerminalOrderNotification(notif)) return false;
+    const stage = getOrderNotificationStage(notif);
     const keys = getOrderIdentityKeys(notif);
     if (notif.id) keys.push(notif.id.toLowerCase().trim());
-    return keys.some((k) => dismissedSet.has(k));
+    return keys.some((k) => dismissedSet.has(`${k}::${stage}`) || dismissedSet.has(k));
   };
 
   const [soundEnabled, setSoundEnabled] = useState(true);
@@ -1271,17 +1420,34 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     }
   };
 
-  // Notificaciones filtradas según el rol y sucursal del usuario, ocultando pedidos entregados/cancelados que ya fueron vistos en este perfil
+  // Notificaciones filtradas según el rol y sucursal del usuario, con estado de lectura y ocultación de concluidos 100% independientes por perfil
   const visibleNotifications = useMemo(() => {
-    const filtered = notifications.filter((notif) => {
-      const ts = resolveNotificationTimestamp(notif);
-      if (ts < CLEAN_SLATE_EPOCH) return false;
-      if (isDismissedTerminalForProfile(notif, dismissedTerminalOrders)) return false;
-      return isNotificationVisibleForUser(notif, user, currentBranch);
-    });
-    // DEDUPLICACIÓN Y RECICLAJE EN TIEMPO DE RENDER: Garantía del 100% de 1 sola notificación por pedido
+    // Referenciar profileStateTick para recalcular al instante ante cambios de perfil, lectura u órdenes
+    void profileStateTick;
+    const dismissedSet = getDismissedSetForProfile(profileKey);
+    const readMap = getReadMapForProfile(profileKey);
+
+    // 1. Enriquecer cada notificación de pedido con el estado actual del pedido almacenado y filtrar por sucursal/rol
+    const enrichedAndFiltered: FBNotification[] = [];
+    for (const rawNotif of notifications) {
+      const ts = resolveNotificationTimestamp(rawNotif);
+      if (ts < CLEAN_SLATE_EPOCH) continue;
+
+      const isOrderNotif =
+        rawNotif.category === "pedidos" ||
+        Boolean(rawNotif.orderId) ||
+        (rawNotif.title && rawNotif.title.toLowerCase().includes("ped-")) ||
+        (rawNotif.title && rawNotif.title.toLowerCase().includes("pedido"));
+
+      const notif = isOrderNotif ? mergeNotifications(rawNotif, rawNotif) : rawNotif;
+      if (isDismissedTerminalForProfile(notif, dismissedSet)) continue;
+      if (!isNotificationVisibleForUser(notif, user, currentBranch)) continue;
+      enrichedAndFiltered.push(notif);
+    }
+
+    // 2. DEDUPLICACIÓN Y RECICLAJE EN TIEMPO DE RENDER: Garantía del 100% de 1 sola notificación por pedido
     const deduped: FBNotification[] = [];
-    for (const item of filtered) {
+    for (const item of enrichedAndFiltered) {
       const idx = deduped.findIndex((d) => isSameOrderEvent(d, item));
       if (idx === -1) {
         deduped.push(item);
@@ -1289,10 +1455,17 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         deduped[idx] = mergeNotifications(deduped[idx], item);
       }
     }
-    return deduped.filter((n) => !isDismissedTerminalForProfile(n, dismissedTerminalOrders));
-  }, [notifications, user, currentBranch, dismissedTerminalOrders]);
 
-  // Conteo de no leídas calculado exclusivamente sobre las notificaciones visibles para el usuario
+    // 3. Proyectar estado de lectura (read) exclusivo e independiente para este perfil
+    return deduped
+      .filter((n) => !isDismissedTerminalForProfile(n, dismissedSet))
+      .map((n) => ({
+        ...n,
+        read: isNotificationReadForProfile(n, readMap),
+      }));
+  }, [notifications, user, currentBranch, profileKey, profileStateTick]);
+
+  // Conteo de no leídas calculado exclusivamente sobre las notificaciones visibles para el perfil activo
   const unreadCount = useMemo(() => {
     return visibleNotifications.filter((n) => !n.read).length;
   }, [visibleNotifications]);
@@ -1371,15 +1544,18 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       }
 
       const existingMatch = notificationsRef.current.find((n) => isSameOrderEvent(n, remoteNotif));
+      const prevIntrinsicStage = existingMatch ? getNotificationIntrinsicStage(existingMatch) : null;
+      const incomingStage = getOrderNotificationStage(remoteNotif);
       const isSameStageEcho = Boolean(
         existingMatch &&
-        getOrderNotificationStage(existingMatch) === getOrderNotificationStage(remoteNotif) &&
+        prevIntrinsicStage === incomingStage &&
         Math.abs((remoteNotif.timestamp || Date.now()) - (existingMatch.timestamp || 0)) < 8000
       );
 
       // Si el pedido cambió a un nuevo estado (ej. entregado o cancelado), asegurarse de mostrar la alerta reciclada arriba
-      if (!existingMatch || getOrderNotificationStage(existingMatch) !== getOrderNotificationStage(remoteNotif)) {
+      if (!existingMatch || prevIntrinsicStage !== incomingStage) {
         undismissOrderForProfile(remoteNotif);
+        markNotificationUnreadForProfile(remoteNotif);
       }
 
       setNotifications((prev) => {
@@ -1431,7 +1607,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
             const existingMatch = notificationsRef.current.find((n) =>
               isSameOrderEvent(n, { id: notifId, orderId: order.id, highlightText: order.orderNumber })
             );
-            if (existingMatch && getOrderNotificationStage(existingMatch) === "created") {
+            if (existingMatch && getNotificationIntrinsicStage(existingMatch) === "created") {
               return;
             }
 
@@ -1527,11 +1703,18 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
             };
 
             const existingMatch = notificationsRef.current.find((n) => isSameOrderEvent(n, notif));
+            const prevIntrinsicStage = existingMatch ? getNotificationIntrinsicStage(existingMatch) : null;
+            const incomingStage = getOrderNotificationStage(notif);
             const isSameStageEcho = Boolean(
               existingMatch &&
-              getOrderNotificationStage(existingMatch) === getOrderNotificationStage(notif) &&
+              prevIntrinsicStage === incomingStage &&
               Math.abs(Date.now() - (existingMatch.timestamp || 0)) < 8000
             );
+
+            if (!existingMatch || prevIntrinsicStage !== incomingStage) {
+              undismissOrderForProfile(notif);
+              markNotificationUnreadForProfile(notif);
+            }
 
             setNotifications((prev) => {
               const updated = upsertAndRecycleNotification(prev, notif, { markUnreadOnUpdate: true });
@@ -1600,14 +1783,17 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
             };
 
             const existingMatch = notificationsRef.current.find((n) => isSameOrderEvent(n, notif));
+            const prevIntrinsicStage = existingMatch ? getNotificationIntrinsicStage(existingMatch) : null;
+            const incomingStage = getOrderNotificationStage(notif);
             const isSameStageEcho = Boolean(
               existingMatch &&
-              getOrderNotificationStage(existingMatch) === getOrderNotificationStage(notif) &&
+              prevIntrinsicStage === incomingStage &&
               Math.abs(Date.now() - (existingMatch.timestamp || 0)) < 8000
             );
 
-            if (!existingMatch || getOrderNotificationStage(existingMatch) !== getOrderNotificationStage(notif)) {
+            if (!existingMatch || prevIntrinsicStage !== incomingStage) {
               undismissOrderForProfile(notif);
+              markNotificationUnreadForProfile(notif);
             }
 
             setNotifications((prev) => {
@@ -1746,15 +1932,17 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     }
 
     const existingMatch = notificationsRef.current.find((n) => isSameOrderEvent(n, fullNotif));
+    const prevIntrinsicStage = existingMatch ? getNotificationIntrinsicStage(existingMatch) : null;
+    const incomingStage = getOrderNotificationStage(fullNotif);
     const isSameStageEcho = Boolean(
       existingMatch &&
-      getOrderNotificationStage(existingMatch) === getOrderNotificationStage(fullNotif) &&
+      prevIntrinsicStage === incomingStage &&
       Math.abs(timestamp - (existingMatch.timestamp || 0)) < 8000
     );
 
-    if (!existingMatch || getOrderNotificationStage(existingMatch) !== getOrderNotificationStage(fullNotif)) {
-      undismissOrderForProfile(fullNotif);
-    }
+    // Siempre des-ocultar y marcar como NO leída la nueva etapa del pedido (para que quien le dio salida también la vea en azul hasta que la abra)
+    undismissOrderForProfile(fullNotif);
+    markNotificationUnreadForProfile(fullNotif);
 
     // Reciclar notificación del mismo pedido y subirla hasta arriba (posición 0) como notificación principal
     setNotifications((prev) => {
@@ -1791,70 +1979,48 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   }, [activeToast]);
 
   const markAsRead = (id: string) => {
-    setNotifications((prev) => {
-      const target = prev.find((n) => n.id === id);
-      // Si el pedido ya fue entregado o cancelado y el usuario ya vio la notificación, desaparece del perfil
-      if (target && isTerminalOrderNotification(target)) {
-        dismissTerminalOrderForProfile(target);
-        const updated = prev.filter((n) => n.id !== id && !isSameOrderEvent(n, target));
-        persistNotifs(updated);
-        return updated;
-      }
-      const updated = prev.map((n) => (n.id === id ? { ...n, read: true } : n));
-      persistNotifs(updated);
-      return updated;
-    });
+    const target = visibleNotifications.find((n) => n.id === id) || notificationsRef.current.find((n) => n.id === id);
+    if (!target) return;
+    markNotificationReadForProfile(target);
+    // Si el pedido ya fue entregado o cancelado y este perfil ya vio la notificación, desaparece ÚNICAMENTE de este perfil
+    if (isTerminalOrderNotification(target)) {
+      dismissTerminalOrderForProfile(target);
+    }
   };
 
   const markAsUnread = (id: string) => {
-    setNotifications((prev) => {
-      const updated = prev.map((n) => (n.id === id ? { ...n, read: false } : n));
-      persistNotifs(updated);
-      return updated;
-    });
+    const target = visibleNotifications.find((n) => n.id === id) || notificationsRef.current.find((n) => n.id === id);
+    if (!target) return;
+    markNotificationUnreadForProfile(target);
   };
 
   const markAllAsRead = () => {
     playChime();
-    setNotifications((prev) => {
-      const visibleIds = new Set(visibleNotifications.map((n) => n.id));
-      const terminalTargets = prev.filter((n) => visibleIds.has(n.id) && isTerminalOrderNotification(n));
-      terminalTargets.forEach((t) => dismissTerminalOrderForProfile(t));
-
-      const updated = prev
-        .filter((n) => !(visibleIds.has(n.id) && isTerminalOrderNotification(n)))
-        .map((n) => (visibleIds.has(n.id) ? { ...n, read: true } : n));
-      persistNotifs(updated);
-      return updated;
+    visibleNotifications.forEach((n) => {
+      markNotificationReadForProfile(n);
+      if (isTerminalOrderNotification(n)) {
+        dismissTerminalOrderForProfile(n);
+      }
     });
   };
 
   const deleteNotification = (id: string) => {
-    setNotifications((prev) => {
-      const target = prev.find((n) => n.id === id);
-      // Las notificaciones NO pueden ocultarse ni eliminarse, SOLO cuando los pedidos estén entregados o cancelados
-      if (!target || !isTerminalOrderNotification(target)) {
-        return prev;
-      }
-      dismissTerminalOrderForProfile(target);
-      const updated = prev.filter((n) => n.id !== id && !isSameOrderEvent(n, target));
-      persistNotifs(updated);
-      return updated;
-    });
+    const target = visibleNotifications.find((n) => n.id === id) || notificationsRef.current.find((n) => n.id === id);
+    // Las notificaciones NO pueden ocultarse ni eliminarse mientras el pedido esté activo;
+    // cuando el pedido está entregado o cancelado, se oculta de forma independiente para el perfil actual
+    if (!target || !isTerminalOrderNotification(target)) {
+      return;
+    }
+    markNotificationReadForProfile(target);
+    dismissTerminalOrderForProfile(target);
   };
 
   const clearAll = () => {
-    setNotifications((prev) => {
-      // Solo se pueden ocultar/eliminar las notificaciones de pedidos entregados o cancelados
-      const visibleIds = new Set(visibleNotifications.map((n) => n.id));
-      prev.forEach((n) => {
-        if (visibleIds.has(n.id) && isTerminalOrderNotification(n)) {
-          dismissTerminalOrderForProfile(n);
-        }
-      });
-      const updated = prev.filter((n) => !(visibleIds.has(n.id) && isTerminalOrderNotification(n)));
-      persistNotifs(updated);
-      return updated;
+    visibleNotifications.forEach((n) => {
+      if (isTerminalOrderNotification(n)) {
+        markNotificationReadForProfile(n);
+        dismissTerminalOrderForProfile(n);
+      }
     });
   };
 
@@ -1875,12 +2041,8 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
           title: ord.orderNumber,
           highlightText: ord.status,
         };
+        markNotificationReadForProfile(syntheticNotif);
         dismissTerminalOrderForProfile(syntheticNotif);
-        setNotifications((prev) => {
-          const updated = prev.filter((n) => !isSameOrderEvent(n, syntheticNotif));
-          persistNotifs(updated);
-          return updated;
-        });
       }
       setSelectedOrderForDetail(ord);
     } else {
@@ -1891,13 +2053,9 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         order?.status === "entregado" ||
         order?.status === "cancelado";
 
+      markNotificationReadForProfile(notif);
       if (isTerminal) {
         dismissTerminalOrderForProfile(notif);
-        setNotifications((prev) => {
-          const updated = prev.filter((n) => n.id !== notif.id && !isSameOrderEvent(n, notif));
-          persistNotifs(updated);
-          return updated;
-        });
       }
       if (order) {
         setSelectedOrderForDetail(order);
@@ -1992,9 +2150,43 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
             return;
           }
           const nextStatus = o.status === "pendiente" ? "en_horno" : o.status === "en_horno" ? "listo" : "entregado";
-          updateOrderStatus(o.id, nextStatus);
-          const updated = getStoredOrders().find((item) => item.id === o.id);
-          if (updated) setSelectedOrderForDetail(updated);
+          const updated = updateOrderStatus(o.id, nextStatus) || getStoredOrders().find((item) => item.id === o.id);
+          if (updated) {
+            if (updated.status === "entregado") {
+              setSelectedOrderForDetail(null);
+            } else {
+              setSelectedOrderForDetail(updated);
+            }
+            if (updated.status === "listo" || updated.status === "entregado") {
+              const totalNum = Number(updated.total) || 0;
+              const isDelivered = updated.status === "entregado";
+              const isCross = updated.operatingBranchName && updated.branchName && updated.operatingBranchName !== updated.branchName;
+              addNotification({
+                id: `notif-order-status-${updated.id}-${updated.status}`,
+                senderName: isDelivered
+                  ? `📦 Pedido Entregado (${updated.branchName || "Sucursal"})`
+                  : `🎂 Listo en Sucursal (${updated.branchName || "Sucursal"})`,
+                senderAvatar: isDelivered ? "📦" : "🎂",
+                badgeIcon: "pastel",
+                title: isDelivered
+                  ? `Pedido Entregado con Éxito: ${updated.orderNumber}${totalNum ? ` • Total $${totalNum.toFixed(2)}` : ""}`
+                  : `El producto ya está en sucursal: ${updated.orderNumber}${totalNum ? ` • Total $${totalNum.toFixed(2)}` : ""}`,
+                highlightText: `${updated.customerName} • ${isDelivered ? "Entregado al Cliente" : "Listo en Sucursal"}`,
+                description: isDelivered
+                  ? `${updated.description ? `${updated.description}. ` : ""}El pedido ${updated.orderNumber} de "${updated.customerName}" fue entregado satisfactoriamente en ${updated.branchName || "sucursal"}.${isCross ? ` (Originado en: ${updated.operatingBranchName}).` : ""}`
+                  : `${updated.description ? `${updated.description}. ` : ""}El pedido ${updated.orderNumber} de "${updated.customerName}" ya está LISTO en ${updated.branchName || "sucursal"} para entrega.`,
+                category: "pedidos",
+                orderId: updated.id,
+                orderData: updated,
+                branchId: updated.branchId,
+                branchName: updated.branchName,
+                operatingBranchId: updated.operatingBranchId,
+                operatingBranchName: updated.operatingBranchName,
+                actionLabel: isDelivered ? "Ver Pedido Entregado" : "Ver Detalle",
+                actionLink: "/pedidos",
+              });
+            }
+          }
           if (typeof window !== "undefined") {
             window.dispatchEvent(new Event("brito_orders_updated"));
           }
@@ -2004,9 +2196,32 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
             alert("Este pedido pertenece al historial.");
             return;
           }
-          updateOrderStatus(o.id, "entregado");
-          const updated = getStoredOrders().find((item) => item.id === o.id);
-          if (updated) setSelectedOrderForDetail(updated);
+          const updated = updateOrderStatus(o.id, "entregado") || getStoredOrders().find((item) => item.id === o.id);
+          if (updated) {
+            setSelectedOrderForDetail(null);
+            if (updated.status === "entregado") {
+              const totalNum = Number(updated.total) || 0;
+              const isCross = updated.operatingBranchName && updated.branchName && updated.operatingBranchName !== updated.branchName;
+              addNotification({
+                id: `notif-order-status-${updated.id}-entregado`,
+                senderName: `📦 Pedido Entregado (${updated.branchName || "Sucursal"})`,
+                senderAvatar: "📦",
+                badgeIcon: "pastel",
+                title: `Pedido Entregado con Éxito: ${updated.orderNumber}${totalNum ? ` • Total $${totalNum.toFixed(2)}` : ""}`,
+                highlightText: `${updated.customerName} • Entregado al Cliente`,
+                description: `${updated.description ? `${updated.description}. ` : ""}El pedido ${updated.orderNumber} de "${updated.customerName}" fue entregado satisfactoriamente en ${updated.branchName || "sucursal"}.${isCross ? ` (Originado en: ${updated.operatingBranchName}).` : ""}`,
+                category: "pedidos",
+                orderId: updated.id,
+                orderData: updated,
+                branchId: updated.branchId,
+                branchName: updated.branchName,
+                operatingBranchId: updated.operatingBranchId,
+                operatingBranchName: updated.operatingBranchName,
+                actionLabel: "Ver Pedido Entregado",
+                actionLink: "/pedidos",
+              });
+            }
+          }
           if (typeof window !== "undefined") {
             window.dispatchEvent(new Event("brito_orders_updated"));
           }
@@ -2030,8 +2245,32 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
           if (confirm(confirmMsg)) {
             if (isCancelled) {
               deleteCustomOrder(o.id);
+              setNotifications((prev) => {
+                const updatedNotifs = prev.filter((n) => !isSameOrderEvent(n, { orderId: o.id, title: o.orderNumber }));
+                persistNotifs(updatedNotifs);
+                return updatedNotifs;
+              });
             } else {
-              updateOrderStatus(o.id, "cancelado");
+              const updated = updateOrderStatus(o.id, "cancelado") || { ...o, status: "cancelado" as const };
+              const totalNum = Number(updated.total) || 0;
+              addNotification({
+                id: `notif-order-status-${updated.id}-cancelado`,
+                senderName: `🗑️ Pedido Cancelado (${updated.branchName || "Sucursal"})`,
+                senderAvatar: "🗑️",
+                badgeIcon: "pastel",
+                title: `Pedido Cancelado / Dado de Baja: ${updated.orderNumber}${totalNum ? ` • Total $${totalNum.toFixed(2)}` : ""}`,
+                highlightText: `${updated.customerName} • Dado de Baja`,
+                description: `${updated.description ? `${updated.description}. ` : ""}El pedido ${updated.orderNumber} de "${updated.customerName}" fue dado de baja.`,
+                category: "pedidos",
+                orderId: updated.id,
+                orderData: updated,
+                branchId: updated.branchId,
+                branchName: updated.branchName,
+                operatingBranchId: updated.operatingBranchId,
+                operatingBranchName: updated.operatingBranchName,
+                actionLabel: "Ver Pedido Cancelado",
+                actionLink: "/pedidos",
+              });
             }
             setSelectedOrderForDetail(null);
             if (typeof window !== "undefined") {
@@ -2055,7 +2294,13 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
           }
           if (selectedOrderForDetail) {
             const updated = getStoredOrders().find((o) => o.id === selectedOrderForDetail.id);
-            if (updated) setSelectedOrderForDetail(updated);
+            if (updated) {
+              if (updated.status === "entregado") {
+                setSelectedOrderForDetail(null);
+              } else {
+                setSelectedOrderForDetail(updated);
+              }
+            }
           }
         }}
       />

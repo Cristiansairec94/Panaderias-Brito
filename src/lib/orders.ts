@@ -1344,21 +1344,34 @@ export function addOrderPayment(
   }
 
   if (typeof window !== "undefined" && realtimeHub?.broadcastNotification) {
+    const isDelivered = order.status === "entregado";
     const isPaid = order.remainingBalance === 0 || order.paymentStatus === "liquidado";
     const originName = order.operatingBranchName || "Sucursal";
     const destName = order.branchName || "Sucursal";
     const isCross = originName.toLowerCase().trim() !== destName.toLowerCase().trim();
+    const totalNum = Number(order.total) || 0;
+    const baseItemsDesc = order.description ? `${order.description}. ` : "";
 
     realtimeHub.broadcastNotification({
-      id: `notif-order-pay-${order.id}-${paymentAmount}`,
-      senderName: isPaid ? `🎂 Pedido Liquidado (${destName})` : `💰 Abono Recibido (${destName})`,
-      senderAvatar: isPaid ? "🎂" : "💰",
+      id: isDelivered ? `notif-order-status-${order.id}-entregado` : `notif-order-pay-${order.id}-${paymentAmount}`,
+      senderName: isDelivered
+        ? `📦 Pedido Entregado (${destName})`
+        : isPaid
+        ? `🎂 Pedido Liquidado (${destName})`
+        : `💰 Abono Recibido (${destName})`,
+      senderAvatar: isDelivered ? "📦" : isPaid ? "🎂" : "💰",
       badgeIcon: "pastel",
-      title: isPaid
+      title: isDelivered
+        ? `Pedido Entregado con Éxito: ${order.orderNumber}${totalNum ? ` • Total $${totalNum.toFixed(2)}` : ""}`
+        : isPaid
         ? `Pedido Liquidado ${order.orderNumber}: $${paymentAmount.toFixed(2)}`
         : `Abono de Pedido ${order.orderNumber}: $${paymentAmount.toFixed(2)}`,
-      highlightText: `${order.customerName} - ${isPaid ? "100% Pagado" : `Resta: $${(order.remainingBalance || 0).toFixed(2)}`}`,
-      description: isCross
+      highlightText: isDelivered
+        ? `${order.customerName} • Entregado al Cliente`
+        : `${order.customerName} - ${isPaid ? "100% Pagado" : `Resta: $${(order.remainingBalance || 0).toFixed(2)}`}`,
+      description: isDelivered
+        ? `${baseItemsDesc}El pedido ${order.orderNumber} de "${order.customerName}" fue entregado satisfactoriamente en ${destName}.${isCross ? ` (Originado en: ${originName}).` : ""}`
+        : isCross
         ? `Se registró pago de $${paymentAmount.toFixed(2)} en ${destName}. Pedido originado en ${originName}. ${isPaid ? "Listo para entrega final." : `Saldo restante: $${(order.remainingBalance || 0).toFixed(2)}.`}`
         : `Se registró pago de $${paymentAmount.toFixed(2)}. Pedido: ${order.description}. ${isPaid ? "Listo para entrega final." : `Saldo restante: $${(order.remainingBalance || 0).toFixed(2)}.`}`,
       timeAgo: formatNotificationHour(Date.now()),
@@ -1371,7 +1384,11 @@ export function addOrderPayment(
       branchName: order.branchName,
       operatingBranchId: order.operatingBranchId,
       operatingBranchName: order.operatingBranchName,
-      actionLabel: (order.remainingBalance || 0) > 0 ? `Cobrar $${(order.remainingBalance || 0).toFixed(2)}` : "Ver Detalle",
+      actionLabel: isDelivered
+        ? "Ver Pedido Entregado"
+        : (order.remainingBalance || 0) > 0
+        ? `Cobrar $${(order.remainingBalance || 0).toFixed(2)}`
+        : "Ver Detalle",
       actionLink: "/pedidos",
       orderData: order,
     });
