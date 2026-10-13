@@ -481,6 +481,18 @@ const INITIAL_FB_NOTIFICATIONS: FBNotification[] = [];
 
 export function findOrderForNotification(notif: FBNotification): CustomOrder | null {
   try {
+    // 0. Si la notificación ya contiene el pedido estructurado
+    if (notif.orderData) {
+      const allOrders = getStoredOrders();
+      const exists = allOrders.some(
+        (o) => o.id === notif.orderData!.id || o.orderNumber === notif.orderData!.orderNumber
+      );
+      if (!exists) {
+        saveStoredOrders([notif.orderData, ...allOrders]);
+      }
+      return notif.orderData;
+    }
+
     const allOrders = getStoredOrders();
 
     // 1. Coincidencia directa por orderId
@@ -512,57 +524,17 @@ export function findOrderForNotification(notif: FBNotification): CustomOrder | n
       if (found) return found;
     }
 
-    // 4. Si no se encontró en almacenamiento local, sintetizar un CustomOrder completo con los datos enriquecidos de la notificación
-    if (notif.category === "pedidos" || notif.title.toLowerCase().includes("pedido")) {
-      const folio = folioMatch ? `PED-${folioMatch[1]}` : "PED-101";
-      const totalMatch = notif.title.match(/Total\s*\$?([\d,]+(\.\d+)?)/i);
-      const depositMatch = notif.highlightText.match(/Anticipo:\s*\$?([\d,]+(\.\d+)?)/i);
-      const balanceMatch = notif.description.match(/Saldo restante:\s*\$?([\d,]+(\.\d+)?)/i);
-
-      const total = totalMatch ? parseFloat(totalMatch[1].replace(/,/g, "")) : 950;
-      const deposit = depositMatch ? parseFloat(depositMatch[1].replace(/,/g, "")) : 500;
-      const balance = balanceMatch ? parseFloat(balanceMatch[1].replace(/,/g, "")) : (total - deposit);
-
-      return {
-        id: folio,
-        orderNumber: folio,
-        customerName: notif.highlightText.split("-")[0]?.trim() || "Sra. María González",
-        phone: "55 1234 5678",
-        branchId: notif.branchId || "branch-matriz",
-        branchName: notif.branchName || notif.senderName.replace(/^[^\(]*\(|\)[^\)]*$/g, "") || "Sucursal Matriz (Centro)",
-        operatingBranchId: notif.operatingBranchId || notif.branchId || "branch-matriz",
-        operatingBranchName: notif.operatingBranchName || notif.branchName || "Sucursal Matriz (Centro)",
-        description: notif.description,
-        deliveryDate: new Date(Date.now() + 86400000).toISOString().split("T")[0],
-        deliveryTime: "16:00",
-        deliveryType: "sucursal",
-        status: "pendiente",
-        total,
-        deposit,
-        remainingBalance: balance,
-        paymentStatus: balance <= 0 ? "liquidado" : "anticipo",
-        paymentMethod: "efectivo",
-        dedication: "¡Mis XV Años Mariana!",
-        notes: notif.description,
-        createdAt: new Date().toISOString(),
-        cashier: "Lupita Brito",
-        items: [
-          {
-            name: "Pastel 3 Leches Artesanal Grande (50 personas)",
-            quantity: 1,
-            unitPrice: 850,
-            subtotal: 850,
-            notes: "Relleno de duraznos en almíbar y cubierta en crema chantilly lila",
-          },
-          {
-            name: "Pay de Queso con Zarzamora",
-            quantity: 1,
-            unitPrice: 100,
-            subtotal: 100,
-            notes: "Para mesa de postres",
-          },
-        ],
-      };
+    // 4. Si no se encontró en almacenamiento local, reconstruir usando el extractor centralizado
+    // y guardarlo de inmediato en almacenamiento local para vincularlo 100% con el historial
+    const reconstructed = extractOrderFromNotification(notif);
+    if (reconstructed) {
+      const exists = allOrders.some(
+        (o) => o.id === reconstructed.id || o.orderNumber === reconstructed.orderNumber
+      );
+      if (!exists) {
+        saveStoredOrders([reconstructed, ...allOrders]);
+      }
+      return reconstructed;
     }
   } catch (e) {
     console.error("Error finding order for notification:", e);
@@ -1073,6 +1045,28 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         ...incomingNotif,
         timestamp: notifTs > 0 ? notifTs : Date.now(),
       };
+
+      // Vincular 100% de inmediato con el almacenamiento de pedidos
+      if (remoteNotif.orderData) {
+        const stored = getStoredOrders();
+        const exists = stored.some((o) => o.id === remoteNotif.orderData!.id || o.orderNumber === remoteNotif.orderData!.orderNumber);
+        if (!exists) {
+          saveStoredOrders([remoteNotif.orderData, ...stored]);
+        }
+      } else if (remoteNotif.category === "pedidos" || remoteNotif.orderId || (remoteNotif.title && remoteNotif.title.toLowerCase().includes("ped-"))) {
+        const stored = getStoredOrders();
+        const exists = stored.some(
+          (o) =>
+            (remoteNotif.orderId && (o.id === remoteNotif.orderId || o.orderNumber === remoteNotif.orderId)) ||
+            (remoteNotif.title && o.orderNumber && remoteNotif.title.includes(o.orderNumber))
+        );
+        if (!exists) {
+          const recovered = extractOrderFromNotification(remoteNotif);
+          if (recovered) {
+            saveStoredOrders([recovered, ...stored]);
+          }
+        }
+      }
 
       const isDuplicate = notificationsRef.current.some((n) => isSameOrderEvent(n, remoteNotif));
       if (isDuplicate) {
