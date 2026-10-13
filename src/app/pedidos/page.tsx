@@ -51,6 +51,8 @@ import { realtimeHub } from "@/lib/realtime/realtimeHub";
 import { createClient } from "@/lib/supabase/client";
 import {
   getStoredOrders,
+  saveStoredOrders,
+  extractOrderFromNotification,
   syncOrdersWithServer,
   updateOrderStatus,
   deleteCustomOrder,
@@ -104,22 +106,26 @@ export type OrderClassificationKey =
 export default function PedidosPage() {
   const { branches, currentBranch, isAllBranches } = useBranch();
   const { user } = useAuth();
-  const { addNotification } = useNotifications();
+  const { addNotification, notifications } = useNotifications();
 
   // Control de roles y asignación de sucursal:
-  // Administradores: control y visualización total multi-sucursal ("all" y cualquier tienda)
+  // Administradores: control y visualización total multi-sucursal ("all" y cualquier tienda sin excepciones)
   // Perfiles de sucursal: estrictamente los pedidos de su sucursal asignada
   const isAdmin = Boolean(
-    user && (
-      user.role === "admin" ||
-      user.role === "auxiliar_admin" ||
-      user.id === "usr-1" ||
-      user.id === "usr-2" ||
-      user.username === "admin" ||
-      user.username === "paulina" ||
-      (user.name && user.name.toLowerCase().includes("paulina")) ||
-      (user.name && (user.name.toLowerCase().includes("toño") || user.name.toLowerCase().includes("tono")))
-    )
+    !user || // Asumir vista de administrador por defecto si aún no carga o sin usuario específico
+    user.role === "admin" ||
+    user.role === "administrador" ||
+    user.role === "auxiliar_admin" ||
+    user.role === "auxiliar_administrativo" ||
+    user.role === "dueño" ||
+    user.role === "dueno" ||
+    user.role === "gerente" ||
+    user.id === "usr-1" ||
+    user.id === "usr-2" ||
+    user.username === "admin" ||
+    user.username === "paulina" ||
+    (user.name && user.name.toLowerCase().includes("paulina")) ||
+    (user.name && (user.name.toLowerCase().includes("toño") || user.name.toLowerCase().includes("tono")))
   );
   const canFilterBranches = isAdmin;
   const userBranchId = (
@@ -135,10 +141,11 @@ export default function PedidosPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedBranchFilter, setSelectedBranchFilter] = useState<string>(() => (canFilterBranches ? "all" : userBranchId));
 
-  // Filtro efectivo de sucursal: para personal de sucursal SIEMPRE es su userBranchId
+  // Filtro efectivo de sucursal: para personal de sucursal SIEMPRE es su userBranchId;
+  // para administradores por defecto SIEMPRE es "all" para ver todos los pedidos sin excepciones
   const effectiveBranchFilter = useMemo(() => {
     if (!canFilterBranches) return userBranchId;
-    return selectedBranchFilter || userBranchId || "all";
+    return selectedBranchFilter || "all";
   }, [canFilterBranches, selectedBranchFilter, userBranchId]);
 
   const [classificationFilter, setClassificationFilter] = useState<OrderClassificationKey>("all");
@@ -185,10 +192,47 @@ export default function PedidosPage() {
   const [isHistoryDashboardOpen, setIsHistoryDashboardOpen] = useState(false);
   const [historyDashboardTab, setHistoryDashboardTab] = useState<"todos" | "entregados" | "cancelados">("todos");
 
-  // Cargar pedidos desde almacenamiento local
-  const loadOrders = () => {
-    setOrders(getStoredOrders());
-  };
+  // Cargar pedidos desde almacenamiento local y asegurar vinculación 100% con notificaciones
+  const loadOrders = useCallback(() => {
+    const stored = getStoredOrders();
+    // Vinculación y reconciliación garantizada:
+    // Revisar si existen notificaciones de pedidos en el contexto o localStorage que falten en la lista
+    try {
+      const currentOrders = [...stored];
+      let hasChanges = false;
+      const notifsToCheck = Array.isArray(notifications) && notifications.length > 0 ? notifications : [];
+      for (const notif of notifsToCheck) {
+        const isPedido =
+          notif.category === "pedidos" ||
+          Boolean(notif.orderId) ||
+          (notif.title && notif.title.toLowerCase().includes("ped-")) ||
+          (notif.title && notif.title.toLowerCase().includes("pedido"));
+
+        if (isPedido) {
+          const alreadyExists = currentOrders.some(
+            (o) =>
+              (notif.orderId && (o.id === notif.orderId || o.orderNumber === notif.orderId)) ||
+              (notif.title && o.orderNumber && notif.title.includes(o.orderNumber))
+          );
+          if (!alreadyExists) {
+            const recovered = extractOrderFromNotification(notif);
+            if (recovered && !currentOrders.some((o) => o.id === recovered.id || o.orderNumber === recovered.orderNumber)) {
+              currentOrders.unshift(recovered);
+              hasChanges = true;
+            }
+          }
+        }
+      }
+      if (hasChanges) {
+        saveStoredOrders(currentOrders);
+        setOrders(currentOrders);
+        return;
+      }
+    } catch (e) {
+      console.warn("Error en reconciliación loadOrders:", e);
+    }
+    setOrders(stored);
+  }, [notifications]);
 
   // Cerrar modal de confirmación de "Listo en sucursal" con tecla Escape o Enter
   useEffect(() => {
@@ -278,31 +322,16 @@ export default function PedidosPage() {
   }, []);
 
   // Sincronización de sucursal:
-  // Para administradores se sincroniza con la cabecera ("all" o tienda individual);
-  // para cajeros por defecto inicia en su tienda asignada, pero permitiéndoles seleccionar "all" u otra tienda si lo desean.
-  const hasInitializedBranchRef = useRef(false);
+  // Para perfiles de administrador: deben ver todos los pedidos que levanten todas las sucursales sin excepciones ("all").
+  // Si el usuario explícitamente elige una tienda en el selector interno de pedidos, se respeta;
+  // pero jamás se sobreescribe automáticamente forzando a una sola tienda individual.
+  // Para cajeros y perfiles operativos: anclados a su sucursal asignada.
   useEffect(() => {
     if (!canFilterBranches) {
       setSelectedBranchFilter(userBranchId);
       return;
     }
-    if (!hasInitializedBranchRef.current) {
-      hasInitializedBranchRef.current = true;
-      if (isAllBranches) {
-        setSelectedBranchFilter("all");
-      } else if (currentBranch && currentBranch.id) {
-        setSelectedBranchFilter(currentBranch.id);
-      }
-      return;
-    }
-    if (canFilterBranches) {
-      if (isAllBranches) {
-        setSelectedBranchFilter("all");
-      } else if (currentBranch && currentBranch.id) {
-        setSelectedBranchFilter(currentBranch.id);
-      }
-    }
-  }, [canFilterBranches, userBranchId, isAllBranches, currentBranch?.id]);
+  }, [canFilterBranches, userBranchId]);
 
   // Local minute clock (for checking if delivery time has passed today)
   const [currentMinutes, setCurrentMinutes] = useState<number>(() => {
