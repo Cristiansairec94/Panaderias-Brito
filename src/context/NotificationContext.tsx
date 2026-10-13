@@ -1106,6 +1106,22 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
           if (!order) return;
           const orderTs = order.timestamp || (order.createdAt ? new Date(order.createdAt).getTime() : 0);
           if (orderTs > 0 && orderTs < CLEAN_SLATE_EPOCH) return;
+
+          // Sincronizar y vincular 100% el pedido en el historial del almacenamiento local
+          try {
+            const stored = getStoredOrders();
+            const existingIdx = stored.findIndex((o) => o.id === order.id || o.orderNumber === order.orderNumber);
+            if (existingIdx === -1) {
+              saveStoredOrders([order, ...stored]);
+            } else {
+              const updated = [...stored];
+              updated[existingIdx] = { ...updated[existingIdx], ...order };
+              saveStoredOrders(updated);
+            }
+          } catch (storageErr) {
+            console.warn("Error actualizando pedido desde realtimeHub.onOrder:", storageErr);
+          }
+
           if (action === "create") {
             const notifId = `notif-order-${order.id}`;
             if (
@@ -1146,6 +1162,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
               read: false,
               category: "pedidos",
               orderId: order.id,
+              orderData: order,
               branchId: order.branchId,
               branchName: order.branchName,
               operatingBranchId: order.operatingBranchId,
@@ -1202,6 +1219,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
               read: false,
               category: "pedidos",
               orderId: order.id,
+              orderData: order,
               branchId: order.branchId,
               branchName: order.branchName,
               operatingBranchId: order.operatingBranchId,
@@ -1273,6 +1291,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
               read: false,
               category: "pedidos",
               orderId: order.id,
+              orderData: order,
               branchId: order.branchId,
               branchName: order.branchName,
               operatingBranchId: order.operatingBranchId,
@@ -1382,6 +1401,28 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       ...notif,
       timestamp,
     };
+
+    // Vincular 100% de inmediato con el almacenamiento de pedidos
+    if (fullNotif.orderData) {
+      const stored = getStoredOrders();
+      const exists = stored.some((o) => o.id === fullNotif.orderData!.id || o.orderNumber === fullNotif.orderData!.orderNumber);
+      if (!exists) {
+        saveStoredOrders([fullNotif.orderData, ...stored]);
+      }
+    } else if (fullNotif.category === "pedidos" || fullNotif.orderId || (fullNotif.title && fullNotif.title.toLowerCase().includes("ped-"))) {
+      const stored = getStoredOrders();
+      const exists = stored.some(
+        (o) =>
+          (fullNotif.orderId && (o.id === fullNotif.orderId || o.orderNumber === fullNotif.orderId)) ||
+          (fullNotif.title && o.orderNumber && fullNotif.title.includes(o.orderNumber))
+      );
+      if (!exists) {
+        const recovered = extractOrderFromNotification(fullNotif);
+        if (recovered) {
+          saveStoredOrders([recovered, ...stored]);
+        }
+      }
+    }
 
     const isDuplicate = notificationsRef.current.some((n) => isSameOrderEvent(n, fullNotif));
     if (isDuplicate) {
