@@ -2,9 +2,52 @@ import { NextRequest, NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
 import { CustomOrder } from "@/types";
-import { INITIAL_ORDERS, normalizeOrder } from "@/lib/orders";
+import { INITIAL_ORDERS, normalizeOrder, ORDER_STATUS_RANK, orderToSupabasePayload } from "@/lib/orders";
 import { recordServerRealtimeEvent } from "@/lib/realtime/serverEvents";
 import { CLEAN_SLATE_EPOCH } from "@/lib/wipeOperationalData";
+
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://yaxqevvvoluaqanspqqf.supabase.co";
+const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "sb_publishable_3XTqXPSLsMF6xJ-x2VBCZg_mM9FvVgw";
+
+function pickMoreAdvancedOrder(a: CustomOrder, b: CustomOrder): CustomOrder {
+  const rankA = ORDER_STATUS_RANK[a.status] ?? 0;
+  const rankB = ORDER_STATUS_RANK[b.status] ?? 0;
+  if (rankA !== rankB) {
+    return rankA > rankB ? a : b;
+  }
+  const depA = Number(a.deposit) || 0;
+  const depB = Number(b.deposit) || 0;
+  if (depA !== depB) {
+    return depA > depB ? a : b;
+  }
+  const payA = Array.isArray(a.payments) ? a.payments.length : 0;
+  const payB = Array.isArray(b.payments) ? b.payments.length : 0;
+  if (payA !== payB) {
+    return payA > payB ? a : b;
+  }
+  const tsA = a.timestamp || (a.createdAt ? new Date(a.createdAt).getTime() : 0);
+  const tsB = b.timestamp || (b.createdAt ? new Date(b.createdAt).getTime() : 0);
+  return tsB >= tsA ? { ...a, ...b } : { ...b, ...a };
+}
+
+async function upsertOrderToSupabaseRest(order: CustomOrder): Promise<void> {
+  try {
+    const payload = orderToSupabasePayload(order);
+    await fetch(`${SUPABASE_URL}/rest/v1/custom_orders?on_conflict=id`, {
+      method: "POST",
+      headers: {
+        apikey: SUPABASE_KEY,
+        Authorization: `Bearer ${SUPABASE_KEY}`,
+        "Content-Type": "application/json",
+        Prefer: "resolution=merge-duplicates",
+      },
+      body: JSON.stringify(payload),
+      cache: "no-store",
+    });
+  } catch (err) {
+    console.warn("[API Orders] No se pudo sincronizar pedido a Supabase:", err);
+  }
+}
 
 // Ruta al archivo de almacenamiento persistente en el servidor
 const DATA_DIR = path.join(process.cwd(), "src", "data");
@@ -32,10 +75,6 @@ function ensureDataDirectory() {
 }
 
 function readStoredOrders(): CustomOrder[] {
-  if (inMemoryOrdersCache !== null) {
-    return inMemoryOrdersCache;
-  }
-
   try {
     ensureDataDirectory();
     if (fs.existsSync(ORDERS_FILE)) {
@@ -54,6 +93,10 @@ function readStoredOrders(): CustomOrder[] {
     }
   } catch (err) {
     console.warn("[API Orders] Error al leer orders.json, usando memoria:", err);
+  }
+
+  if (inMemoryOrdersCache !== null) {
+    return inMemoryOrdersCache;
   }
 
   inMemoryOrdersCache = [];
@@ -87,33 +130,47 @@ export async function GET(req: NextRequest) {
   try {
     let orders = readStoredOrders();
 
-    if (orders.length === 0) {
-      try {
-        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://yaxqevvvoluaqanspqqf.supabase.co";
-        const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "sb_publishable_3XTqXPSLsMF6xJ-x2VBCZg_mM9FvVgw";
-        const res = await fetch(`${supabaseUrl}/rest/v1/custom_orders?select=*&order=created_at.desc`, {
-          headers: {
-            apikey: supabaseKey,
-            Authorization: `Bearer ${supabaseKey}`,
-          },
-          cache: "no-store",
-        });
+    try {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/custom_orders?select=*&order=created_at.desc`, {
+        headers: {
+          apikey: SUPABASE_KEY,
+          Authorization: `Bearer ${SUPABASE_KEY}`,
+        },
+        cache: "no-store",
+      });
 
-        if (res.ok) {
-          const data = await res.json();
-          if (Array.isArray(data) && data.length > 0) {
-            orders = data
-              .filter((o: any) => {
-                const ts = o.timestamp ? Number(o.timestamp) : new Date(o.created_at || o.createdAt).getTime();
-                return ts >= CLEAN_SLATE_EPOCH;
-              })
-              .map(normalizeOrder);
-            writeStoredOrders(orders);
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data) && data.length > 0) {
+          const dbOrders = data
+            .filter((o: any) => {
+              const ts = o.timestamp ? Number(o.timestamp) : new Date(o.created_at || o.createdAt).getTime();
+              return ts >= CLEAN_SLATE_EPOCH;
+            })
+            .map(normalizeOrder);
+          const mergedMap = new Map<string, CustomOrder>();
+          for (const ord of dbOrders) {
+            const key = ord.orderNumber || ord.id;
+            if (key) mergedMap.set(key, ord);
           }
+          for (const fileOrd of orders) {
+            const key = fileOrd.orderNumber || fileOrd.id;
+            if (!key) continue;
+            if (mergedMap.has(key)) {
+              const dbOrd = mergedMap.get(key)!;
+              const best = pickMoreAdvancedOrder(dbOrd, fileOrd);
+              mergedMap.set(key, best);
+              if (best.status !== dbOrd.status || best.deposit !== dbOrd.deposit) {
+                upsertOrderToSupabaseRest(best);
+              }
+            }
+          }
+          orders = Array.from(mergedMap.values());
+          writeStoredOrders(orders);
         }
-      } catch (dbErr) {
-        console.warn("[API Orders GET] Error al cargar desde Supabase:", dbErr);
       }
+    } catch (dbErr) {
+      console.warn("[API Orders GET] Error al cargar desde Supabase:", dbErr);
     }
 
     return NextResponse.json({
@@ -162,13 +219,9 @@ export async function POST(req: NextRequest) {
         if (!key) continue;
 
         if (ordersMap.has(key)) {
-          // Si ya existe, nos quedamos con el que tenga mayor timestamp o actualizamos campos
+          // Si ya existe, preservar siempre el estado más avanzado (ej. entregado > listo > pendiente) y mayor abono
           const existing = ordersMap.get(key)!;
-          const existingTs = existing.timestamp || (existing.createdAt ? new Date(existing.createdAt).getTime() : 0);
-
-          if (incomingTs >= existingTs) {
-            ordersMap.set(key, { ...existing, ...ord });
-          }
+          ordersMap.set(key, pickMoreAdvancedOrder(existing, ord));
         } else {
           ordersMap.set(key, ord);
 
@@ -220,6 +273,7 @@ export async function POST(req: NextRequest) {
       if (key) {
         ordersMap.set(key, ord);
       }
+      await upsertOrderToSupabaseRest(ord);
 
       // Propagar evento en tiempo real en el servidor para que todos los dispositivos y sucursales lo sincronicen
       try {
@@ -320,10 +374,11 @@ export async function PUT(req: NextRequest) {
     currentOrders[idx] = {
       ...currentOrders[idx],
       ...updates,
-      timestamp: Date.now(),
+      timestamp: updates.timestamp || Date.now(),
     };
 
     writeStoredOrders(currentOrders);
+    await upsertOrderToSupabaseRest(currentOrders[idx]);
 
     try {
       const updatedOrder = currentOrders[idx];

@@ -23,6 +23,31 @@ export const CANONICAL_BRANCH_NAMES: Record<string, string> = {
   "branch-1790889237862": "Sucursal San Ildefonso",
 };
 
+const RECENT_LOCAL_MUTATIONS = new Map<string, number>();
+
+export function markOrderLocalMutation(order: Partial<CustomOrder> | null | undefined, ts: number = Date.now()) {
+  if (!order) return;
+  if (order.id) RECENT_LOCAL_MUTATIONS.set(order.id, ts);
+  if (order.orderNumber) RECENT_LOCAL_MUTATIONS.set(order.orderNumber, ts);
+}
+
+export function hasRecentOrderLocalMutation(order: Partial<CustomOrder> | null | undefined, windowMs: number = 20000): boolean {
+  if (!order) return false;
+  const now = Date.now();
+  const tsId = order.id ? RECENT_LOCAL_MUTATIONS.get(order.id) : undefined;
+  const tsNum = order.orderNumber ? RECENT_LOCAL_MUTATIONS.get(order.orderNumber) : undefined;
+  const ts = Math.max(tsId || 0, tsNum || 0);
+  return ts > 0 && now - ts <= windowMs;
+}
+
+export const ORDER_STATUS_RANK: Record<string, number> = {
+  pendiente: 0,
+  en_horno: 1,
+  listo: 2,
+  entregado: 3,
+  cancelado: 4,
+};
+
 export function orderToSupabasePayload(order: CustomOrder): any {
   // Destination/Pickup branch: where the customer picks up or receives the order
   const effPickupBranchId = resolveBranchId(order.branchId, undefined) || "branch-matriz";
@@ -53,13 +78,16 @@ export function orderToSupabasePayload(order: CustomOrder): any {
     order.branchName ||
     "Sucursal Matriz (Centro)";
 
-  // Embed origin branch in notes metadata so it is NEVER lost when storing in Supabase
-  let finalNotes = (order.notes || "").trim();
+  // Embed origin branch and exact updated_at millisecond timestamp in notes metadata
+  // so Supabase never loses modification timestamps across browser tabs
+  let finalNotes = (order.notes || "").replace(/\[TS:[^\]]+\]/g, "").trim();
   if (effOperatingBranchId) {
     if (!finalNotes.includes("[Origen:")) {
       finalNotes = `[Origen: ${effOperatingBranchId}|${effOperatingBranchName}] ${finalNotes}`.trim();
     }
   }
+  const effectiveTs = order.timestamp ? Number(order.timestamp) : Date.now();
+  finalNotes = `[TS: ${effectiveTs}] ${finalNotes}`.trim();
 
   return {
     id: order.id || order.orderNumber,
@@ -105,7 +133,10 @@ export function extractOrderOriginAndNotes(order?: Partial<CustomOrder> | { note
 
   const rawNotes = order.notes || "";
   const match = rawNotes.match(/\[Origen:\s*([^\|\]]+)(?:\|([^\]]+))?\]/);
-  const cleanNotes = rawNotes.replace(/\[Origen:[^\]]+\]/g, "").trim();
+  const cleanNotes = rawNotes
+    .replace(/\[Origen:[^\]]+\]/g, "")
+    .replace(/\[TS:[^\]]+\]/g, "")
+    .trim();
 
   const originId = order.operatingBranchId || (match ? match[1].trim() : undefined) || order.branchId;
   const rawOriginName = order.operatingBranchName || (match && match[2] ? match[2].trim() : undefined) || order.branchName || "Sucursal Matriz (Centro)";
@@ -132,7 +163,16 @@ export async function persistOrderToSupabase(order: CustomOrder): Promise<void> 
   try {
     const supabase = createClient();
     const payload = orderToSupabasePayload(order);
-    const { error } = await supabase.from("custom_orders").upsert(payload, { onConflict: "id" });
+    let { error } = await supabase.from("custom_orders").upsert(payload, { onConflict: "id" });
+    if (error) {
+      // Si falla por FK de customer_id local o colisión de order_number previo, limpiar y reintentar
+      const safePayload = { ...payload, customer_id: null };
+      if (payload.order_number) {
+        await supabase.from("custom_orders").delete().eq("order_number", payload.order_number).neq("id", payload.id);
+      }
+      const retry = await supabase.from("custom_orders").upsert(safePayload, { onConflict: "id" });
+      error = retry.error;
+    }
     if (error) {
       console.warn("[OrdersSupabase] Error al guardar pedido en Supabase:", error);
     } else {
@@ -193,6 +233,8 @@ export function normalizeOrder(order: any): CustomOrder {
   const phone = order.phone || "N/A";
 
   const rawNotes = order.notes || "";
+  const tsMatch = rawNotes.match(/\[TS:\s*(\d+)\]/);
+  const tsFromNotes = tsMatch ? Number(tsMatch[1]) : 0;
   const originMatch = rawNotes.match(/\[Origen:\s*([^\|\]]+)(?:\|([^\]]+))?\]/);
   const originBranchId = originMatch ? originMatch[1].trim() : undefined;
   const originBranchName = originMatch && originMatch[2] ? originMatch[2].trim() : undefined;
@@ -218,8 +260,8 @@ export function normalizeOrder(order: any): CustomOrder {
     }
   }
 
-  // Ensure origin metadata is stamped in notes if operating branch differs from pickup
-  let notes = rawNotes;
+  // Ensure origin metadata is stamped in notes if operating branch differs from pickup, and strip internal [TS: ...]
+  let notes = rawNotes.replace(/\[TS:[^\]]+\]/g, "").trim();
   if (operatingBranchId && operatingBranchId !== branchId && !notes.includes("[Origen:")) {
     notes = `[Origen: ${operatingBranchId}|${operatingBranchName}] ${notes}`.trim();
   }
@@ -236,7 +278,9 @@ export function normalizeOrder(order: any): CustomOrder {
 
   const rawCreated = order.createdAt || order.created_at || new Date().toISOString();
   const createdAt = typeof rawCreated === "string" ? rawCreated : new Date(rawCreated).toISOString();
-  const timestamp = order.timestamp ? Number(order.timestamp) : parseDateTimeSafe(createdAt) || Date.now();
+  const createdTs = parseDateTimeSafe(createdAt) || Date.now();
+  const explicitTs = order.timestamp ? Number(order.timestamp) : 0;
+  const timestamp = Math.max(explicitTs, tsFromNotes, createdTs);
 
   const shiftName = order.shiftName || order.shift_name || undefined;
 
@@ -365,8 +409,6 @@ export function extractOrderFromNotification(notif: any): CustomOrder | null {
     }
 
     // Rutas y sucursales (Origen y Destino/Recogida)
-    // Ej: "🎂 Sucursal San Juan ➔ Sucursal San Ildefonso"
-    // Ej: "[Levantado en: Sucursal San Juan • Entrega en: Sucursal San Ildefonso]"
     const routeMatch = fullText.match(/(?:🎂\s*)?([^\➔\-]+)\s*[➔\-]\s*([^\]\.\,\(]+)/);
     const originMatch = fullText.match(/Levantado en:\s*([^•\]]+)/i);
     const destMatch = fullText.match(/(?:Entrega en|Recoge en):\s*([^\]\.\,]+)/i);
@@ -454,6 +496,54 @@ export function extractOrderFromNotification(notif: any): CustomOrder | null {
   }
 }
 
+export function reconcileOrderPair(
+  serverOrd: CustomOrder,
+  localOrd: CustomOrder,
+  isLocallyMutated: boolean
+): { winner: CustomOrder; shouldPushLocal: boolean } {
+  const serverRank = ORDER_STATUS_RANK[serverOrd.status] ?? 0;
+  const localRank = ORDER_STATUS_RANK[localOrd.status] ?? 0;
+  const serverDeposit = Number(serverOrd.deposit) || 0;
+  const localDeposit = Number(localOrd.deposit) || 0;
+  const serverPaymentsCount = Array.isArray(serverOrd.payments) ? serverOrd.payments.length : 0;
+  const localPaymentsCount = Array.isArray(localOrd.payments) ? localOrd.payments.length : 0;
+  const serverTs = serverOrd.timestamp || parseDateTimeSafe(serverOrd.createdAt) || 0;
+  const localTs = localOrd.timestamp || parseDateTimeSafe(localOrd.createdAt) || 0;
+
+  // 1. Si esta pestaña acaba de modificar este pedido recientemente, prevalece el cambio local
+  if (isLocallyMutated && localTs >= serverTs) {
+    const localDiffers =
+      localOrd.status !== serverOrd.status ||
+      localDeposit !== serverDeposit ||
+      localPaymentsCount !== serverPaymentsCount ||
+      localOrd.remainingBalance !== serverOrd.remainingBalance;
+    return { winner: localOrd, shouldPushLocal: localDiffers };
+  }
+
+  // 2. Protección estricta contra regresión de estado:
+  // Una pestaña pasiva jamás debe revertir un pedido "entregado", "cancelado" o "listo" a "pendiente"
+  if (serverRank > localRank) {
+    return { winner: serverOrd, shouldPushLocal: false };
+  }
+  if (localRank > serverRank) {
+    return { winner: localOrd, shouldPushLocal: true };
+  }
+
+  // 3. Protección estricta contra pérdida de abonos o liquidación
+  if (serverDeposit > localDeposit || serverPaymentsCount > localPaymentsCount) {
+    return { winner: serverOrd, shouldPushLocal: false };
+  }
+  if (localDeposit > serverDeposit || localPaymentsCount > serverPaymentsCount) {
+    return { winner: localOrd, shouldPushLocal: true };
+  }
+
+  // 4. Si ambos tienen el mismo estado y pagos, prevalece el servidor salvo mutación local más reciente
+  if (isLocallyMutated && localTs > serverTs) {
+    return { winner: localOrd, shouldPushLocal: true };
+  }
+  return { winner: serverOrd, shouldPushLocal: false };
+}
+
 export function getStoredOrders(): CustomOrder[] {
   if (typeof window === "undefined") {
     return INITIAL_ORDERS;
@@ -489,15 +579,27 @@ export function getStoredOrders(): CustomOrder[] {
               (n.title && n.title.toLowerCase().includes("pedido"));
 
             if (isPedido) {
-              const alreadyHas = epochFiltered.some(
+              const existingIdx = epochFiltered.findIndex(
                 (o: any) =>
                   (n.orderId && (o.id === n.orderId || o.orderNumber === n.orderId || o.order_number === n.orderId)) ||
                   (n.title && o.orderNumber && n.title.includes(o.orderNumber))
               );
-              if (!alreadyHas) {
-                const recovered = extractOrderFromNotification(n);
+              const recovered = extractOrderFromNotification(n);
+              if (existingIdx === -1) {
                 if (recovered) {
                   epochFiltered.unshift(recovered);
+                  changed = true;
+                }
+              } else if (recovered) {
+                const existingOrd = normalizeOrder(epochFiltered[existingIdx]);
+                const recRank = ORDER_STATUS_RANK[recovered.status] ?? 0;
+                const exRank = ORDER_STATUS_RANK[existingOrd.status] ?? 0;
+                if (recRank > exRank) {
+                  epochFiltered[existingIdx] = {
+                    ...existingOrd,
+                    status: recovered.status,
+                    timestamp: Math.max(existingOrd.timestamp || 0, recovered.timestamp || 0),
+                  };
                   changed = true;
                 }
               }
@@ -542,6 +644,7 @@ export async function syncOrdersWithServer(): Promise<CustomOrder[]> {
   try {
     const localOrders = getStoredOrders();
     let serverOrders: CustomOrder[] = [];
+    let fetchedFromSupabase = false;
 
     // 1. Consultar directamente pedidos maestros en Supabase
     try {
@@ -551,20 +654,23 @@ export async function syncOrdersWithServer(): Promise<CustomOrder[]> {
         .select("*")
         .order("created_at", { ascending: false });
 
-      if (!error && Array.isArray(data) && data.length > 0) {
-        serverOrders = data
-          .filter((o: any) => {
-            const ts = o.timestamp ? Number(o.timestamp) : parseDateTimeSafe(o.created_at);
-            return ts >= CLEAN_SLATE_EPOCH;
-          })
-          .map(normalizeOrder);
+      if (!error && Array.isArray(data)) {
+        fetchedFromSupabase = true;
+        if (data.length > 0) {
+          serverOrders = data
+            .filter((o: any) => {
+              const ts = o.timestamp ? Number(o.timestamp) : parseDateTimeSafe(o.created_at);
+              return ts >= CLEAN_SLATE_EPOCH;
+            })
+            .map(normalizeOrder);
+        }
       }
     } catch (dbErr) {
       console.warn("[OrdersSync] Supabase no disponible temporalmente:", dbErr);
     }
 
     // 2. Si Supabase no devolvió pedidos, consultar /api/orders como fallback
-    if (serverOrders.length === 0) {
+    if (!fetchedFromSupabase && serverOrders.length === 0) {
       try {
         const res = await fetch("/api/orders", { method: "GET" });
         if (res.ok) {
@@ -603,22 +709,23 @@ export async function syncOrdersWithServer(): Promise<CustomOrder[]> {
       if (localTs < CLEAN_SLATE_EPOCH) continue;
 
       const existing = (ord.id && ordersMap.get(ord.id)) || (ord.orderNumber && ordersMap.get(ord.orderNumber));
+      const isLocallyMutated = hasRecentOrderLocalMutation(ord);
 
       if (!existing) {
-        // Pedido creado localmente que no está en el servidor aún
-        if (ord.id) ordersMap.set(ord.id, ord);
-        if (ord.orderNumber) ordersMap.set(ord.orderNumber, ord);
-        hasLocalChangesToPush = true;
-        pendingPushList.push(ord);
-      } else {
-        const serverTs = existing.timestamp || (existing.createdAt ? new Date(existing.createdAt).getTime() : 0);
-
-        if (localTs > serverTs) {
-          // El local es más reciente (por ejemplo se cobró o editó en el dispositivo)
+        // Solo subir si acaba de ser creado localmente o si Supabase no respondió
+        if (!fetchedFromSupabase || isLocallyMutated || Date.now() - localTs <= 60000) {
           if (ord.id) ordersMap.set(ord.id, ord);
           if (ord.orderNumber) ordersMap.set(ord.orderNumber, ord);
           hasLocalChangesToPush = true;
           pendingPushList.push(ord);
+        }
+      } else {
+        const { winner, shouldPushLocal } = reconcileOrderPair(existing, ord, isLocallyMutated);
+        if (winner.id) ordersMap.set(winner.id, winner);
+        if (winner.orderNumber) ordersMap.set(winner.orderNumber, winner);
+        if (shouldPushLocal) {
+          hasLocalChangesToPush = true;
+          pendingPushList.push(winner);
         }
       }
     }
@@ -678,10 +785,12 @@ if (typeof window !== "undefined" && realtimeHub?.onOrder) {
       if (!order) return;
       const current = getStoredOrders();
       if (action === "create") {
+        markOrderLocalMutation(order, order.timestamp || Date.now());
         if (!current.some((o) => o.id === order.id || o.orderNumber === order.orderNumber)) {
           saveStoredOrders([order, ...current]);
         }
       } else if (action === "payment" || action === "status") {
+        markOrderLocalMutation(order, order.timestamp || Date.now());
         const idx = current.findIndex((o) => o.id === order.id || o.orderNumber === order.orderNumber);
         if (idx !== -1) {
           current[idx] = order;
@@ -999,6 +1108,7 @@ export function addCustomOrder(data: {
     payments: payments,
   };
 
+  markOrderLocalMutation(newOrder, newOrder.timestamp);
   saveStoredOrders([newOrder, ...current]);
 
   // Persistir pedido y anticipo directamente en Supabase para sincronización 100% en tiempo real
@@ -1175,6 +1285,7 @@ export function addOrderPayment(
   });
 
   current[idx] = order;
+  markOrderLocalMutation(order, order.timestamp);
   saveStoredOrders(current);
 
   // Persistir actualización de saldo y pagos en Supabase
@@ -1283,12 +1394,14 @@ export function updateOrderStatus(orderId: string, status: CustomOrder["status"]
     return current[idx];
   }
 
+  const nowTs = Date.now();
   current[idx] = {
     ...current[idx],
     status,
-    timestamp: Date.now(),
+    timestamp: nowTs,
   };
 
+  markOrderLocalMutation(current[idx], nowTs);
   saveStoredOrders(current);
 
   // Persistir cambio de estado en Supabase
@@ -1358,9 +1471,11 @@ export function updateCustomOrder(orderId: string, updates: Partial<CustomOrder>
   if (idx === -1) return null;
 
   const existing = current[idx];
+  const nowTs = Date.now();
   const updated: CustomOrder = {
     ...existing,
     ...updates,
+    timestamp: nowTs,
   };
 
   // Recalcular saldos si se modificó total o deposit
@@ -1374,6 +1489,7 @@ export function updateCustomOrder(orderId: string, updates: Partial<CustomOrder>
   }
 
   current[idx] = updated;
+  markOrderLocalMutation(updated, nowTs);
   saveStoredOrders(current);
 
   // Persistir cambios en Supabase
@@ -1384,7 +1500,7 @@ export function updateCustomOrder(orderId: string, updates: Partial<CustomOrder>
     fetch("/api/orders", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ orderId, updates }),
+      body: JSON.stringify({ orderId, updates: { ...updates, timestamp: nowTs } }),
     }).catch(() => {});
     if (realtimeHub?.broadcastOrder) {
       realtimeHub.broadcastOrder("status", updated);

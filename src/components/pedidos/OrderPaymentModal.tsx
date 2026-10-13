@@ -91,7 +91,7 @@ export default function OrderPaymentModal({
     setAmount(nextVal.toString());
   };
 
-  const handleConfirmPayment = () => {
+  const handleConfirmPayment = (forceDeliver?: boolean) => {
     if (numericAmount <= 0) {
       alert("El monto del abono o pago debe ser mayor a $0.");
       return;
@@ -113,7 +113,7 @@ export default function OrderPaymentModal({
       const pickupBranchName = order.branchName || paymentBranchName;
 
       // Delivery is strictly allowed ONLY if the remaining balance is fully covered ($0 remaining)
-      const isDeliveredNow = Boolean(markAsDelivered && isFullPayment);
+      const isDeliveredNow = Boolean((forceDeliver || markAsDelivered) && isFullPayment);
 
       addOrderPayment(order.id, {
         amount: numericAmount,
@@ -548,7 +548,7 @@ export default function OrderPaymentModal({
         </div>
 
         {/* Footer */}
-        <div className="bg-stone-100 border-t border-stone-200 p-4 px-6 flex items-center justify-between gap-3 shrink-0">
+        <div className="bg-stone-100 border-t border-stone-200 p-4 px-6 flex flex-wrap items-center justify-between gap-2.5 shrink-0">
           <button
             type="button"
             onClick={onClose}
@@ -556,25 +556,40 @@ export default function OrderPaymentModal({
           >
             Cancelar
           </button>
-          
-          <button
-            type="button"
-            disabled={isSubmitting || numericAmount <= 0 || numericAmount > order.remainingBalance}
-            onClick={handleConfirmPayment}
-            className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-black text-xs rounded-xl shadow-md transition-all flex items-center gap-2 disabled:opacity-50 cursor-pointer"
-          >
-            <CheckCircle2 className="w-4 h-4" />
-            {isSubmitting
-              ? "Registrando..."
-              : numericAmount <= 0
-              ? "Ingresa un monto"
-              : isFullPayment
-              ? markAsDelivered
-                ? `Liquidar ${formatCurrency(numericAmount)} y Entregar`
-                : `Liquidar Totalmente ${formatCurrency(numericAmount)}`
-              : `Registrar Abono de ${formatCurrency(numericAmount)} (Resta ${formatCurrency(newRemaining)})`
-            }
-          </button>
+
+          <div className="flex items-center gap-2 flex-wrap ml-auto">
+            {isFullPayment && !markAsDelivered && (
+              <button
+                type="button"
+                disabled={isSubmitting || numericAmount <= 0 || numericAmount > order.remainingBalance}
+                onClick={() => handleConfirmPayment(true)}
+                className="px-4 py-2.5 bg-teal-700 hover:bg-teal-800 active:scale-95 text-white font-black text-xs rounded-xl shadow-md transition-all flex items-center gap-1.5 disabled:opacity-50 cursor-pointer ring-2 ring-teal-400/40"
+                title="Liquidar el 100% del saldo y marcar el pedido como ENTREGADO al cliente ahora mismo"
+              >
+                <span>📦</span>
+                <span>{isSubmitting ? "Registrando..." : `Liquidar y Entregar (${formatCurrency(numericAmount)})`}</span>
+              </button>
+            )}
+
+            <button
+              type="button"
+              disabled={isSubmitting || numericAmount <= 0 || numericAmount > order.remainingBalance}
+              onClick={() => handleConfirmPayment(false)}
+              className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-black text-xs rounded-xl shadow-md transition-all flex items-center gap-2 disabled:opacity-50 cursor-pointer"
+            >
+              <CheckCircle2 className="w-4 h-4" />
+              {isSubmitting
+                ? "Registrando..."
+                : numericAmount <= 0
+                ? "Ingresa un monto"
+                : isFullPayment
+                ? markAsDelivered
+                  ? `Liquidar ${formatCurrency(numericAmount)} y Entregar`
+                  : `Solo Liquidar ${formatCurrency(numericAmount)}`
+                : `Registrar Abono de ${formatCurrency(numericAmount)} (Resta ${formatCurrency(newRemaining)})`
+              }
+            </button>
+          </div>
         </div>
       </div>
     </div>
