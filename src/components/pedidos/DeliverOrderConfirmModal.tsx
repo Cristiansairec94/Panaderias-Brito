@@ -87,19 +87,19 @@ export default function DeliverOrderConfirmModal({
         <div className="p-5 sm:p-6 text-center space-y-4 relative z-10">
           
           {/* Animated Center Icon (Bakery Delivery Badge) */}
-          <div className="relative mx-auto w-18 h-18 sm:w-20 sm:h-20 rounded-3xl p-[2px] bg-gradient-to-tr from-amber-500 via-orange-500 to-amber-300 shadow-xl shadow-orange-500/25 flex items-center justify-center group animate-pulse duration-1000">
-            <div className="w-full h-full bg-[#1c0e08] rounded-[22px] flex items-center justify-center text-3xl sm:text-4xl shadow-inner select-none">
+          <div className="relative mx-auto w-20 h-20 rounded-3xl p-[2px] bg-gradient-to-tr from-amber-500 via-orange-500 to-amber-300 shadow-xl shadow-orange-500/30 flex items-center justify-center animate-bounce [animation-duration:2.5s]">
+            <div className="w-full h-full bg-[#1c0e08] rounded-[22px] flex items-center justify-center text-4xl shadow-inner select-none">
               🎂
             </div>
-            <span className="absolute -bottom-1 -right-1 w-7 h-7 bg-emerald-500 border-2 border-[#1c0e08] text-white rounded-full flex items-center justify-center shadow-md">
+            <span className="absolute -bottom-1 -right-1 w-7 h-7 bg-emerald-500 border-2 border-[#1c0e08] text-white rounded-full flex items-center justify-center shadow-md animate-pulse">
               <CheckCircle2 className="w-4 h-4" />
             </span>
           </div>
 
           {/* Bakery Brand Pill */}
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-300 text-[11px] font-black uppercase tracking-wider shadow-xs">
-            <Sparkles className="w-3 h-3 text-amber-400" />
-            <span>Panadería Brito • Entrega en Mostrador</span>
+          <div className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-300 text-[11px] font-black uppercase tracking-wider shadow-xs">
+            <Sparkles className="w-3.5 h-3.5 text-amber-400 animate-spin [animation-duration:4s]" />
+            <span>Panadería Brito • {order.deliveryType === "domicilio" ? "Entrega a Domicilio" : "Entrega en Mostrador"}</span>
           </div>
 
           {/* Main Title & Prompt */}
@@ -108,7 +108,7 @@ export default function DeliverOrderConfirmModal({
               ¿Confirmas entregar este pedido?
             </h3>
             <p className="text-xs text-stone-300 font-medium max-w-xs mx-auto leading-relaxed">
-              Marcarás el pedido como <strong className="text-emerald-400">ENTREGADO</strong> al cliente en mostrador.
+              Marcarás el pedido como <strong className="text-emerald-400">ENTREGADO</strong> {order.deliveryType === "domicilio" ? "al repartidor / domicilio" : "al cliente en mostrador"}.
             </p>
           </div>
 
@@ -159,12 +159,17 @@ export default function DeliverOrderConfirmModal({
           </div>
 
           {/* Safety Reassurance Notice ("como seguro") */}
-          <div className="bg-emerald-950/40 border border-emerald-500/30 rounded-2xl p-2.5 flex items-start gap-2.5 text-left text-[11px] text-emerald-200">
-            <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
-            <div className="space-y-0.5 leading-tight">
-              <p className="font-bold text-emerald-300">Confirmación de Seguridad</p>
-              <p className="text-[10.5px] text-emerald-200/80">
-                El pedido pasará automáticamente al Historial y se notificará la entrega en tiempo real.
+          <div className="bg-gradient-to-r from-emerald-950/60 to-emerald-900/40 border border-emerald-500/35 rounded-2xl p-3 flex items-start gap-2.5 text-left text-xs text-emerald-200 shadow-inner">
+            <div className="p-1 rounded-lg bg-emerald-500/20 text-emerald-300 shrink-0 mt-0.5">
+              <ShieldCheck className="w-4 h-4" />
+            </div>
+            <div className="space-y-0.5 leading-snug">
+              <p className="font-black text-emerald-300 flex items-center gap-1.5 text-xs">
+                <span>Confirmación Segura de Entrega</span>
+                <span className="text-[10px] font-bold px-1.5 py-0.2 bg-emerald-500/20 text-emerald-200 rounded border border-emerald-500/30 uppercase">Sin Saldo Pendiente</span>
+              </p>
+              <p className="text-[11px] text-emerald-200/90">
+                Al confirmar, el pedido pasará automáticamente al Historial de Entregas y se actualizará en tiempo real en todas las sucursales.
               </p>
             </div>
           </div>
