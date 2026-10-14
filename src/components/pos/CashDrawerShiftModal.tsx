@@ -33,7 +33,7 @@ import {
 } from "lucide-react";
 import { Product, Sale, CashExpense, CashIncome, ShiftCutRecord, CustomOrder } from "@/types";
 import { formatCurrency, onlyNumbersKeyDown, cleanDecimalNumbers, formatDateTimeSafe, parseDateTimeSafe, matchesCashier, getStoredShiftStartBoundary, resolveBranchId } from "@/lib/utils";
-import { getStoredOrders, syncOrdersWithServer, normalizeOrder } from "@/lib/orders";
+import { getStoredOrders, syncOrdersWithServer, normalizeOrder, getOrderShiftCollection } from "@/lib/orders";
 import { useNotifications, FBNotification } from "@/context/NotificationContext";
 import { useBranch } from "@/context/BranchContext";
 import { useAuth } from "@/context/AuthContext";
@@ -417,12 +417,15 @@ export default function CashDrawerShiftModal({
 
   if (!isOpen) return null;
 
-  // Límite temporal estricto del turno actual (timestamp en ms con soporte por sucursal)
+  // Límite temporal estricto del turno actual (timestamp en ms con soporte por sucursal, mínimo 00:00:00 de hoy)
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+  const todayStartTs = todayStart.getTime();
   const activeCutTs = parseDateTimeSafe(currentBranch?.lastCut?.timestamp || currentBranch?.lastCut?.date);
-  const validLastCut = (lastCutTimestamp && lastCutTimestamp > 0 && lastCutTimestamp <= Date.now()) 
+  const validLastCut = (lastCutTimestamp && lastCutTimestamp >= todayStartTs && lastCutTimestamp <= Date.now()) 
     ? lastCutTimestamp 
-    : (activeCutTs > 0 && activeCutTs <= Date.now() ? activeCutTs : 0);
-  const shiftStartBoundary = Math.max(validLastCut, getStoredShiftStartBoundary(effectiveBranchId || currentBranch?.id));
+    : (activeCutTs >= todayStartTs && activeCutTs <= Date.now() ? activeCutTs : 0);
+  const shiftStartBoundary = Math.max(todayStartTs, validLastCut, getStoredShiftStartBoundary(effectiveBranchId || currentBranch?.id));
 
   // 1. Cálculos de Ventas del Turno (todas las ventas de mostrador del turno en esta sucursal)
   const shiftSales = (sales || []).filter((s) => {
@@ -463,7 +466,7 @@ export default function CashDrawerShiftModal({
     return Array.from(map.values());
   })();
 
-  // Pedidos especiales del turno (anticipos y liquidaciones de pedidos en efectivo cobrados en esta sucursal)
+  // Pedidos especiales del turno (anticipos y liquidaciones de pedidos cobrados estrictamente en este turno y sucursal)
   const shiftOrders = allOrdersPool.filter((o) => {
     if (!o || o.status === "cancelado") return false;
     const rawNotes = String(o.notes || "");
@@ -483,36 +486,26 @@ export default function CashDrawerShiftModal({
     if (outgoingCashier && o.cashier && !matchesCashier(o.cashier, outgoingCashier) && !belongsToBranchStaff && oBranch !== effectiveBranchId) {
       return false;
     }
-    const oTime = parseDateTimeSafe(o.timestamp || o.createdAt || (o as any).created_at || (o as any).date);
-    if (!oTime || oTime < CLEAN_SLATE_EPOCH) return false;
-    if (shiftStartBoundary > 0) {
-      if (!oTime || oTime < shiftStartBoundary) return false;
-    }
-    if (oTime > Date.now() + 60000) return false;
-    return true;
+    const col = getOrderShiftCollection(o, shiftStartBoundary);
+    return col.isInShift;
   });
 
-  const ordersCash = shiftOrders
-    .filter((o) => (o.paymentMethod === "efectivo" || !o.paymentMethod) && !effectiveSales.some((s) => s.id === o.orderNumber || s.id === o.id))
-    .reduce((sum, o) => sum + (Number(o.deposit) || 0), 0);
+  const ordersCash = shiftOrders.reduce(
+    (sum, o) => sum + getOrderShiftCollection(o, shiftStartBoundary).collectedCash,
+    0
+  );
 
   // Ventas de mostrador y pedidos basadas prioritariamente en la sucursal activa (barra café)
   const targetBranch = (branchId ? branches.find((b) => b.id === branchId) : null) || currentBranch || branches[0];
-  const targetBranchCash = branchCashInDrawer !== undefined && branchCashInDrawer !== null
-    ? Number(branchCashInDrawer)
-    : Number(targetBranch?.cashInDrawer ?? 0);
-
   const branchDeskSales = Number(targetBranch?.todayDeskSales ?? (targetBranch?.todaySales && (targetBranch?.todayOrdersDeposit ?? 0) === 0 ? targetBranch.todaySales : 0));
   const branchOrdersDeposit = Number(targetBranch?.todayOrdersDeposit ?? 0);
-  const branchCashInDrawerVal = targetBranchCash;
 
-  const calculatedPurePosCash = effectiveSales.filter((s) => s.paymentMethod === "efectivo" && !s.isCustomOrder).reduce((sum, s) => sum + s.total, 0);
+  const calculatedPurePosCash = effectiveSales
+    .filter((s) => s.paymentMethod === "efectivo" && !s.isCustomOrder && !String(s.id || "").startsWith("PED-") && !String(s.id || "").startsWith("LIQ-"))
+    .reduce((sum, s) => sum + s.total, 0);
   const rawPurePosCash = branchDeskSales > 0 && calculatedPurePosCash === 0 ? branchDeskSales : calculatedPurePosCash > 0 ? calculatedPurePosCash : branchDeskSales;
 
-  const ordersInSalesCash = effectiveSales.filter((s) => s.paymentMethod === "efectivo" && s.isCustomOrder).reduce((sum, s) => sum + s.total, 0);
-  const calculatedOrdersCash = ordersCash + ordersInSalesCash;
-  const totalOrdersCash = calculatedOrdersCash > 0 ? calculatedOrdersCash : (branchOrdersDeposit > 0 ? branchOrdersDeposit : 0);
-
+  const totalOrdersCash = ordersCash > 0 ? ordersCash : (branchOrdersDeposit > 0 ? branchOrdersDeposit : 0);
   const rawPosCash = rawPurePosCash + totalOrdersCash;
 
   const standardFund = targetBranch?.id === "branch-benito" ? 800 : targetBranch?.id === "branch-flores" ? 1200 : 1000;
@@ -570,28 +563,24 @@ export default function CashDrawerShiftModal({
     })
     .reduce((sum, i) => sum + i.amount, 0);
 
-  // 3. Dinero esperado en caja (Cajón: Fondo Inicial + Ventas Efectivo + Entradas Efectivo - Gastos Efectivo)
+  // 3. Dinero esperado en caja (Cajón: Fondo Inicial + Ventas Efectivo + Pedidos Efectivo + Entradas Efectivo - Gastos Efectivo)
   const rawCalculatedExpectedCash = Math.max(0, effectiveInitialFund + rawPosCash + totalIncomesInCash - totalExpenses);
-  const expectedCashInDrawer = (rawPosCash > 0 || totalIncomesInCash > 0 || totalExpenses > 0)
-    ? Math.max(targetBranchCash, rawCalculatedExpectedCash)
-    : (targetBranchCash > 0 ? targetBranchCash : rawCalculatedExpectedCash);
-
-  const netNonFundCash = Math.max(0, expectedCashInDrawer - effectiveInitialFund - totalIncomesInCash + totalExpenses);
-  const posCash = (rawPosCash > 0 && Math.abs(effectiveInitialFund + rawPosCash + totalIncomesInCash - totalExpenses - expectedCashInDrawer) < 0.01)
-    ? rawPosCash
-    : (cashSalesTotal !== undefined && cashSalesTotal > 0 && Math.abs(effectiveInitialFund + cashSalesTotal + totalIncomesInCash - totalExpenses - expectedCashInDrawer) < 0.01
-        ? cashSalesTotal
-        : netNonFundCash);
-
-  const purePosCash = (rawPurePosCash > 0 && Math.abs(rawPurePosCash + totalOrdersCash - posCash) < 0.01)
-    ? rawPurePosCash
-    : Math.max(0, posCash - totalOrdersCash);
+  const expectedCashInDrawer = rawCalculatedExpectedCash;
+  const posCash = rawPosCash;
+  const purePosCash = rawPurePosCash;
 
   const cashSales = posCash;
-  const cardSales = effectiveSales.filter((s) => s.paymentMethod === "tarjeta").reduce((sum, s) => sum + s.total, 0);
-  const transferSales = effectiveSales.filter((s) => s.paymentMethod === "transferencia").reduce((sum, s) => sum + s.total, 0);
-  const rawTotalSalesAll = effectiveSales.reduce((sum, s) => sum + s.total, 0);
-  const totalSalesAll = rawTotalSalesAll + ordersCash;
+  const cardSales =
+    effectiveSales
+      .filter((s) => s.paymentMethod === "tarjeta" && !s.isCustomOrder && !String(s.id || "").startsWith("PED-") && !String(s.id || "").startsWith("LIQ-"))
+      .reduce((sum, s) => sum + s.total, 0) +
+    shiftOrders.reduce((sum, o) => sum + getOrderShiftCollection(o, shiftStartBoundary).collectedCard, 0);
+  const transferSales =
+    effectiveSales
+      .filter((s) => s.paymentMethod === "transferencia" && !s.isCustomOrder && !String(s.id || "").startsWith("PED-") && !String(s.id || "").startsWith("LIQ-"))
+      .reduce((sum, s) => sum + s.total, 0) +
+    shiftOrders.reduce((sum, o) => sum + getOrderShiftCollection(o, shiftStartBoundary).collectedTransfer, 0);
+  const totalSalesAll = cashSales + cardSales + transferSales;
 
   // 4. Conteo y Diferencia (Arqueo)
   const parsedCountedCash = countedCash === "" ? expectedCashInDrawer : Number(countedCash) || 0;

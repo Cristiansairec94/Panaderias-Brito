@@ -7,7 +7,7 @@ import { recordCashOutflowAsExpense } from "@/lib/expenses";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/context/AuthContext";
 import { parseDateTimeSafe, getStoredShiftStartBoundary, formatDateTimeSafe, compareMovementsDesc, resolveBranchId } from "@/lib/utils";
-import { normalizeOrder } from "@/lib/orders";
+import { normalizeOrder, getOrderShiftCollection } from "@/lib/orders";
 import { CLEAN_SLATE_EPOCH } from "@/lib/wipeOperationalData";
 
 export interface SimulatedSale {
@@ -39,7 +39,12 @@ export function getDeletedBranchIds(): Set<string> {
     if (raw) {
       const arr = JSON.parse(raw);
       if (Array.isArray(arr)) {
-        const filtered = arr.filter((id) => typeof id === "string" && id.trim().length > 0);
+        const filtered = arr.filter(
+          (id) => typeof id === "string" && id.trim().length > 0 && !CANONICAL_BRANCH_IDS.has(id.trim())
+        );
+        if (filtered.length !== arr.length) {
+          localStorage.setItem(DELETED_BRANCHES_STORAGE_KEY, JSON.stringify(filtered));
+        }
         return new Set(filtered);
       }
     }
@@ -48,7 +53,7 @@ export function getDeletedBranchIds(): Set<string> {
 }
 
 export function recordDeletedBranchId(id: string): void {
-  if (typeof window === "undefined" || !id) return;
+  if (typeof window === "undefined" || !id || CANONICAL_BRANCH_IDS.has(id)) return;
   try {
     const set = getDeletedBranchIds();
     set.add(id);
@@ -678,37 +683,48 @@ function resolveBranchParam(param: string | null): string | null {
           const supabase = createClient();
           const todayStart = new Date();
           todayStart.setHours(0, 0, 0, 0);
-          const todayIso = todayStart.toISOString();
+          const todayStartTs = todayStart.getTime();
+          const cleanSlateIso = new Date(CLEAN_SLATE_EPOCH).toISOString();
 
           const [salesRes, ordersRes, movsRes, expsRes, cutsRes, branchesRes] = await Promise.allSettled([
             supabase
               .from("sales")
-              .select("id, branch_id, total, payment_method, cashier, date, created_at")
-              .gte("created_at", todayIso),
+              .select("id, branch_id, total, payment_method, cashier, customer_name, date, created_at, sale_items(product_id, product_name, quantity, unit_price, subtotal)")
+              .gte("created_at", cleanSlateIso)
+              .order("created_at", { ascending: false }),
             supabase
               .from("custom_orders")
               .select("*")
+              .gte("created_at", cleanSlateIso)
               .order("created_at", { ascending: false })
               .limit(200),
             supabase
               .from("cash_movements")
               .select("id, branch_id, type, category, category_label, amount, reason, authorized_by, created_at")
-              .gte("created_at", todayIso),
+              .gte("created_at", cleanSlateIso)
+              .order("created_at", { ascending: false }),
             supabase
               .from("cash_expenses")
               .select("id, branch_id, amount, category, description, cashier, created_at")
-              .gte("created_at", todayIso),
+              .gte("created_at", cleanSlateIso)
+              .order("created_at", { ascending: false }),
             supabase
               .from("cash_shifts")
               .select("id, shift_name, cashier_name, branch_id, opened_at, initial_cash, cash_sales, card_sales, transfer_sales, total_cash_in, total_cash_out, expected_cash, actual_cash, difference, status, notes")
-              .gte("opened_at", todayIso),
+              .gte("opened_at", cleanSlateIso)
+              .order("opened_at", { ascending: false }),
             supabase
               .from("branches")
               .select("id, name, short_name, address, phone, is_active"),
           ]);
 
           const dbSales = salesRes.status === "fulfilled" && !salesRes.value.error
-            ? (salesRes.value.data || []).filter((s: any) => parseDateTimeSafe(s.created_at || s.date) >= CLEAN_SLATE_EPOCH)
+            ? (salesRes.value.data || []).filter((s: any) => {
+                if (!s || !s.id) return false;
+                const idStr = String(s.id);
+                if (idStr.startsWith("LIQ-") || idStr.startsWith("PED-") || /^pos-\d{10,}$/.test(idStr)) return false;
+                return parseDateTimeSafe(s.created_at || s.date) >= CLEAN_SLATE_EPOCH;
+              })
             : [];
           const dbOrders = ordersRes.status === "fulfilled" && !ordersRes.value.error
             ? (ordersRes.value.data || []).filter((o: any) => parseDateTimeSafe(o.created_at) >= CLEAN_SLATE_EPOCH)
@@ -724,9 +740,9 @@ function resolveBranchParam(param: string | null): string | null {
             : [];
           const dbBranches = branchesRes.status === "fulfilled" && !branchesRes.value.error ? branchesRes.value.data || [] : [];
 
-          // Sincronizar sucursales inactivas de Supabase con los tombstones locales
+          // Sincronizar sucursales inactivas de Supabase con los tombstones locales (nunca ocultar las 6 canónicas)
           dbBranches.forEach((dbB: any) => {
-            if (dbB && dbB.id && dbB.is_active === false) {
+            if (dbB && dbB.id && dbB.is_active === false && !CANONICAL_BRANCH_IDS.has(dbB.id)) {
               recordDeletedBranchId(dbB.id);
             }
           });
@@ -791,9 +807,16 @@ function resolveBranchParam(param: string | null): string | null {
             if (!latestCutByBranch.has(bId)) {
               latestCutByBranch.set(bId, cut);
               const ts = cut.timestamp || parseDateTimeSafe(cut.date);
-              cutTimestampByBranch.set(bId, ts);
+              if (ts >= CLEAN_SLATE_EPOCH) {
+                cutTimestampByBranch.set(bId, ts);
+              }
             }
           });
+
+          // Límite estricto del turno actual para cada sucursal: último corte cerrado de esa sucursal o CLEAN_SLATE_EPOCH
+          const getShiftLimit = (bId: string): number => {
+            return Math.max(CLEAN_SLATE_EPOCH, cutTimestampByBranch.get(bId) || 0);
+          };
 
           // Sincronizar historial de cortes y límites de turno en localStorage para todas las pantallas del navegador
           if (typeof window !== "undefined") {
@@ -807,13 +830,13 @@ function resolveBranchParam(param: string | null): string | null {
 
               latestCutByBranch.forEach((cut, bId) => {
                 const cutTs = cut.timestamp || parseDateTimeSafe(cut.date);
-                let cutFund = Number(cut.nextFund ?? cut.initialFund ?? 0);
-                if (bId === "branch-matriz" && (cutFund === 800 || cutFund <= 0)) {
-                  cutFund = 1000;
-                } else if (cutFund <= 0) {
-                  cutFund = bId === "branch-benito" ? 800 : bId === "branch-flores" ? 1200 : 1000;
-                }
-                if (cutTs > 0) {
+                if (cutTs >= CLEAN_SLATE_EPOCH) {
+                  let cutFund = Number(cut.nextFund ?? cut.initialFund ?? 0);
+                  if (bId === "branch-matriz" && (cutFund === 800 || cutFund <= 0)) {
+                    cutFund = 1000;
+                  } else if (cutFund <= 0) {
+                    cutFund = bId === "branch-benito" ? 800 : bId === "branch-flores" ? 1200 : 1000;
+                  }
                   localStorage.setItem(`brito_shift_start_${bId}`, cutTs.toString());
                   localStorage.setItem(`brito_pos_initial_fund_${bId}`, cutFund.toString());
                   if (bId === "branch-matriz") {
@@ -823,59 +846,250 @@ function resolveBranchParam(param: string | null): string | null {
                 }
               });
 
-              // Limpiar ventas locales que ya pertenecen a un turno cortado/cerrado
+              // Sincronizar ventas de mostrador de Supabase con brito_pos_master_sales y brito_pos_current_sales
+              const mapDbSaleToLocal = (s: any, existingLocal?: any) => {
+                const sTs = parseDateTimeSafe(s.created_at || s.date);
+                const dbItems = Array.isArray(s.sale_items) && s.sale_items.length > 0
+                  ? s.sale_items.map((it: any) => ({
+                      product: {
+                        id: it.product_id || `prod-${s.id}`,
+                        name: it.product_name || "Pan",
+                        price: Number(it.unit_price) || 0,
+                        category: "pan_dulce",
+                        stock: 99,
+                      },
+                      quantity: Number(it.quantity) || 1,
+                    }))
+                  : [];
+                const useExistingItems =
+                  existingLocal &&
+                  Array.isArray(existingLocal.items) &&
+                  existingLocal.items.length > 0 &&
+                  (dbItems.length === 0 || (dbItems.length === 1 && dbItems[0].product.name === "Venta en mostrador"));
+
+                return {
+                  id: s.id,
+                  date: s.date || formatDateTimeSafe(s.created_at),
+                  items: useExistingItems
+                    ? existingLocal.items
+                    : dbItems.length > 0
+                    ? dbItems
+                    : [
+                        {
+                          product: {
+                            id: `prod-${s.id}`,
+                            name: "Venta en mostrador",
+                            price: Number(s.total) || 0,
+                            category: "pan_dulce",
+                            stock: 99,
+                          },
+                          quantity: 1,
+                        },
+                      ],
+                  total: Number(s.total) || 0,
+                  paymentMethod: s.payment_method || "efectivo",
+                  cashier: s.cashier || "Cajero",
+                  customerName: s.customer_name || existingLocal?.customerName || "Público General",
+                  customerId: existingLocal?.customerId || "cli-0",
+                  timestamp: sTs,
+                  createdAt: s.created_at || new Date(sTs).toISOString(),
+                  branchId: resolveBranchId(s.branch_id, s.cashier),
+                  branchName: existingLocal?.branchName,
+                };
+              };
+
+              const rawMaster = localStorage.getItem("brito_pos_master_sales");
+              const masterParsed: any[] = rawMaster ? JSON.parse(rawMaster) : [];
+              const masterMap = new Map<string, any>();
+              if (Array.isArray(masterParsed)) {
+                masterParsed.forEach((ms) => {
+                  if (!ms || !ms.id) return;
+                  const idStr = String(ms.id);
+                  if (/^pos-\d{10,}$/.test(idStr)) return;
+                  const mTs = parseDateTimeSafe(ms.timestamp || ms.createdAt || ms.date);
+                  if (mTs >= CLEAN_SLATE_EPOCH) {
+                    masterMap.set(idStr, ms);
+                  }
+                });
+              }
+              dbSales.forEach((dbs: any) => {
+                if (!dbs || !dbs.id) return;
+                const mapped = mapDbSaleToLocal(dbs, masterMap.get(dbs.id));
+                masterMap.set(dbs.id, mapped);
+              });
+              const updatedMaster = Array.from(masterMap.values()).sort(
+                (a, b) => parseDateTimeSafe(b.timestamp || b.createdAt || b.date) - parseDateTimeSafe(a.timestamp || a.createdAt || a.date)
+              );
+              localStorage.setItem("brito_pos_master_sales", JSON.stringify(updatedMaster.slice(0, 1000)));
+
+              // Limpiar e hidratar brito_pos_current_sales con todas las ventas del turno activo
               const curSalesRaw = localStorage.getItem("brito_pos_current_sales");
-              if (curSalesRaw) {
-                const curSales = JSON.parse(curSalesRaw);
-                if (Array.isArray(curSales)) {
-                  const filtered = curSales.filter((s: any) => {
-                    const sBranch = s.branchId || s.branch_id || "branch-matriz";
-                    const sTime = parseDateTimeSafe(s.timestamp || s.createdAt || s.date);
-                    const bCutLimit = cutTimestampByBranch.get(sBranch) || 0;
-                    return sTime >= CLEAN_SLATE_EPOCH && sTime > bCutLimit;
-                  });
-                  localStorage.setItem("brito_pos_current_sales", JSON.stringify(filtered));
-                }
+              const curSalesParsed: any[] = curSalesRaw ? JSON.parse(curSalesRaw) : [];
+              const curSalesMap = new Map<string, any>();
+              if (Array.isArray(curSalesParsed)) {
+                curSalesParsed.forEach((s: any) => {
+                  if (!s || !s.id) return;
+                  const idStr = String(s.id);
+                  if (/^pos-\d{10,}$/.test(idStr) || idStr.startsWith("LIQ-") || idStr.startsWith("PED-") || s.isCustomOrder) return;
+                  const sBranch = resolveBranchId(s.branchId || s.branch_id, s.cashier);
+                  const sTime = parseDateTimeSafe(s.timestamp || s.createdAt || s.date);
+                  const bShiftLimit = getShiftLimit(sBranch);
+                  if (sTime >= CLEAN_SLATE_EPOCH && sTime > bShiftLimit) {
+                    curSalesMap.set(idStr, s);
+                  }
+                });
               }
+              updatedMaster.forEach((ms: any) => {
+                if (!ms || !ms.id) return;
+                const idStr = String(ms.id);
+                if (/^pos-\d{10,}$/.test(idStr) || idStr.startsWith("LIQ-") || idStr.startsWith("PED-") || ms.isCustomOrder) return;
+                const sBranch = resolveBranchId(ms.branchId || ms.branch_id, ms.cashier);
+                const sTime = parseDateTimeSafe(ms.timestamp || ms.createdAt || ms.date);
+                const bShiftLimit = getShiftLimit(sBranch);
+                if (sTime >= CLEAN_SLATE_EPOCH && sTime > bShiftLimit) {
+                  curSalesMap.set(idStr, ms);
+                }
+              });
+              const finalCurSales = Array.from(curSalesMap.values()).sort(
+                (a, b) => parseDateTimeSafe(b.timestamp || b.createdAt || b.date) - parseDateTimeSafe(a.timestamp || a.createdAt || a.date)
+              );
+              localStorage.setItem("brito_pos_current_sales", JSON.stringify(finalCurSales));
 
-              // Limpiar gastos locales que ya pertenecen a un turno cortado/cerrado
+              // Limpiar e hidratar gastos locales del turno activo
               const curExpRaw = localStorage.getItem("brito_pos_current_expenses");
-              if (curExpRaw) {
-                const curExp = JSON.parse(curExpRaw);
-                if (Array.isArray(curExp)) {
-                  const filtered = curExp.filter((e: any) => {
-                    const eBranch = e.branchId || e.branch_id || "branch-matriz";
-                    const eTime = parseDateTimeSafe(e.timestamp || e.createdAt || e.date);
-                    const bCutLimit = cutTimestampByBranch.get(eBranch) || 0;
-                    return eTime >= CLEAN_SLATE_EPOCH && eTime > bCutLimit;
-                  });
-                  localStorage.setItem("brito_pos_current_expenses", JSON.stringify(filtered));
-                }
+              const curExpParsed: any[] = curExpRaw ? JSON.parse(curExpRaw) : [];
+              const curExpMap = new Map<string, any>();
+              if (Array.isArray(curExpParsed)) {
+                curExpParsed.forEach((e: any) => {
+                  if (!e || !e.id) return;
+                  const eBranch = resolveBranchId(e.branchId || e.branch_id, e.cashier);
+                  const eTime = parseDateTimeSafe(e.timestamp || e.createdAt || e.date);
+                  const bShiftLimit = getShiftLimit(eBranch);
+                  if (eTime >= CLEAN_SLATE_EPOCH && eTime > bShiftLimit) {
+                    curExpMap.set(String(e.id), e);
+                  }
+                });
               }
+              dbExps.forEach((dbe: any) => {
+                if (!dbe || !dbe.id) return;
+                const eBranch = resolveBranchId(dbe.branch_id, dbe.cashier);
+                const eTime = parseDateTimeSafe(dbe.created_at);
+                const bShiftLimit = getShiftLimit(eBranch);
+                if (eTime >= CLEAN_SLATE_EPOCH && eTime > bShiftLimit && !curExpMap.has(String(dbe.id))) {
+                  curExpMap.set(String(dbe.id), {
+                    id: dbe.id,
+                    amount: Number(dbe.amount) || 0,
+                    category: dbe.category || "gasto",
+                    description: dbe.description || "Gasto de caja",
+                    cashier: dbe.cashier || "Cajero",
+                    date: formatDateTimeSafe(dbe.created_at),
+                    createdAt: dbe.created_at,
+                    timestamp: eTime,
+                    branchId: eBranch,
+                    paymentMethod: "efectivo",
+                  });
+                }
+              });
+              localStorage.setItem("brito_pos_current_expenses", JSON.stringify(Array.from(curExpMap.values())));
 
-              // Limpiar ingresos locales que ya pertenecen a un turno cortado/cerrado
+              // Limpiar e hidratar ingresos en efectivo locales del turno activo
               const curIncRaw = localStorage.getItem("brito_pos_current_incomes");
-              if (curIncRaw) {
-                const curInc = JSON.parse(curIncRaw);
-                if (Array.isArray(curInc)) {
-                  const filtered = curInc.filter((i: any) => {
-                    const iBranch = i.branchId || i.branch_id || "branch-matriz";
-                    const iTime = parseDateTimeSafe(i.timestamp || i.date || i.createdAt);
-                    const bCutLimit = cutTimestampByBranch.get(iBranch) || 0;
-                    return iTime >= CLEAN_SLATE_EPOCH && iTime > bCutLimit;
-                  });
-                  localStorage.setItem("brito_pos_current_incomes", JSON.stringify(filtered));
-                }
+              const curIncParsed: any[] = curIncRaw ? JSON.parse(curIncRaw) : [];
+              const curIncMap = new Map<string, any>();
+              if (Array.isArray(curIncParsed)) {
+                curIncParsed.forEach((i: any) => {
+                  if (!i || !i.id) return;
+                  if (i.category === "abono_pedido" || i.category === "pedido" || i.category === "venta_mostrador" || i.orderId) return;
+                  const iBranch = resolveBranchId(i.branchId || i.branch_id, i.cashier);
+                  const iTime = parseDateTimeSafe(i.timestamp || i.date || i.createdAt);
+                  const bShiftLimit = getShiftLimit(iBranch);
+                  if (iTime >= CLEAN_SLATE_EPOCH && iTime > bShiftLimit) {
+                    curIncMap.set(String(i.id), i);
+                  }
+                });
               }
+              dbMovs.forEach((dbm: any) => {
+                if (!dbm || !dbm.id || dbm.type !== "entrada") return;
+                if (dbm.category === "venta_mostrador" || dbm.category === "corte_caja" || dbm.category === "abono_pedido" || dbm.category === "pedido") return;
+                if (String(dbm.id).startsWith("order-") || String(dbm.id).includes("PED-")) return;
+                const rLower = String(dbm.reason || "").toLowerCase();
+                if (rLower.includes("pedido") || rLower.includes("abono") || rLower.includes("anticipo") || rLower.includes("liquidaci")) return;
+                if (Number(dbm.amount) === 6000) return;
+                const iBranch = resolveBranchId(dbm.branch_id, dbm.authorized_by);
+                const iTime = parseDateTimeSafe(dbm.created_at);
+                const bShiftLimit = getShiftLimit(iBranch);
+                if (iTime >= CLEAN_SLATE_EPOCH && iTime > bShiftLimit && !curIncMap.has(String(dbm.id))) {
+                  curIncMap.set(String(dbm.id), {
+                    id: dbm.id,
+                    amount: Number(dbm.amount) || 0,
+                    category: dbm.category || "fondo_cambio",
+                    categoryLabel: dbm.category_label || "Fondo de Cambio",
+                    paymentMethod: "efectivo",
+                    concept: dbm.reason || "Entrada de efectivo",
+                    cashier: dbm.authorized_by || "Cajero",
+                    branchId: iBranch,
+                    date: formatDateTimeSafe(dbm.created_at),
+                    timestamp: String(iTime),
+                  });
+                }
+              });
+              localStorage.setItem("brito_pos_current_incomes", JSON.stringify(Array.from(curIncMap.values())));
 
               if (cutsChanged) {
                 window.dispatchEvent(new Event("brito_shift_cuts_updated"));
               }
               window.dispatchEvent(new Event("brito_sales_updated"));
+              window.dispatchEvent(new Event("brito_incomes_updated"));
               window.dispatchEvent(new Event("brito_caja_updated"));
             } catch (e) {
               console.warn("[BranchContext] Error sincronizando localStorage de cortes:", e);
             }
+          }
+
+          // Sincronizar primero pedidos de Supabase con almacenamiento local para tener una lista unificada al 100%
+          let unifiedOrdersList: any[] = [];
+          try {
+            const rawLocalOrd = typeof window !== "undefined" ? localStorage.getItem("brito_custom_orders") : null;
+            const localOrdList = (rawLocalOrd ? JSON.parse(rawLocalOrd) : []).filter((o: any) => {
+              const ts = o.timestamp ? Number(o.timestamp) : parseDateTimeSafe(o.createdAt || o.created_at);
+              return ts >= CLEAN_SLATE_EPOCH;
+            });
+            const ordMap = new Map<string, any>();
+
+            localOrdList.forEach((o: any) => {
+              const norm = normalizeOrder(o);
+              if (norm.id) ordMap.set(norm.id, norm);
+              if (norm.orderNumber) ordMap.set(norm.orderNumber, norm);
+            });
+
+            let anyOrdUpdated = false;
+            dbOrders.forEach((dbo: any) => {
+              const norm = normalizeOrder(dbo);
+              const existing = (norm.id && ordMap.get(norm.id)) || (norm.orderNumber && ordMap.get(norm.orderNumber));
+              const exTs = existing?.timestamp || 0;
+              const normTs = norm.timestamp || 0;
+              if (!existing || exTs < normTs || existing.deposit !== norm.deposit || existing.status !== norm.status) {
+                if (norm.id) ordMap.set(norm.id, norm);
+                if (norm.orderNumber) ordMap.set(norm.orderNumber, norm);
+                anyOrdUpdated = true;
+              }
+            });
+
+            const uniqueOrders = new Map<string, any>();
+            for (const ord of ordMap.values()) {
+              const key = ord.id || ord.orderNumber;
+              if (key && !uniqueOrders.has(key)) {
+                uniqueOrders.set(key, ord);
+              }
+            }
+            unifiedOrdersList = Array.from(uniqueOrders.values());
+
+            if (anyOrdUpdated && typeof window !== "undefined") {
+              localStorage.setItem("brito_custom_orders", JSON.stringify(unifiedOrdersList));
+              window.dispatchEvent(new Event("brito_orders_updated"));
+            }
+          } catch {
+            unifiedOrdersList = dbOrders.map((dbo: any) => normalizeOrder(dbo));
           }
 
           const branchAgg = new Map<string, {
@@ -920,11 +1134,18 @@ function resolveBranchParam(param: string | null): string | null {
             dayAccumulatedDeskSales: 0,
             dayAccumulatedDeskTickets: 0,
             dayAccumulatedOrdersDeposit: 0,
+            lastCashier: undefined as string | undefined,
+            branchName: undefined as string | undefined,
           });
 
           const currentDeletedIds = getDeletedBranchIds();
-          branches.forEach((b) => {
+          DEFAULT_BRANCHES.forEach((b) => {
             if (!currentDeletedIds.has(b.id)) {
+              branchAgg.set(b.id, initBranchAgg());
+            }
+          });
+          branches.forEach((b) => {
+            if (!currentDeletedIds.has(b.id) && !branchAgg.has(b.id)) {
               branchAgg.set(b.id, initBranchAgg());
             }
           });
@@ -933,8 +1154,14 @@ function resolveBranchParam(param: string | null): string | null {
             return resolveBranchId(rawBranchId, cashierName);
           };
 
-          // 1. Agregar ventas de mostrador (filtrando turno activo vs acumulado)
+          // 1. Agregar ventas de mostrador (filtrando turno activo vs acumulado de hoy)
+          const seenSaleIds = new Set<string>();
           dbSales.forEach((s: any) => {
+            if (!s) return;
+            const sId = String(s.id || "");
+            if (sId.startsWith("PED-") || sId.startsWith("LIQ-") || s.is_custom_order || s.isCustomOrder) return;
+            if (sId) seenSaleIds.add(sId);
+
             const bId = resolveBranchForRecord(s.branch_id, s.cashier);
             let cur = branchAgg.get(bId);
             if (!cur) {
@@ -943,13 +1170,15 @@ function resolveBranchParam(param: string | null): string | null {
             }
             const amt = Number(s.total) || 0;
             const saleTime = parseDateTimeSafe(s.created_at || s.date);
-            const cutLimit = cutTimestampByBranch.get(bId) || 0;
+            const shiftLimit = getShiftLimit(bId);
 
-            cur.dayAccumulatedDeskSales += amt;
-            cur.dayAccumulatedDeskTickets += 1;
+            if (saleTime >= todayStartTs) {
+              cur.dayAccumulatedDeskSales += amt;
+              cur.dayAccumulatedDeskTickets += 1;
+            }
 
-            // SOLO sumar al turno activo si la venta ocurrió DESPUÉS del corte cerrado
-            if (saleTime > cutLimit) {
+            // SOLO sumar al turno activo si la venta ocurrió en el turno actual (>= shiftLimit)
+            if (saleTime >= shiftLimit) {
               cur.deskSales += amt;
               cur.deskTickets += 1;
               if (s.payment_method === "tarjeta") cur.deskCard += amt;
@@ -959,9 +1188,53 @@ function resolveBranchParam(param: string | null): string | null {
             }
           });
 
-          // 2. Agregar pedidos especiales (anticipos y liquidaciones en la sucursal donde se cobró)
+          // Incorporar ventas locales del turno actual que aún no estén en dbSales para sincronización inmediata 100%
+          if (typeof window !== "undefined") {
+            try {
+              const rawLocalSales = localStorage.getItem("brito_pos_current_sales");
+              if (rawLocalSales) {
+                const localSales = JSON.parse(rawLocalSales);
+                if (Array.isArray(localSales)) {
+                  localSales.forEach((s: any) => {
+                    if (!s) return;
+                    const sId = String(s.id || "");
+                    if (sId.startsWith("PED-") || sId.startsWith("LIQ-") || s.isCustomOrder || s.is_custom_order) return;
+                    if (sId && seenSaleIds.has(sId)) return;
+                    if (sId) seenSaleIds.add(sId);
+
+                    const bId = resolveBranchForRecord(s.branchId || s.branch_id, s.cashier);
+                    let cur = branchAgg.get(bId);
+                    if (!cur) {
+                      cur = initBranchAgg();
+                      branchAgg.set(bId, cur);
+                    }
+                    const amt = Number(s.total) || 0;
+                    const saleTime = parseDateTimeSafe(s.timestamp || s.createdAt || s.date);
+                    const shiftLimit = getShiftLimit(bId);
+
+                    if (saleTime >= todayStartTs) {
+                      cur.dayAccumulatedDeskSales += amt;
+                      cur.dayAccumulatedDeskTickets += 1;
+                    }
+                    if (saleTime >= shiftLimit) {
+                      cur.deskSales += amt;
+                      cur.deskTickets += 1;
+                      const pm = s.paymentMethod || s.payment_method || "efectivo";
+                      if (pm === "tarjeta") cur.deskCard += amt;
+                      else if (pm === "transferencia") cur.deskTransfer += amt;
+                      else cur.deskCash += amt;
+                      if (s.cashier) cur.lastCashier = s.cashier;
+                    }
+                  });
+                }
+              }
+            } catch {}
+          }
+
+          // 2. Agregar pedidos especiales (SOLO los levantados o abonados dentro del turno actual de hoy)
           const countedOrderNums = new Set<string>();
-          dbOrders.forEach((o: any) => {
+          unifiedOrdersList.forEach((o: any) => {
+            if (!o || o.status === "cancelado") return;
             const rawNotes = String(o.notes || "");
             const originMatch = rawNotes.match(/\[Origen:\s*([^\|\]]+)(?:\|([^\]]+))?\]/);
             const originBranchId = originMatch && originMatch[1] ? originMatch[1].trim() : undefined;
@@ -970,9 +1243,9 @@ function resolveBranchParam(param: string | null): string | null {
               ? resolveBranchId(originBranchId, o.cashier)
               : (o.operating_branch_id || o.operatingBranchId)
               ? resolveBranchId(o.operating_branch_id || o.operatingBranchId, o.cashier)
-              : (cashierBranchId || resolveBranchForRecord(o.branch_id, o.cashier));
+              : (cashierBranchId || resolveBranchForRecord(o.branch_id || o.branchId, o.cashier));
 
-            if (o.order_number) countedOrderNums.add(String(o.order_number).toUpperCase());
+            if (o.order_number || o.orderNumber) countedOrderNums.add(String(o.order_number || o.orderNumber).toUpperCase());
             if (o.id) countedOrderNums.add(String(o.id).toUpperCase());
 
             let cur = branchAgg.get(bId);
@@ -980,23 +1253,23 @@ function resolveBranchParam(param: string | null): string | null {
               cur = initBranchAgg();
               branchAgg.set(bId, cur);
             }
-            if (o.branch_name && !originBranchId) cur.branchName = o.branch_name;
-            const dep = Number(o.deposit) || 0;
-            const tot = Number(o.total) || 0;
-            const orderTime = parseDateTimeSafe(o.created_at);
-            const cutLimit = cutTimestampByBranch.get(bId) || 0;
+            if ((o.branch_name || o.branchName) && !originBranchId) cur.branchName = o.branch_name || o.branchName;
 
-            if (dep > 0) cur.dayAccumulatedOrdersDeposit += dep;
+            const shiftLimit = getShiftLimit(bId);
+            const dayCol = getOrderShiftCollection(o, todayStartTs);
+            if (dayCol.collectedTotal > 0) {
+              cur.dayAccumulatedOrdersDeposit += dayCol.collectedTotal;
+            }
 
-            // SOLO sumar al turno activo si el pedido ocurrió DESPUÉS del corte cerrado
-            if (orderTime > cutLimit) {
-              cur.orderTotal += tot;
+            const shiftCol = getOrderShiftCollection(o, shiftLimit);
+            if (shiftCol.isInShift) {
+              cur.orderTotal += shiftCol.orderTotalInShift;
               cur.orderCount += 1;
-              if (dep > 0) {
-                cur.orderTotalCobrado += dep;
-                if (o.payment_method === "tarjeta") cur.orderCard += dep;
-                else if (o.payment_method === "transferencia") cur.orderTransfer += dep;
-                else cur.orderCash += dep;
+              if (shiftCol.collectedTotal > 0) {
+                cur.orderTotalCobrado += shiftCol.collectedTotal;
+                cur.orderCash += shiftCol.collectedCash;
+                cur.orderCard += shiftCol.collectedCard;
+                cur.orderTransfer += shiftCol.collectedTransfer;
               }
               if (o.cashier && !cur.lastCashier) cur.lastCashier = o.cashier;
             }
@@ -1017,9 +1290,9 @@ function resolveBranchParam(param: string | null): string | null {
                 }
                 const amt = Number(m.amount) || 0;
                 const movTime = parseDateTimeSafe(m.created_at);
-                const cutLimit = cutTimestampByBranch.get(bId) || 0;
-                if (amt > 0) cur.dayAccumulatedOrdersDeposit += amt;
-                if (movTime > cutLimit && amt > 0) {
+                const shiftLimit = getShiftLimit(bId);
+                if (movTime >= todayStartTs && amt > 0) cur.dayAccumulatedOrdersDeposit += amt;
+                if (movTime >= shiftLimit && amt > 0) {
                   cur.orderTotal += amt;
                   cur.orderCount += 1;
                   cur.orderTotalCobrado += amt;
@@ -1046,8 +1319,8 @@ function resolveBranchParam(param: string | null): string | null {
             }
             const amt = Number(m.amount) || 0;
             const movTime = parseDateTimeSafe(m.created_at);
-            const cutLimit = cutTimestampByBranch.get(bId) || 0;
-            if (movTime > cutLimit) {
+            const shiftLimit = getShiftLimit(bId);
+            if (movTime >= shiftLimit) {
               if (m.type === "entrada") {
                 cur.cashInflow += amt;
                 cur.movNet += amt;
@@ -1081,8 +1354,8 @@ function resolveBranchParam(param: string | null): string | null {
                     }
                     const amt = Number(inc.amount) || 0;
                     const t = parseDateTimeSafe(inc.timestamp || inc.date || inc.createdAt);
-                    const cutLimit = cutTimestampByBranch.get(bId) || 0;
-                    if (t > cutLimit && (inc.paymentMethod === "efectivo" || !inc.paymentMethod)) {
+                    const shiftLimit = getShiftLimit(bId);
+                    if (t >= shiftLimit && (inc.paymentMethod === "efectivo" || !inc.paymentMethod)) {
                       cur.cashInflow += amt;
                       cur.movNet += amt;
                     }
@@ -1092,8 +1365,11 @@ function resolveBranchParam(param: string | null): string | null {
             } catch {}
           }
 
-          // 4. Gastos en efectivo
+          // 4. Gastos en efectivo (Supabase + locales aún no sincronizados)
+          const seenExpIds = new Set<string>();
           dbExps.forEach((e: any) => {
+            if (!e) return;
+            if (e.id) seenExpIds.add(String(e.id));
             const bId = resolveBranchForRecord(e.branch_id, e.cashier);
             let cur = branchAgg.get(bId);
             if (!cur) {
@@ -1101,54 +1377,39 @@ function resolveBranchParam(param: string | null): string | null {
               branchAgg.set(bId, cur);
             }
             const expTime = parseDateTimeSafe(e.created_at);
-            const cutLimit = cutTimestampByBranch.get(bId) || 0;
-            if (expTime > cutLimit) {
+            const shiftLimit = getShiftLimit(bId);
+            if (expTime >= shiftLimit) {
               cur.expCash += Number(e.amount) || 0;
               if (e.cashier && !cur.lastCashier) cur.lastCashier = e.cashier;
             }
           });
 
-          // Sincronizar pedidos de Supabase hacia el almacenamiento local si hay pedidos nuevos
-          if (dbOrders.length > 0) {
+          if (typeof window !== "undefined") {
             try {
-              const rawLocalOrd = localStorage.getItem("brito_custom_orders");
-              const localOrdList = (rawLocalOrd ? JSON.parse(rawLocalOrd) : []).filter((o: any) => {
-                const ts = o.timestamp ? Number(o.timestamp) : parseDateTimeSafe(o.createdAt || o.created_at);
-                return ts >= CLEAN_SLATE_EPOCH;
-              });
-              const ordMap = new Map<string, any>();
-
-              // Cargar existentes previamente normalizados
-              localOrdList.forEach((o: any) => {
-                const norm = normalizeOrder(o);
-                if (norm.id) ordMap.set(norm.id, norm);
-                if (norm.orderNumber) ordMap.set(norm.orderNumber, norm);
-              });
-
-              let anyOrdUpdated = false;
-
-              dbOrders.forEach((dbo: any) => {
-                const norm = normalizeOrder(dbo);
-                const existing = (norm.id && ordMap.get(norm.id)) || (norm.orderNumber && ordMap.get(norm.orderNumber));
-                const exTs = existing?.timestamp || 0;
-                const normTs = norm.timestamp || 0;
-                if (!existing || exTs < normTs || existing.deposit !== norm.deposit || existing.status !== norm.status) {
-                  if (norm.id) ordMap.set(norm.id, norm);
-                  if (norm.orderNumber) ordMap.set(norm.orderNumber, norm);
-                  anyOrdUpdated = true;
+              const rawLocalExps = localStorage.getItem("brito_pos_current_expenses");
+              if (rawLocalExps) {
+                const localExps = JSON.parse(rawLocalExps);
+                if (Array.isArray(localExps)) {
+                  localExps.forEach((e: any) => {
+                    if (!e || !e.id) return;
+                    const eId = String(e.id);
+                    if (eId.includes("354644") || eId.includes("299599") || eId.includes("334972") || Number(e.amount) > 500000) return;
+                    if (seenExpIds.has(eId)) return;
+                    seenExpIds.add(eId);
+                    const bId = resolveBranchForRecord(e.branchId || e.branch_id, e.cashier);
+                    let cur = branchAgg.get(bId);
+                    if (!cur) {
+                      cur = initBranchAgg();
+                      branchAgg.set(bId, cur);
+                    }
+                    const expTime = parseDateTimeSafe(e.timestamp || e.createdAt || e.date);
+                    const shiftLimit = getShiftLimit(bId);
+                    if (expTime >= shiftLimit) {
+                      cur.expCash += Number(e.amount) || 0;
+                      if (e.cashier && !cur.lastCashier) cur.lastCashier = e.cashier;
+                    }
+                  });
                 }
-              });
-
-              if (anyOrdUpdated) {
-                const uniqueOrders = new Map<string, any>();
-                for (const ord of ordMap.values()) {
-                  const key = ord.id || ord.orderNumber;
-                  if (key && !uniqueOrders.has(key)) {
-                    uniqueOrders.set(key, ord);
-                  }
-                }
-                localStorage.setItem("brito_custom_orders", JSON.stringify(Array.from(uniqueOrders.values())));
-                window.dispatchEvent(new Event("brito_orders_updated"));
               }
             } catch {}
           }
@@ -1201,7 +1462,7 @@ function resolveBranchParam(param: string | null): string | null {
 
             // 4. Sincronizar datos de Supabase si existen
             dbBranches.forEach((dbB: any) => {
-              if (!dbB || !dbB.id || currentDeletedIds.has(dbB.id) || dbB.is_active === false) return;
+              if (!dbB || !dbB.id || currentDeletedIds.has(dbB.id) || (dbB.is_active === false && !CANONICAL_BRANCH_IDS.has(dbB.id))) return;
               const existing = branchMap.get(dbB.id);
               if (existing) {
                 branchMap.set(dbB.id, {
@@ -1246,24 +1507,35 @@ function resolveBranchParam(param: string | null): string | null {
 
             const updated = Array.from(branchMap.values()).map((rawB) => {
               const b = syncBranchWithUsers(rawB, usersList);
-              const agg = branchAgg.get(b.id);
-              if (!agg) return b;
+              const agg = branchAgg.get(b.id) || initBranchAgg();
 
               const latestCut = latestCutByBranch.get(b.id);
+              const latestCutTs = latestCut ? (latestCut.timestamp || parseDateTimeSafe(latestCut.date)) : 0;
 
               // TOTAL GENERAL COBRADO DEL TURNO ACTIVO
               const totalCobrado = agg.deskSales + agg.orderTotalCobrado;
               const totalTickets = agg.deskTickets + agg.orderCount;
 
-              // Fondo inicial: Si hay un corte registrado para esta sucursal, el fondo del nuevo turno SIEMPRE es el nextFund del corte.
+              // Fondo inicial sincronizado 100% con Caja y Corte de Turno
               const standardFund = b.id === "branch-benito" ? 800 : b.id === "branch-flores" ? 1200 : 1000;
               let initialFund = standardFund;
-              if (latestCut && latestCut.nextFund !== undefined && latestCut.nextFund !== null && Number(latestCut.nextFund) > 0) {
+              if (latestCut && latestCutTs >= todayStartTs && latestCut.nextFund !== undefined && latestCut.nextFund !== null && Number(latestCut.nextFund) > 0) {
                 const parsed = Number(latestCut.nextFund);
                 initialFund = (b.id === "branch-matriz" && parsed === 800) ? 1000 : parsed;
-              } else if (b.currentShift?.initialFund !== undefined && b.currentShift?.initialFund !== null && Number(b.currentShift.initialFund) > 0) {
-                const parsed = Number(b.currentShift.initialFund);
-                initialFund = (b.id === "branch-matriz" && parsed === 800) ? 1000 : parsed;
+              } else {
+                let savedLocalFund = 0;
+                if (typeof window !== "undefined") {
+                  const rawF = localStorage.getItem(`brito_pos_initial_fund_${b.id}`);
+                  if (rawF !== null && !isNaN(Number(rawF)) && Number(rawF) > 0) {
+                    savedLocalFund = Number(rawF);
+                  }
+                }
+                if (savedLocalFund > 0 && !(b.id === "branch-matriz" && savedLocalFund === 800)) {
+                  initialFund = savedLocalFund;
+                } else if (b.currentShift?.initialFund !== undefined && b.currentShift?.initialFund !== null && Number(b.currentShift.initialFund) > 0) {
+                  const parsed = Number(b.currentShift.initialFund);
+                  initialFund = (b.id === "branch-matriz" && parsed === 800) ? 1000 : parsed;
+                }
               }
 
               // Flujo de salidas: evitar doble deducción entre cash_movements y cash_expenses
@@ -1357,16 +1629,17 @@ function resolveBranchParam(param: string | null): string | null {
             return updated;
           });
 
-          // 5. Construir y consolidar todos los movimientos de dinero de hoy para supervisión en vivo
+          // 5. Construir y consolidar todos los movimientos de dinero de HOY para supervisión en vivo
           const unified: BranchCashMovement[] = [];
           const branchNameMap = new Map<string, string>();
           DEFAULT_BRANCHES.forEach((b) => branchNameMap.set(b.id, b.shortName || b.name));
 
-          // A) Ventas
+          // A) Ventas de hoy
           dbSales.forEach((s: any) => {
-            const bId = s.branch_id || "branch-matriz";
+            const bId = resolveBranchForRecord(s.branch_id, s.cashier);
             const bName = branchNameMap.get(bId) || "Sucursal";
             const timeMs = parseDateTimeSafe(s.created_at || s.date);
+            if (timeMs < todayStartTs) return;
             unified.push({
               id: `sale-${s.id}`,
               branchId: bId,
@@ -1386,31 +1659,41 @@ function resolveBranchParam(param: string | null): string | null {
             });
           });
 
-          // B) Pedidos con anticipo o pago
-          dbOrders.forEach((o: any) => {
-            const bId = o.branch_id || "branch-matriz";
-            const bName = o.branch_name || branchNameMap.get(bId) || "Sucursal";
-            const deposit = Number(o.deposit) || 0;
-            if (deposit > 0) {
-              const timeMs = parseDateTimeSafe(o.created_at);
-              unified.push({
-                id: `order-${o.id}`,
-                branchId: bId,
-                branchName: bName,
-                type: "entrada",
-                category: "abono_pedido",
-                categoryLabel: "Anticipo de Pedido",
-                amount: deposit,
-                reason: `Pedido #${o.order_number || o.id} (${o.customer_name || "Cliente"}): ${o.description || "Pedido especial"}`,
-                authorizedBy: o.cashier || "Cajero",
-                timestamp: formatDateTimeSafe(o.created_at),
-                createdAt: o.created_at,
-                rawTimestamp: timeMs,
-                movementType: "pedido",
-                cashier: o.cashier || "Cajero",
-                paymentMethod: o.payment_method || "efectivo",
-              });
-            }
+          // B) Pedidos con anticipo o abono cobrado HOY
+          unifiedOrdersList.forEach((o: any) => {
+            if (!o || o.status === "cancelado") return;
+            const dayCol = getOrderShiftCollection(o, todayStartTs);
+            if (dayCol.collectedTotal <= 0) return;
+
+            const rawNotes = String(o.notes || "");
+            const originMatch = rawNotes.match(/\[Origen:\s*([^\|\]]+)(?:\|([^\]]+))?\]/);
+            const originBranchId = originMatch && originMatch[1] ? originMatch[1].trim() : undefined;
+            const cashierBranchId = o.cashier && !/don toño|admin|carlos/i.test(String(o.cashier)) ? resolveBranchId(undefined, o.cashier) : undefined;
+            const bId = originBranchId
+              ? resolveBranchId(originBranchId, o.cashier)
+              : (o.operating_branch_id || o.operatingBranchId)
+              ? resolveBranchId(o.operating_branch_id || o.operatingBranchId, o.cashier)
+              : (cashierBranchId || resolveBranchForRecord(o.branch_id || o.branchId, o.cashier));
+
+            const bName = branchNameMap.get(bId) || o.operatingBranchName || o.branch_name || o.branchName || "Sucursal";
+            const timeMs = parseDateTimeSafe(o.createdAt || o.created_at) || Date.now();
+            unified.push({
+              id: `order-${o.id}`,
+              branchId: bId,
+              branchName: bName,
+              type: "entrada",
+              category: "abono_pedido",
+              categoryLabel: "Anticipo de Pedido",
+              amount: dayCol.collectedTotal,
+              reason: `Pedido #${o.orderNumber || o.order_number || o.id} (${o.customerName || o.customer_name || "Cliente"}): ${o.description || "Pedido especial"}`,
+              authorizedBy: o.cashier || "Cajero",
+              timestamp: formatDateTimeSafe(o.createdAt || o.created_at),
+              createdAt: o.createdAt || o.created_at,
+              rawTimestamp: Math.max(timeMs, todayStartTs),
+              movementType: "pedido",
+              cashier: o.cashier || "Cajero",
+              paymentMethod: o.paymentMethod || o.payment_method || "efectivo",
+            });
           });
 
           // C) Gastos en efectivo
@@ -1924,8 +2207,18 @@ function resolveBranchParam(param: string | null): string | null {
       ? realtimeHub.onOrder((payload) => {
           if (!payload || !payload.order) return;
           const { action, order } = payload;
-          const deposit = Number(order.deposit) || 0;
-          if (deposit > 0 && (action === "create" || action === "payment")) {
+          const paymentsArr = Array.isArray(order.payments) ? order.payments : [];
+          const lastPay = paymentsArr.length > 0 ? paymentsArr[paymentsArr.length - 1] : null;
+          const paidDelta =
+            action === "payment" && lastPay
+              ? Number(lastPay.amount) || 0
+              : Number(order.deposit) || 0;
+          const paidMethod =
+            action === "payment" && lastPay?.paymentMethod
+              ? lastPay.paymentMethod
+              : order.paymentMethod || "efectivo";
+
+          if (paidDelta > 0 && (action === "create" || action === "payment")) {
             const rawNotes = String(order.notes || "");
             const originMatch = rawNotes.match(/\[Origen:\s*([^\|\]]+)(?:\|([^\]]+))?\]/);
             const originBranchId = originMatch && originMatch[1] ? originMatch[1].trim() : undefined;
@@ -1943,7 +2236,7 @@ function resolveBranchParam(param: string | null): string | null {
               type: "entrada",
               category: "abono_pedido",
               categoryLabel: action === "payment" ? "Abono a Pedido" : "Anticipo de Pedido",
-              amount: deposit,
+              amount: paidDelta,
               reason: `Pedido #${order.orderNumber || order.id} (${order.customerName}): ${order.description || "Pedido especial"}`,
               authorizedBy: order.cashier || "Cajero",
               timestamp: payload.timestamp || new Date().toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" }),
@@ -1951,7 +2244,7 @@ function resolveBranchParam(param: string | null): string | null {
               rawTimestamp: Date.now(),
               movementType: "pedido",
               cashier: order.cashier || "Cajero",
-              paymentMethod: order.paymentMethod || "efectivo",
+              paymentMethod: paidMethod,
             };
 
             setCashMovements((prev) => {
@@ -1962,26 +2255,10 @@ function resolveBranchParam(param: string | null): string | null {
               return next;
             });
 
-            // Actualizar métricas de pedidos y dinero en gaveta de la sucursal operativa
-            setBranches((prev) => {
-              const isCash = order.paymentMethod === "efectivo" || !order.paymentMethod;
-              const updated = prev.map((b) => {
-                if (b.id !== bId) return b;
-                return {
-                  ...b,
-                  todaySales: (Number(b.todaySales) || 0) + deposit,
-                  todayTickets: (Number(b.todayTickets) || 0) + (action === "create" ? 1 : 0),
-                  todayOrdersDeposit: (Number(b.todayOrdersDeposit) || 0) + deposit,
-                  todayOrdersTotal: (Number(b.todayOrdersTotal) || 0) + (action === "create" ? (Number(order.total) || deposit) : 0),
-                  todayOrdersCount: (Number(b.todayOrdersCount) || 0) + (action === "create" ? 1 : 0),
-                  cashInDrawer: isCash ? (Number(b.cashInDrawer) || 0) + deposit : b.cashInDrawer,
-                };
-              });
-              try {
-                localStorage.setItem("brito_branches_data", JSON.stringify(updated));
-              } catch {}
-              return updated;
-            });
+            // Reconciliar métricas exactas del turno activo
+            setTimeout(() => {
+              syncBranchesRef.current?.();
+            }, 50);
 
             try {
               window.dispatchEvent(new Event("brito_caja_updated"));

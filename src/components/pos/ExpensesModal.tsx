@@ -60,7 +60,7 @@ import { useSync } from "@/context/SyncContext";
 import { useBranch } from "@/context/BranchContext";
 import { realtimeHub } from "@/lib/realtime/realtimeHub";
 import { recordCashOutflowAsExpense } from "@/lib/expenses";
-import { getStoredOrders, syncOrdersWithServer, normalizeOrder, updateOrderStatus, deleteCustomOrder } from "@/lib/orders";
+import { getStoredOrders, syncOrdersWithServer, normalizeOrder, updateOrderStatus, deleteCustomOrder, getOrderShiftCollection } from "@/lib/orders";
 import { getStoredIncomes, cleanDuplicateIncomes } from "@/lib/incomes";
 import { markRecordIdsAsSynced } from "@/lib/sync/syncService";
 import TicketModal from "@/components/pos/TicketModal";
@@ -1042,7 +1042,7 @@ export default function ExpensesModal({
   // Ventas exclusivas del turno actual (todas las ventas emitidas en la terminal en este turno)
   const effectiveSales = shiftSales;
 
-  // Pedidos especiales del turno (anticipos, liquidaciones y pedidos dados de salida en el turno activo)
+  // Pedidos especiales del turno (anticipos y liquidaciones cobrados estrictamente en el turno activo)
   const relevantOrders = useMemo(() => {
     const boundary = shiftStartBoundary > 0 ? shiftStartBoundary : getStoredShiftStartBoundary(activeBranch?.id);
     const sourceOrders = mergeOrdersList(orders, internalOrders);
@@ -1050,20 +1050,8 @@ export default function ExpensesModal({
       if (!o) return false;
       if (o.status === "cancelado") return false;
       if (!isOrderCashInBranch(o) && !isOrderInBranch(o)) return false;
-      const oTime = parseDateTimeSafe(o.timestamp || o.createdAt || (o as any).created_at || (o as any).date);
-      const latestPaymentTime = Array.isArray(o.payments) && o.payments.length > 0
-        ? Math.max(...o.payments.map((p) => parseDateTimeSafe(p.date || (p as any).timestamp || (p as any).createdAt) || 0))
-        : 0;
-      const effectiveTime = Math.max(oTime || 0, latestPaymentTime || 0);
-      if (boundary > 0) {
-        if (!effectiveTime || effectiveTime < boundary) {
-          return false;
-        }
-      }
-      if (effectiveTime > Date.now() + 60000) {
-        return false;
-      }
-      return true;
+      const col = getOrderShiftCollection(o, boundary);
+      return col.isInShift;
     });
   }, [orders, internalOrders, mergeOrdersList, isOrderCashInBranch, isOrderInBranch, shiftStartBoundary, shiftVersion, ordersVersion, activeBranch?.id]);
 
@@ -1126,7 +1114,7 @@ export default function ExpensesModal({
 
   // Métricas superiores sincronizadas con el alcance activo (ventas de mostrador sin pedidos)
   const activeSalesForKpi = useMemo(() => {
-    return salesPoolForTickets.filter((s) => !s.isCustomOrder);
+    return salesPoolForTickets.filter((s) => !s.isCustomOrder && !String(s.id || "").startsWith("PED-") && !String(s.id || "").startsWith("LIQ-"));
   }, [salesPoolForTickets]);
   const activeOrdersForKpi = ordersPool;
 
@@ -1135,7 +1123,7 @@ export default function ExpensesModal({
   // Ventas de mostrador del turno (todas las formas de pago: efectivo, tarjeta, transferencia)
   const shiftPurePosTotal = useMemo(() => {
     const calculated = effectiveSales
-      .filter((s) => !s.isCustomOrder)
+      .filter((s) => !s.isCustomOrder && !String(s.id || "").startsWith("PED-") && !String(s.id || "").startsWith("LIQ-"))
       .reduce((acc, s) => acc + (Number(s.total) || 0), 0);
     const branchDeskTotal = Number(activeBranch?.todayDeskSales ?? (activeBranch?.todaySales && (activeBranch?.todayOrdersDeposit ?? 0) === 0 ? activeBranch.todaySales : 0));
     return branchDeskTotal > 0 && calculated === 0 ? branchDeskTotal : calculated > 0 ? calculated : branchDeskTotal;
@@ -1144,7 +1132,7 @@ export default function ExpensesModal({
   // Ventas de mostrador puras en efectivo (excluyendo pedidos) - Para el balance contable del cajón
   const shiftPurePosCash = useMemo(() => {
     const calculated = effectiveSales
-      .filter((s) => s.paymentMethod === "efectivo" && !s.isCustomOrder)
+      .filter((s) => s.paymentMethod === "efectivo" && !s.isCustomOrder && !String(s.id || "").startsWith("PED-") && !String(s.id || "").startsWith("LIQ-"))
       .reduce((acc, s) => acc + (Number(s.total) || 0), 0);
     const branchDeskCash = Number(activeBranch?.todayDeskSales ?? (activeBranch?.todaySales && (activeBranch?.todayOrdersDeposit ?? 0) === 0 ? activeBranch.todaySales : 0));
     return branchDeskCash > 0 && calculated === 0 ? branchDeskCash : calculated > 0 ? calculated : branchDeskCash;
@@ -1152,29 +1140,23 @@ export default function ExpensesModal({
 
   // Pedidos especiales del turno (todas las formas de pago: efectivo, tarjeta, transferencia)
   const shiftOrdersTotal = useMemo(() => {
-    const fromSales = effectiveSales
-      .filter((s) => s.isCustomOrder)
-      .reduce((acc, s) => acc + (Number(s.total) || 0), 0);
-    const fromOrders = effectiveOrders
-      .filter((o) => !effectiveSales.some((s) => s.id === o.orderNumber || s.id === o.id))
-      .reduce((sum, o) => sum + (Number(o.deposit) || 0), 0);
-    const calculated = fromSales + fromOrders;
-    const branchOrdersTotal = Number(activeBranch?.todayOrdersTotal ?? activeBranch?.todayOrdersDeposit ?? 0);
+    const boundary = shiftStartBoundary > 0 ? shiftStartBoundary : getStoredShiftStartBoundary(activeBranch?.id);
+    const calculated = effectiveOrders
+      .filter((o) => isOrderCashInBranch(o))
+      .reduce((sum, o) => sum + getOrderShiftCollection(o, boundary).collectedTotal, 0);
+    const branchOrdersTotal = Number(activeBranch?.todayOrdersDeposit ?? 0);
     return branchOrdersTotal > 0 && calculated === 0 ? branchOrdersTotal : calculated > 0 ? calculated : branchOrdersTotal;
-  }, [effectiveSales, effectiveOrders, activeBranch?.todayOrdersTotal, activeBranch?.todayOrdersDeposit]);
+  }, [effectiveOrders, isOrderCashInBranch, shiftStartBoundary, activeBranch?.id, activeBranch?.todayOrdersDeposit]);
 
   // Pedidos especiales cobrados en efectivo (anticipos y liquidaciones) - Para el balance contable del cajón
   const shiftOrdersCash = useMemo(() => {
-    const fromSales = effectiveSales
-      .filter((s) => s.paymentMethod === "efectivo" && s.isCustomOrder)
-      .reduce((acc, s) => acc + (Number(s.total) || 0), 0);
-    const fromOrders = effectiveOrders
-      .filter((o) => (o.paymentMethod === "efectivo" || !o.paymentMethod) && !effectiveSales.some((s) => s.id === o.orderNumber || s.id === o.id))
-      .reduce((sum, o) => sum + (Number(o.deposit) || 0), 0);
-    const calculated = fromSales + fromOrders;
+    const boundary = shiftStartBoundary > 0 ? shiftStartBoundary : getStoredShiftStartBoundary(activeBranch?.id);
+    const calculated = effectiveOrders
+      .filter((o) => isOrderCashInBranch(o))
+      .reduce((sum, o) => sum + getOrderShiftCollection(o, boundary).collectedCash, 0);
     const branchOrdersCash = Number(activeBranch?.todayOrdersDeposit ?? 0);
     return branchOrdersCash > 0 && calculated === 0 ? branchOrdersCash : calculated > 0 ? calculated : branchOrdersCash;
-  }, [effectiveSales, effectiveOrders, activeBranch?.todayOrdersDeposit]);
+  }, [effectiveOrders, isOrderCashInBranch, shiftStartBoundary, activeBranch?.id, activeBranch?.todayOrdersDeposit]);
 
   // Ventas totales en efectivo (mostrador + anticipos/liquidaciones de pedidos)
   const totalShiftCashSales = useMemo(() => {
@@ -1194,27 +1176,10 @@ export default function ExpensesModal({
     })
     .reduce((sum, i) => sum + i.amount, 0);
 
-  const targetBranchCash = branchCashInDrawer !== undefined && branchCashInDrawer !== null
-    ? Number(branchCashInDrawer)
-    : Number(activeBranch?.cashInDrawer ?? 0);
-
   const calculatedCashInDrawer = Math.max(0, effectiveFund + totalShiftCashSales + totalIncomesInCash - totalExpenses);
-  const netCashInDrawer = (totalShiftCashSales > 0 || totalIncomesInCash > 0 || totalExpenses > 0)
-    ? Math.max(targetBranchCash, calculatedCashInDrawer)
-    : (targetBranchCash > 0 ? targetBranchCash : calculatedCashInDrawer);
-
-  // Reconciliación contable exacta: Si netCashInDrawer viene de la sucursal activa (p.ej. $3,467 de San Benito)
-  // garantizamos que Fondo + Ventas + Pedidos + Entradas - Salidas sea matemáticamente idéntico y gemelo a Corte de Caja
-  const netNonFundCash = Math.max(0, netCashInDrawer - effectiveFund - totalIncomesInCash + totalExpenses);
-  const reconciledCashSales = (totalShiftCashSales > 0 && Math.abs(effectiveFund + totalShiftCashSales + totalIncomesInCash - totalExpenses - netCashInDrawer) < 0.01)
-    ? totalShiftCashSales
-    : (cashSalesTotal !== undefined && cashSalesTotal > 0 && Math.abs(effectiveFund + cashSalesTotal + totalIncomesInCash - totalExpenses - netCashInDrawer) < 0.01
-        ? cashSalesTotal
-        : netNonFundCash);
-
-  const reconciledPurePosCash = (shiftPurePosCash > 0 && Math.abs(shiftPurePosCash + shiftOrdersCash - reconciledCashSales) < 0.01)
-    ? shiftPurePosCash
-    : Math.max(0, reconciledCashSales - shiftOrdersCash);
+  const netCashInDrawer = calculatedCashInDrawer;
+  const reconciledCashSales = totalShiftCashSales;
+  const reconciledPurePosCash = shiftPurePosCash;
 
   const totalOrdersDeposits = activeOrdersForKpi.reduce((sum, o) => sum + (Number(o.deposit) || 0), 0);
   const totalOrdersValue = activeOrdersForKpi.reduce((sum, o) => sum + (Number(o.total) || 0), 0);

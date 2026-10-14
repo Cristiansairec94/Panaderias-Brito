@@ -127,18 +127,6 @@ export default function OrderPaymentModal({
 
       if (numericAmount > 0) {
         try {
-          registerRealSale(
-            paymentBranchId,
-            numericAmount,
-            paymentMethod,
-            user?.name || "Cajero en Turno",
-            `${isFullPayment ? "Liquidación" : "Abono"} Pedido ${order.orderNumber} - ${order.customerName}`
-          );
-        } catch (saleErr) {
-          console.warn("Could not register in registerRealSale:", saleErr);
-        }
-
-        try {
           const isCross = originBranchName.toLowerCase().trim() !== pickupBranchName.toLowerCase().trim();
           const newTotalPaid = Number(updatedOrder?.deposit ?? (order.deposit + numericAmount));
           const finalOrder: CustomOrder = updatedOrder || {

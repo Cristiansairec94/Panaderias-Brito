@@ -397,12 +397,14 @@ export interface Branch {
   topProduct?: BranchTopProduct;
   todayDeskSales?: number;
   todayDeskTickets?: number;
+  todayPieces?: number;
   todayOrdersDeposit?: number;
   todayOrdersTotal?: number;
   todayOrdersCount?: number;
   lastCut?: ShiftCutRecord;
   dayAccumulatedSales?: number;
   dayAccumulatedTickets?: number;
+  dayAccumulatedPieces?: number;
 }
 
 export interface BranchCashMovement {

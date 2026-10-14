@@ -542,6 +542,8 @@ export function getStoredShiftStartBoundary(branchId?: string): number {
   if (typeof window === "undefined") return 0;
   try {
     const now = Date.now();
+    const MIN_SHIFT_EPOCH = 1791928800000;
+
     const effectiveBranchId =
       branchId ||
       localStorage.getItem("brito_current_branch_id") ||
@@ -555,7 +557,7 @@ export function getStoredShiftStartBoundary(branchId?: string): number {
       const branchStored = localStorage.getItem("brito_shift_start_" + effectiveBranchId);
       if (branchStored && !isNaN(Number(branchStored)) && Number(branchStored) > 0) {
         const num = Number(branchStored);
-        if (num <= now && num > maxCutTs) {
+        if (num >= MIN_SHIFT_EPOCH && num <= now && num > maxCutTs) {
           maxCutTs = num;
         }
       }
@@ -569,13 +571,8 @@ export function getStoredShiftStartBoundary(branchId?: string): number {
         if (Array.isArray(parsed) && parsed.length > 0) {
           for (const cut of parsed) {
             let cutBranch = cut.branchId || "branch-matriz";
-            if (cutBranch === "branch-matriz") {
-              const resp = (cut.responsible || cut.outgoingCashier || "").toLowerCase();
-              if (resp.includes("silvia") || resp.includes("ildefonso")) {
-                cutBranch = "branch-1790889237862";
-              } else if (resp.includes("angeles") || resp.includes("ángeles") || resp.includes("lazaro") || resp.includes("lázaro")) {
-                cutBranch = "branch-angeles";
-              }
+            if (cutBranch === "branch-matriz" && (cut.responsible || cut.outgoingCashier)) {
+              cutBranch = resolveBranchId(cut.branchId, cut.responsible || cut.outgoingCashier);
             }
             if (effectiveBranchId && effectiveBranchId !== "all" && cutBranch !== effectiveBranchId) {
               continue;
@@ -584,7 +581,7 @@ export function getStoredShiftStartBoundary(branchId?: string): number {
               typeof cut.timestamp === "number"
                 ? cut.timestamp
                 : parseDateTimeSafe(cut.timestamp || cut.date || cut.createdAt);
-            if (cutTs > 0 && cutTs <= now && cutTs > maxCutTs) {
+            if (cutTs >= MIN_SHIFT_EPOCH && cutTs <= now && cutTs > maxCutTs) {
               maxCutTs = cutTs;
             }
           }
@@ -599,28 +596,20 @@ export function getStoredShiftStartBoundary(branchId?: string): number {
         const branches = JSON.parse(rawBranches);
         if (Array.isArray(branches)) {
           const matchB = branches.find((b: any) => b && b.id === effectiveBranchId);
-          if (matchB) {
-            if (matchB.lastCut) {
-              const bCutTs = typeof matchB.lastCut.timestamp === "number"
-                ? matchB.lastCut.timestamp
-                : parseDateTimeSafe(matchB.lastCut.timestamp || matchB.lastCut.date || matchB.lastCut.createdAt);
-              if (bCutTs > 0 && bCutTs <= now && bCutTs > maxCutTs) {
-                maxCutTs = bCutTs;
-              }
-            }
-            if (matchB.currentShift?.openedAt) {
-              const openTs = parseDateTimeSafe(matchB.currentShift.openedAt);
-              if (openTs > 0 && openTs <= now && openTs > maxCutTs) {
-                maxCutTs = openTs;
-              }
+          if (matchB && matchB.lastCut) {
+            const bCutTs = typeof matchB.lastCut.timestamp === "number"
+              ? matchB.lastCut.timestamp
+              : parseDateTimeSafe(matchB.lastCut.timestamp || matchB.lastCut.date || matchB.lastCut.createdAt);
+            if (bCutTs >= MIN_SHIFT_EPOCH && bCutTs <= now && bCutTs > maxCutTs) {
+              maxCutTs = bCutTs;
             }
           }
         }
       }
     } catch {}
 
-    // 4. Si encontramos un corte válido, asegurar que la clave específica quede guardada
-    if (maxCutTs > 0) {
+    // 4. Si encontramos un corte válido para la sucursal, asegurar que la clave específica quede guardada
+    if (maxCutTs >= MIN_SHIFT_EPOCH) {
       try {
         if (effectiveBranchId && effectiveBranchId !== "all") {
           localStorage.setItem("brito_shift_start_" + effectiveBranchId, maxCutTs.toString());
@@ -629,21 +618,19 @@ export function getStoredShiftStartBoundary(branchId?: string): number {
       return maxCutTs;
     }
 
-    // 5. Clave global del turno actual sólo si no hay sucursal específica o no encontró corte
+    // 5. Clave global del turno actual sólo si no hay sucursal específica
     if (!effectiveBranchId || effectiveBranchId === "all") {
       const stored = localStorage.getItem("brito_current_shift_start_timestamp");
       if (stored && !isNaN(Number(stored)) && Number(stored) > 0) {
         const num = Number(stored);
-        if (num <= now) return num;
+        if (num >= MIN_SHIFT_EPOCH && num <= now) return num;
       }
     }
 
-    // 6. Si no hay cortes hoy, iniciar al comienzo del día de hoy (00:00:00)
-    const todayStart = new Date();
-    todayStart.setHours(0, 0, 0, 0);
-    return todayStart.getTime();
+    // 6. Si la sucursal no tiene cortes cerrados aún, su turno abarca desde CLEAN_SLATE_EPOCH
+    return MIN_SHIFT_EPOCH;
   } catch (e) {}
-  return Date.now();
+  return 0;
 }
 
 /**
@@ -860,10 +847,10 @@ export function resolveBranchId(rawBranchId: string | null | undefined, cashierN
 
     // 3. Reconocimiento de palabras clave y nombres canónicos
     if (cLower.includes("angeles") || cLower.includes("ángeles") || cLower.includes("lazaro") || cLower.includes("lázaro") || cLower.includes("andres") || cLower.includes("andrés")) return "branch-angeles";
-    if (cLower.includes("benito") || cLower.includes("mendoza")) return "branch-benito";
+    if (cLower.includes("benito") || cLower.includes("mendoza") || cLower === "ana" || cLower.startsWith("ana ")) return "branch-benito";
     if (cLower.includes("ildefonso") || cLower.includes("silvia") || cLower.includes("puga")) return "branch-1790889237862";
     if (cLower.includes("sanjuan") || cLower.includes("san juan") || cLower.includes("noe") || cLower.includes("noé") || cLower.includes("velasquez") || cLower.includes("velásquez")) return "branch-sanjuan";
-    if (cLower.includes("flores") || cLower.includes("sofia") || cLower.includes("sofía") || cLower.includes("elena")) return "branch-flores";
+    if (cLower.includes("flores") || cLower.includes("sofia") || cLower.includes("sofía") || cLower.includes("elena") || cLower.includes("carmen")) return "branch-flores";
     if (cLower.includes("matriz") || cLower.includes("centro") || cLower.includes("toño") || cLower.includes("tono") || cLower.includes("lupita") || cLower.includes("bueno")) return "branch-matriz";
   }
 

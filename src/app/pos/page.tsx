@@ -84,7 +84,7 @@ import PrinterConfigModal from "@/components/pos/PrinterConfigModal";
 import CreateOrderModal from "@/components/pedidos/CreateOrderModal";
 import OrderReceiptModal from "@/components/pedidos/OrderReceiptModal";
 import OrderPaymentModal from "@/components/pedidos/OrderPaymentModal";
-import { getStoredOrders, syncOrdersWithServer } from "@/lib/orders";
+import { getStoredOrders, syncOrdersWithServer, getOrderShiftCollection } from "@/lib/orders";
 import { recordPosSaleIncome, removePosSaleIncome, getStoredIncomes, cleanDuplicateIncomes } from "@/lib/incomes";
 import { getStoredPrinterConfig, PrinterConfig } from "@/lib/printer";
 
@@ -408,7 +408,7 @@ function CartPriceInput({
 export default function POSPage() {
   const { user } = useAuth();
   const isAdmin = user?.role === "admin" || user?.role === "auxiliar_admin";
-  const { branches, currentBranch, switchBranch, registerRealSale, cancelRealSale, cashMovements } = useBranch();
+  const { branches, currentBranch, switchBranch, updateBranch, registerRealSale, cancelRealSale, cashMovements } = useBranch();
   const { addNotification, openShiftCutDetail } = useNotifications();
   const { toggleMobile } = useSidebar();
   const { isOnline, isSyncing, isSynced, enqueueOfflineItem, removeQueueItem, pendingCount } = useSync();
@@ -2183,15 +2183,15 @@ export default function POSPage() {
 
   const totalCashSales = useMemo(() => {
     let posCash = (currentShiftSales || [])
-      .filter((s) => s && s.paymentMethod === "efectivo")
+      .filter((s) => s && s.paymentMethod === "efectivo" && !s.isCustomOrder && !String(s.id || "").startsWith("PED-") && !String(s.id || "").startsWith("LIQ-"))
       .reduce((sum, s) => sum + (Number(s.total) || 0), 0);
     const branchDeskCash = Number(activeBranch?.todayDeskSales ?? (activeBranch?.todaySales && (activeBranch?.todayOrdersDeposit ?? 0) === 0 ? activeBranch.todaySales : 0));
     if (branchDeskCash > 0 && posCash === 0) {
       posCash = branchDeskCash;
     }
-    // Para el conteo de efectivo en cajón, sumar anticipos cobrados en efectivo en este turno y sucursal operativa
-    const allShiftOrdersForCash = getStoredOrders().filter((o) => {
-      if (!o || o.status === "cancelado") return false;
+    // Para el conteo de efectivo en cajón, sumar anticipos y liquidaciones cobrados en efectivo estrictamente en este turno y sucursal operativa
+    const ordersCashCalc = getStoredOrders().reduce((sum, o) => {
+      if (!o || o.status === "cancelado") return sum;
       if (activeBranch && activeBranch.id !== "all") {
         const bId = activeBranch.id.toLowerCase().trim();
         const rawNotes = String(o.notes || "");
@@ -2208,24 +2208,16 @@ export default function POSPage() {
           ? resolveBranchId(opId, o.cashier)
           : (cashierBranchId || resolveBranchId(pId, o.cashier));
         if (cashBranchId !== bId) {
-          return false;
+          return sum;
         }
       }
-      const t = parseDateTimeSafe(o.timestamp || o.createdAt || (o as any).created_at || (o as any).date);
-      if (shiftStartBoundary > 0 && (!t || t < shiftStartBoundary)) return false;
-      return (o.paymentMethod === "efectivo" || !o.paymentMethod) && !(currentShiftSales || []).some((s) => s.id === o.orderNumber || s.id === o.id);
-    });
-    const ordersCashCalc = allShiftOrdersForCash.reduce((sum, o) => sum + (Number(o.deposit) || 0), 0);
+      const col = getOrderShiftCollection(o, shiftStartBoundary);
+      return sum + col.collectedCash;
+    }, 0);
     const branchOrdersDeposit = Number(activeBranch?.todayOrdersDeposit ?? 0);
     const ordersCash = ordersCashCalc > 0 ? ordersCashCalc : (branchOrdersDeposit > 0 ? branchOrdersDeposit : 0);
-    const baseCash = posCash + ordersCash;
-    const targetBranchCash = Number(activeBranch?.cashInDrawer ?? 0);
-    const targetFund = Number(initialCashFund || 0);
-    if (targetBranchCash > 0 && baseCash === 0 && targetBranchCash > targetFund) {
-      return targetBranchCash - targetFund;
-    }
-    return baseCash;
-  }, [currentShiftSales, shiftStartBoundary, shiftVersion, activeBranch?.id, activeBranch?.todayDeskSales, activeBranch?.todaySales, activeBranch?.todayOrdersDeposit, activeBranch?.currentShift?.cashSales, activeBranch?.cashInDrawer, initialCashFund]);
+    return posCash + ordersCash;
+  }, [currentShiftSales, shiftStartBoundary, shiftVersion, activeBranch?.id, activeBranch?.todayDeskSales, activeBranch?.todaySales, activeBranch?.todayOrdersDeposit]);
 
   const totalExpenses = (currentShiftExpenses || []).reduce((sum, e) => sum + (Number(e?.amount) || 0), 0);
   const totalExtraInCash = (currentShiftIncomes || [])
@@ -2239,12 +2231,16 @@ export default function POSPage() {
       return true;
     })
     .reduce((sum, i) => sum + (Number(i.amount) || 0), 0);
-  const calculatedNetCashInDrawer = (Number(initialCashFund) || 0) + totalCashSales + totalExtraInCash - totalExpenses;
-  const netCashInDrawer = (totalCashSales > 0 || totalExtraInCash > 0 || totalExpenses > 0)
-    ? Math.max(Number(activeBranch?.cashInDrawer || 0), calculatedNetCashInDrawer)
-    : (activeBranch?.cashInDrawer !== undefined && Number(activeBranch.cashInDrawer) > 0
-        ? Number(activeBranch.cashInDrawer)
-        : calculatedNetCashInDrawer);
+  const calculatedNetCashInDrawer = Math.max(0, (Number(initialCashFund) || 0) + totalCashSales + totalExtraInCash - totalExpenses);
+  const netCashInDrawer = calculatedNetCashInDrawer;
+
+  useEffect(() => {
+    if (!activeBranch || !activeBranch.id || activeBranch.id === "all") return;
+    const currentDrawer = Number(activeBranch.cashInDrawer ?? 0);
+    if (Math.abs(currentDrawer - netCashInDrawer) >= 0.01) {
+      updateBranch(activeBranch.id, { cashInDrawer: netCashInDrawer });
+    }
+  }, [activeBranch?.id, activeBranch?.cashInDrawer, netCashInDrawer, updateBranch]);
   const totalStockValue = (products || []).reduce((sum, p) => sum + ((Number(p?.stock) || 0) * (Number(p?.price) || 0)), 0);
 
   const handleQuickCash = (amount: number) => {
@@ -3935,7 +3931,7 @@ export default function POSPage() {
                   title={`Dinero actual en cajón para ${activeBranch?.name || "Sucursal Matriz"}`}
                 >
                   <span>💵 Caja:</span>
-                  <strong className="text-emerald-400 font-black">{formatCurrency(activeBranch?.cashInDrawer ?? 0)}</strong>
+                  <strong className="text-emerald-400 font-black">{formatCurrency(netCashInDrawer)}</strong>
                 </span>
                 <span className="text-amber-400/60">•</span>
                 <span className="text-amber-300/80 font-medium">Mostrador</span>

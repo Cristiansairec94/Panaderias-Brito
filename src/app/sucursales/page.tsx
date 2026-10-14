@@ -237,24 +237,26 @@ export default function SucursalesPage() {
 
   // General metrics calculated per branch for the selected period
   const branchesOverview = useMemo(() => {
+    const isTodayPeriod = selectedPeriod === "hoy";
     const totalChainPeriodSales = branches.reduce((sum, b) => {
+      if (isTodayPeriod) return sum + Number(b.todaySales || 0);
       const weight = b.code.includes("MAT") ? 1.05 : b.code.includes("BEN") ? 0.95 : 1.0;
       return sum + Math.round(b.todaySales * periodMultiplier * weight);
     }, 0);
 
     return branches.map((b) => {
-      const weight = b.code.includes("MAT") ? 1.05 : b.code.includes("BEN") ? 0.95 : 1.0;
-      const periodSales = Math.round(b.todaySales * periodMultiplier * weight);
-      const periodTickets = Math.max(1, Math.round(b.todayTickets * periodMultiplier * weight));
+      const weight = isTodayPeriod ? 1.0 : (b.code.includes("MAT") ? 1.05 : b.code.includes("BEN") ? 0.95 : 1.0);
+      const periodSales = isTodayPeriod ? Number(b.todaySales || 0) : Math.round(b.todaySales * periodMultiplier * weight);
+      const periodTickets = isTodayPeriod ? Number(b.todayTickets || 0) : Math.round(b.todayTickets * periodMultiplier * weight);
       // Average price per bread piece ~ $16.5 MXN
       const periodPieces = Math.round(periodSales / 16.5);
       const dailyAveragePieces = Math.round(periodPieces / periodMultiplier);
-      const averageTicket = periodSales / periodTickets;
+      const averageTicket = periodTickets > 0 ? periodSales / periodTickets : 0;
       const periodGoal = b.dailyGoal * periodMultiplier;
       const percentGoal = Math.min(100, Math.round((periodSales / (periodGoal || 1)) * 100));
       const marketShare = totalChainPeriodSales > 0 
         ? Math.round((periodSales / totalChainPeriodSales) * 100) 
-        : 33;
+        : Math.round(100 / Math.max(1, branches.length));
 
       // Realistic breakdown stats for the expanded drawer
       const isMatriz = b.code.includes("MAT");

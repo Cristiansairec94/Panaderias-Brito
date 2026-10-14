@@ -485,6 +485,15 @@ export async function syncAllLocalDataToSupabase(): Promise<{
 
     const unsyncedSales = Array.from(salesMap.values()).filter((s) => {
       if (!s.id || syncedIds.has(s.id)) return false;
+      const idStr = String(s.id);
+      if (
+        s.isCustomOrder ||
+        idStr.startsWith("LIQ-") ||
+        idStr.startsWith("PED-") ||
+        /^pos-\d{10,}$/.test(idStr)
+      ) {
+        return false;
+      }
       const sTs = s.timestamp ? Number(s.timestamp) : parseDateTimeSafe(s.createdAt || s.date);
       return sTs >= CLEAN_SLATE_EPOCH;
     });
@@ -495,10 +504,15 @@ export async function syncAllLocalDataToSupabase(): Promise<{
       for (let i = 0; i < unsyncedSales.length; i += CHUNK_SIZE) {
         const chunk = unsyncedSales.slice(i, i + CHUNK_SIZE);
         const salesPayload = chunk.map((sale) => {
-          const sDate = sale.date || sale.createdAt || new Date().toISOString();
+          const sTs = sale.timestamp ? Number(sale.timestamp) : parseDateTimeSafe(sale.createdAt || sale.date);
+          const isoCreated = sale.createdAt && !isNaN(Date.parse(sale.createdAt))
+            ? new Date(sale.createdAt).toISOString()
+            : (sTs > 0 ? new Date(sTs).toISOString() : new Date().toISOString());
+          const sDate = sale.date || isoCreated;
           return {
             id: sale.id,
             date: sDate,
+            created_at: isoCreated,
             total: Number(sale.total) || 0,
             payment_method: sale.paymentMethod || "efectivo",
             cashier: sale.cashier || "Don Toño Brito",
@@ -571,23 +585,37 @@ export async function syncAllLocalDataToSupabase(): Promise<{
       return eTs >= CLEAN_SLATE_EPOCH;
     });
     if (unsyncedExpenses.length > 0) {
-      const expPayload = unsyncedExpenses.map((exp) => ({
-        id: exp.id,
-        amount: Number(exp.amount) || 0,
-        category: exp.category || "general",
-        description: exp.description || exp.reason || "Gasto de caja",
-        cashier: exp.cashier || "Don Toño Brito",
-        branch_id: exp.branchId || "branch-matriz",
-      }));
-      const movPayload = unsyncedExpenses.map((exp) => ({
-        id: exp.id.startsWith("mov-") ? exp.id : `mov-${exp.id}`,
-        type: "salida",
-        category: exp.category || "general",
-        amount: Number(exp.amount) || 0,
-        reason: exp.description || exp.reason || "Gasto",
-        authorized_by: exp.cashier || "Don Toño Brito",
-        branch_id: exp.branchId || "branch-matriz",
-      }));
+      const expPayload = unsyncedExpenses.map((exp) => {
+        const eTs = exp.timestamp ? Number(exp.timestamp) : parseDateTimeSafe(exp.createdAt || exp.date);
+        const isoCreated = exp.createdAt && !isNaN(Date.parse(exp.createdAt))
+          ? new Date(exp.createdAt).toISOString()
+          : (eTs > 0 ? new Date(eTs).toISOString() : new Date().toISOString());
+        return {
+          id: exp.id,
+          amount: Number(exp.amount) || 0,
+          category: exp.category || "general",
+          description: exp.description || exp.reason || "Gasto de caja",
+          cashier: exp.cashier || "Don Toño Brito",
+          branch_id: exp.branchId || "branch-matriz",
+          created_at: isoCreated,
+        };
+      });
+      const movPayload = unsyncedExpenses.map((exp) => {
+        const eTs = exp.timestamp ? Number(exp.timestamp) : parseDateTimeSafe(exp.createdAt || exp.date);
+        const isoCreated = exp.createdAt && !isNaN(Date.parse(exp.createdAt))
+          ? new Date(exp.createdAt).toISOString()
+          : (eTs > 0 ? new Date(eTs).toISOString() : new Date().toISOString());
+        return {
+          id: exp.id.startsWith("mov-") ? exp.id : `mov-${exp.id}`,
+          type: "salida",
+          category: exp.category || "general",
+          amount: Number(exp.amount) || 0,
+          reason: exp.description || exp.reason || "Gasto",
+          authorized_by: exp.cashier || "Don Toño Brito",
+          branch_id: exp.branchId || "branch-matriz",
+          created_at: isoCreated,
+        };
+      });
 
       await supabase.from("cash_expenses").upsert(expPayload, { onConflict: "id" });
       await supabase.from("cash_movements").upsert(movPayload, { onConflict: "id" });
@@ -601,16 +629,6 @@ export async function syncAllLocalDataToSupabase(): Promise<{
   // 4. Sincronizar Ingresos Locales (en lote)
   try {
     const incomesMap = new Map<string, any>();
-    const rawInc1 = localStorage.getItem("brito_incomes_v2");
-    if (rawInc1) {
-      const list = JSON.parse(rawInc1);
-      if (Array.isArray(list)) list.forEach((i) => i.id && incomesMap.set(i.id, i));
-    }
-    const rawInc2 = localStorage.getItem("brito_cash_incomes");
-    if (rawInc2) {
-      const list = JSON.parse(rawInc2);
-      if (Array.isArray(list)) list.forEach((i) => i.id && !incomesMap.has(i.id) && incomesMap.set(i.id, i));
-    }
     const rawInc3 = localStorage.getItem("brito_pos_current_incomes");
     if (rawInc3) {
       const list = JSON.parse(rawInc3);
@@ -619,19 +637,27 @@ export async function syncAllLocalDataToSupabase(): Promise<{
 
     const unsyncedIncomes = Array.from(incomesMap.values()).filter((i) => {
       if (!i.id || i.id.includes("ING-ING") || syncedIds.has(i.id)) return false;
-      const iTs = i.timestamp || (i.createdAt ? parseDateTimeSafe(i.createdAt) : 0);
+      if (i.category === "venta_mostrador" || i.category === "abono_pedido" || i.category === "pedido" || i.orderId || i.saleId) return false;
+      const iTs = parseDateTimeSafe(i.timestamp || i.createdAt || i.date);
       return iTs >= CLEAN_SLATE_EPOCH;
     });
     if (unsyncedIncomes.length > 0) {
-      const incPayload = unsyncedIncomes.map((inc) => ({
-        id: inc.id,
-        type: "entrada",
-        category: inc.category || "general",
-        amount: Number(inc.amount) || 0,
-        reason: inc.concept || inc.reason || "Ingreso de caja",
-        authorized_by: inc.cashier || "Don Toño Brito",
-        branch_id: inc.branchId || "branch-matriz",
-      }));
+      const incPayload = unsyncedIncomes.map((inc) => {
+        const iTs = parseDateTimeSafe(inc.timestamp || inc.createdAt || inc.date);
+        const isoCreated = inc.createdAt && !isNaN(Date.parse(inc.createdAt))
+          ? new Date(inc.createdAt).toISOString()
+          : (iTs > 0 ? new Date(iTs).toISOString() : new Date().toISOString());
+        return {
+          id: inc.id,
+          type: "entrada",
+          category: inc.category || "general",
+          amount: Number(inc.amount) || 0,
+          reason: inc.concept || inc.reason || "Ingreso de caja",
+          authorized_by: inc.cashier || "Don Toño Brito",
+          branch_id: inc.branchId || "branch-matriz",
+          created_at: isoCreated,
+        };
+      });
       await supabase.from("cash_movements").upsert(incPayload, { onConflict: "id" });
       incomesSynced = unsyncedIncomes.length;
       markRecordIdsAsSynced(unsyncedIncomes.map((i) => i.id));

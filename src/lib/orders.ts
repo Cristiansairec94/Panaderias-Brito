@@ -301,7 +301,7 @@ export function normalizeOrder(order: any): CustomOrder {
     payments = [
       {
         id: `PAY-${orderNumber}-0`,
-        date: new Date(timestamp).toLocaleDateString("es-MX", { dateStyle: "short" }),
+        date: formatDateTimeSafe(createdTs),
         amount: deposit,
         paymentMethod: paymentMethod,
         cashier: cashier,
@@ -340,6 +340,113 @@ export function normalizeOrder(order: any): CustomOrder {
     cashier,
     payments,
   };
+}
+
+export interface OrderShiftCollection {
+  isInShift: boolean;
+  isCreatedInShift: boolean;
+  orderTotalInShift: number;
+  collectedTotal: number;
+  collectedCash: number;
+  collectedCard: number;
+  collectedTransfer: number;
+}
+
+/**
+ * Calcula con precisión contable cuánto dinero de un pedido especial ingresó
+ * estrictamente dentro del turno activo (>= shiftBoundary), evitando que pedidos
+ * de días o turnos anteriores inflen la caja actual.
+ */
+export function getOrderShiftCollection(order: any, shiftBoundary: number, targetBranchId?: string): OrderShiftCollection {
+  const empty: OrderShiftCollection = {
+    isInShift: false,
+    isCreatedInShift: false,
+    orderTotalInShift: 0,
+    collectedTotal: 0,
+    collectedCash: 0,
+    collectedCard: 0,
+    collectedTransfer: 0,
+  };
+  if (!order || order.status === "cancelado") return empty;
+
+  const effectiveBoundary = Math.max(shiftBoundary || 0, CLEAN_SLATE_EPOCH);
+
+  const rawNotes = String(order.notes || "");
+  const originMatch = rawNotes.match(/\[Origen:\s*([^\|\]\r\n]+)(?:\|([^\]\r\n]+))?\]/);
+  const originBranchId = originMatch && originMatch[1] ? originMatch[1].trim() : undefined;
+  const opId = order.operatingBranchId || order.operating_branch_id;
+  const pId = order.branchId || order.branch_id;
+  const ordCashierBranch = order.cashier && !/don toño|admin|carlos/i.test(String(order.cashier))
+    ? resolveBranchId(undefined, order.cashier)
+    : undefined;
+  const orderOriginBranch = originBranchId
+    ? resolveBranchId(originBranchId, order.cashier)
+    : opId
+    ? resolveBranchId(opId, order.cashier)
+    : (ordCashierBranch || resolveBranchId(pId, order.cashier));
+
+  const createdRaw = order.createdAt || order.created_at || order.date;
+  const createdTs = parseDateTimeSafe(createdRaw);
+  const isOriginBranchMatch = !targetBranchId || targetBranchId === "all" || orderOriginBranch === targetBranchId;
+  const isCreatedInShift = isOriginBranchMatch && createdTs > effectiveBoundary && createdTs <= Date.now() + 60000;
+
+  const total = Number(order.total) || 0;
+  const deposit = Number(order.deposit) || 0;
+  const defaultMethod = (order.paymentMethod || order.payment_method || "efectivo") as "efectivo" | "tarjeta" | "transferencia";
+  const payments: any[] = Array.isArray(order.payments) ? order.payments : [];
+
+  let cash = 0;
+  let card = 0;
+  let transfer = 0;
+
+  if (payments.length > 0) {
+    for (let i = 0; i < payments.length; i++) {
+      const p = payments[i];
+      if (!p) continue;
+      const amt = Number(p.amount) || 0;
+      if (amt <= 0) continue;
+
+      const pCashier = p.cashier || order.cashier;
+      const pBranch = p.operatingBranchId
+        ? resolveBranchId(p.operatingBranchId, pCashier)
+        : (pCashier && !/don toño|admin|carlos/i.test(String(pCashier))
+            ? resolveBranchId(undefined, pCashier)
+            : orderOriginBranch);
+
+      if (targetBranchId && targetBranchId !== "all" && pBranch !== targetBranchId) {
+        continue;
+      }
+
+      const rawPTs = parseDateTimeSafe((p as any).timestamp || p.date || (p as any).createdAt);
+      const pTs = i === 0 && createdTs > 0 ? createdTs : Math.max(rawPTs, createdTs);
+
+      if (pTs > effectiveBoundary && pTs <= Date.now() + 60000) {
+        const m = p.paymentMethod || defaultMethod;
+        if (m === "tarjeta") card += amt;
+        else if (m === "transferencia") transfer += amt;
+        else cash += amt;
+      }
+    }
+  } else if (isCreatedInShift && deposit > 0) {
+    if (defaultMethod === "tarjeta") card = deposit;
+    else if (defaultMethod === "transferencia") transfer = deposit;
+    else cash = deposit;
+  }
+
+  const collectedTotal = cash + card + transfer;
+  if (isCreatedInShift || collectedTotal > 0) {
+    return {
+      isInShift: true,
+      isCreatedInShift,
+      orderTotalInShift: isCreatedInShift ? total : collectedTotal,
+      collectedTotal,
+      collectedCash: cash,
+      collectedCard: card,
+      collectedTransfer: transfer,
+    };
+  }
+
+  return empty;
 }
 
 /**
