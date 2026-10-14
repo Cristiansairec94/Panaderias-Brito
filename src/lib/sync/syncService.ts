@@ -4,7 +4,7 @@ import { DEFAULT_PRODUCTS, getStoredProducts, saveStoredProducts } from "@/lib/p
 import { DEFAULT_GENERAL_CUSTOMER, getStoredCustomers, saveStoredCustomers } from "@/lib/customers";
 import { playSyncSuccessSound } from "@/lib/sound";
 import { CLEAN_SLATE_EPOCH } from "@/lib/wipeOperationalData";
-import { parseDateTimeSafe } from "@/lib/utils";
+import { parseDateTimeSafe, isOrderSale } from "@/lib/utils";
 
 export const STORAGE_SYNC_QUEUE_KEY = "brito_offline_sync_queue";
 export const STORAGE_LAST_SYNC_KEY = "brito_last_sync_time";
@@ -239,6 +239,8 @@ export async function processSyncQueue(): Promise<{
             customer_name: customerName || "Público General",
             customer_type: customerType || "general",
             branch_id: branchId || item.branchId || "branch-matriz",
+            is_custom_order: item.data?.isCustomOrder || isOrderSale(item.data) || false,
+            order_number: item.data?.orderNumber || (sId.startsWith("LIQ-") ? sId.replace("LIQ-", "") : null),
           }, { onConflict: "id" })
           .select()
           .single();
@@ -506,6 +508,8 @@ export async function syncAllLocalDataToSupabase(): Promise<{
             customer_name: sale.customerName || "Público General",
             customer_type: sale.customerType || "general",
             branch_id: sale.branchId || "branch-matriz",
+            is_custom_order: Boolean(sale.isCustomOrder || (sale as any).is_custom_order || isOrderSale(sale)),
+            order_number: sale.orderNumber || (sale as any).order_number || (sale.id.startsWith("LIQ-") ? sale.id.replace("LIQ-", "") : null),
             payment_reference: sale.paymentReference || null,
             transfer_account: sale.transferAccount || null,
             card_terminal: sale.cardTerminal || null,

@@ -52,12 +52,14 @@ import {
   getStoredShiftStartBoundary,
   deduplicateExpenses,
   deduplicateIncomes,
-  resolveBranchId
+  resolveBranchId,
+  isOrderSale
 } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import { useNotifications } from "@/context/NotificationContext";
 import { useSync } from "@/context/SyncContext";
 import { useBranch } from "@/context/BranchContext";
+import { useAuth } from "@/context/AuthContext";
 import { realtimeHub } from "@/lib/realtime/realtimeHub";
 import { recordCashOutflowAsExpense } from "@/lib/expenses";
 import { getStoredOrders, syncOrdersWithServer, normalizeOrder, updateOrderStatus, deleteCustomOrder } from "@/lib/orders";
@@ -424,10 +426,12 @@ export default function ExpensesModal({
   branchCashInDrawer,
   onOpenCreateOrder,
 }: ExpensesModalProps) {
+  const { user } = useAuth();
   const { addNotification, openOrderDetail, openOrderPayment } = useNotifications();
   const { enqueueOfflineItem, isOnline } = useSync();
-  const { branches, currentBranch, cashMovements } = useBranch();
+  const { branches, currentBranch, cashMovements, switchBranch, isAdmin } = useBranch();
   const activeBranch = (branchId ? branches.find((b) => b.id === branchId) : null) || currentBranch;
+  const isSuperUser = isAdmin || user?.role === "admin" || user?.role === "auxiliar_admin";
 
   const effectiveCashier =
     (activeBranch?.currentShift?.cashier && !activeBranch.currentShift.cashier.includes("Cajera 2"))
@@ -1049,7 +1053,7 @@ export default function ExpensesModal({
     return sourceOrders.filter((o) => {
       if (!o) return false;
       if (o.status === "cancelado") return false;
-      if (!isOrderCashInBranch(o)) return false;
+      if (!isOrderInBranch(o) && !(typeof isOrderCashInBranch === "function" && isOrderCashInBranch(o))) return false;
       const oTime = parseDateTimeSafe(o.timestamp || o.createdAt || (o as any).created_at || (o as any).date);
       if (boundary > 0) {
         if (!oTime || oTime < boundary) {
@@ -1090,7 +1094,7 @@ export default function ExpensesModal({
   const operatorAllOrders = useMemo(() => {
     return (internalOrders || []).filter((o) => {
       if (!o) return false;
-      if (o.status === "entregado" || o.status === "cancelado") return false;
+      if (o.status === "cancelado") return false;
       if (!isOrderInBranch(o)) return false;
       if (o.cashier && cashierName) {
         const isMatch =
@@ -1117,12 +1121,12 @@ export default function ExpensesModal({
   const ordersPool = useMemo(() => {
     if (ticketScopeFilter === "turno") return effectiveOrders;
     if (ticketScopeFilter === "por_dia") return operatorAllOrders.length > 0 ? operatorAllOrders : effectiveOrders;
-    return getStoredOrders().filter((o) => o && o.status !== "entregado" && o.status !== "cancelado" && isOrderInBranch(o));
+    return getStoredOrders().filter((o) => o && o.status !== "cancelado" && isOrderInBranch(o));
   }, [ticketScopeFilter, effectiveOrders, operatorAllOrders, isOrderInBranch]);
 
   // Métricas superiores sincronizadas con el alcance activo (ventas de mostrador sin pedidos)
   const activeSalesForKpi = useMemo(() => {
-    return salesPoolForTickets.filter((s) => !s.isCustomOrder);
+    return salesPoolForTickets.filter((s) => !isOrderSale(s));
   }, [salesPoolForTickets]);
   const activeOrdersForKpi = ordersPool;
 
@@ -1131,45 +1135,89 @@ export default function ExpensesModal({
   // Ventas de mostrador del turno (todas las formas de pago: efectivo, tarjeta, transferencia)
   const shiftPurePosTotal = useMemo(() => {
     const calculated = effectiveSales
-      .filter((s) => !s.isCustomOrder)
+      .filter((s) => !isOrderSale(s))
       .reduce((acc, s) => acc + (Number(s.total) || 0), 0);
-    const branchDeskTotal = Number(activeBranch?.todayDeskSales ?? (activeBranch?.todaySales && (activeBranch?.todayOrdersDeposit ?? 0) === 0 ? activeBranch.todaySales : 0));
-    return branchDeskTotal > 0 && calculated === 0 ? branchDeskTotal : calculated > 0 ? calculated : branchDeskTotal;
-  }, [effectiveSales, activeBranch?.todayDeskSales, activeBranch?.todaySales, activeBranch?.todayOrdersDeposit]);
+    const branchDeskTotal = Number(activeBranch?.todayDeskSales ?? activeBranch?.todaySales ?? 0);
+    return calculated > 0 ? calculated : (branchDeskTotal > 0 ? branchDeskTotal : 0);
+  }, [effectiveSales, activeBranch?.todayDeskSales, activeBranch?.todaySales]);
 
   // Ventas de mostrador puras en efectivo (excluyendo pedidos) - Para el balance contable del cajón
   const shiftPurePosCash = useMemo(() => {
     const calculated = effectiveSales
-      .filter((s) => s.paymentMethod === "efectivo" && !s.isCustomOrder)
+      .filter((s) => s.paymentMethod === "efectivo" && !isOrderSale(s))
       .reduce((acc, s) => acc + (Number(s.total) || 0), 0);
-    const branchDeskCash = Number(activeBranch?.todayDeskSales ?? (activeBranch?.todaySales && (activeBranch?.todayOrdersDeposit ?? 0) === 0 ? activeBranch.todaySales : 0));
-    return branchDeskCash > 0 && calculated === 0 ? branchDeskCash : calculated > 0 ? calculated : branchDeskCash;
-  }, [effectiveSales, activeBranch?.todayDeskSales, activeBranch?.todaySales, activeBranch?.todayOrdersDeposit]);
+    const branchDeskCash = Number(activeBranch?.todayDeskSales ?? 0);
+    return calculated > 0 ? calculated : (branchDeskCash > 0 ? branchDeskCash : 0);
+  }, [effectiveSales, activeBranch?.todayDeskSales]);
 
   // Pedidos especiales del turno (todas las formas de pago: efectivo, tarjeta, transferencia)
   const shiftOrdersTotal = useMemo(() => {
     const fromSales = effectiveSales
-      .filter((s) => s.isCustomOrder)
+      .filter((s) => isOrderSale(s))
       .reduce((acc, s) => acc + (Number(s.total) || 0), 0);
-    const fromOrders = effectiveOrders
-      .filter((o) => !effectiveSales.some((s) => s.id === o.orderNumber || s.id === o.id))
-      .reduce((sum, o) => sum + (Number(o.deposit) || 0), 0);
+
+    let fromOrders = 0;
+    effectiveOrders.forEach((o) => {
+      if (Array.isArray(o.payments) && o.payments.length > 0) {
+        o.payments.forEach((p: any) => {
+          const pAmt = Number(p.amount) || 0;
+          const alreadyInSales = effectiveSales.some((s) => 
+            (s.id === p.id || s.orderNumber === o.orderNumber) && 
+            isOrderSale(s) && 
+            Math.abs(Number(s.total) - pAmt) < 0.01
+          );
+          if (!alreadyInSales) {
+            fromOrders += pAmt;
+          }
+        });
+      } else {
+        const alreadyInSales = effectiveSales.some((s) => (s.id === o.orderNumber || s.id === o.id || s.orderNumber === o.orderNumber) && isOrderSale(s));
+        if (!alreadyInSales) {
+          fromOrders += Number(o.deposit) || 0;
+        }
+      }
+    });
+
     const calculated = fromSales + fromOrders;
     const branchOrdersTotal = Number(activeBranch?.todayOrdersTotal ?? activeBranch?.todayOrdersDeposit ?? 0);
-    return branchOrdersTotal > 0 && calculated === 0 ? branchOrdersTotal : calculated > 0 ? calculated : branchOrdersTotal;
+    return calculated > 0 ? calculated : (branchOrdersTotal > 0 ? branchOrdersTotal : 0);
   }, [effectiveSales, effectiveOrders, activeBranch?.todayOrdersTotal, activeBranch?.todayOrdersDeposit]);
 
   // Pedidos especiales cobrados en efectivo (anticipos y liquidaciones) - Para el balance contable del cajón
   const shiftOrdersCash = useMemo(() => {
     const fromSales = effectiveSales
-      .filter((s) => s.paymentMethod === "efectivo" && s.isCustomOrder)
+      .filter((s) => s.paymentMethod === "efectivo" && isOrderSale(s))
       .reduce((acc, s) => acc + (Number(s.total) || 0), 0);
-    const fromOrders = effectiveOrders
-      .filter((o) => (o.paymentMethod === "efectivo" || !o.paymentMethod) && !effectiveSales.some((s) => s.id === o.orderNumber || s.id === o.id))
-      .reduce((sum, o) => sum + (Number(o.deposit) || 0), 0);
+
+    let fromOrders = 0;
+    effectiveOrders.forEach((o) => {
+      if (Array.isArray(o.payments) && o.payments.length > 0) {
+        o.payments.forEach((p: any) => {
+          const pMeth = (p.paymentMethod || p.payment_method || "efectivo").toLowerCase();
+          if (pMeth !== "efectivo") return;
+          const pAmt = Number(p.amount) || 0;
+          const alreadyInSales = effectiveSales.some((s) => 
+            (s.id === p.id || s.orderNumber === o.orderNumber) && 
+            isOrderSale(s) && 
+            Math.abs(Number(s.total) - pAmt) < 0.01
+          );
+          if (!alreadyInSales) {
+            fromOrders += pAmt;
+          }
+        });
+      } else {
+        const oMeth = (o.paymentMethod || "efectivo").toLowerCase();
+        if (oMeth !== "efectivo") return;
+        const alreadyInSales = effectiveSales.some((s) => (s.id === o.orderNumber || s.id === o.id || s.orderNumber === o.orderNumber) && isOrderSale(s));
+        if (!alreadyInSales) {
+          fromOrders += Number(o.deposit) || 0;
+        }
+      }
+    });
+
     const calculated = fromSales + fromOrders;
     const branchOrdersCash = Number(activeBranch?.todayOrdersDeposit ?? 0);
-    return branchOrdersCash > 0 && calculated === 0 ? branchOrdersCash : calculated > 0 ? calculated : branchOrdersCash;
+    return calculated > 0 ? calculated : (branchOrdersCash > 0 ? branchOrdersCash : 0);
   }, [effectiveSales, effectiveOrders, activeBranch?.todayOrdersDeposit]);
 
   // Ventas totales en efectivo (mostrador + anticipos/liquidaciones de pedidos)
@@ -1195,22 +1243,10 @@ export default function ExpensesModal({
     : Number(activeBranch?.cashInDrawer ?? 0);
 
   const calculatedCashInDrawer = Math.max(0, effectiveFund + totalShiftCashSales + totalIncomesInCash - totalExpenses);
-  const netCashInDrawer = (totalShiftCashSales > 0 || totalIncomesInCash > 0 || totalExpenses > 0)
-    ? Math.max(targetBranchCash, calculatedCashInDrawer)
-    : (targetBranchCash > 0 ? targetBranchCash : calculatedCashInDrawer);
+  const netCashInDrawer = calculatedCashInDrawer > 0 ? calculatedCashInDrawer : (targetBranchCash > 0 ? targetBranchCash : calculatedCashInDrawer);
 
-  // Reconciliación contable exacta: Si netCashInDrawer viene de la sucursal activa (p.ej. $3,467 de San Benito)
-  // garantizamos que Fondo + Ventas + Pedidos + Entradas - Salidas sea matemáticamente idéntico y gemelo a Corte de Caja
-  const netNonFundCash = Math.max(0, netCashInDrawer - effectiveFund - totalIncomesInCash + totalExpenses);
-  const reconciledCashSales = (totalShiftCashSales > 0 && Math.abs(effectiveFund + totalShiftCashSales + totalIncomesInCash - totalExpenses - netCashInDrawer) < 0.01)
-    ? totalShiftCashSales
-    : (cashSalesTotal !== undefined && cashSalesTotal > 0 && Math.abs(effectiveFund + cashSalesTotal + totalIncomesInCash - totalExpenses - netCashInDrawer) < 0.01
-        ? cashSalesTotal
-        : netNonFundCash);
-
-  const reconciledPurePosCash = (shiftPurePosCash > 0 && Math.abs(shiftPurePosCash + shiftOrdersCash - reconciledCashSales) < 0.01)
-    ? shiftPurePosCash
-    : Math.max(0, reconciledCashSales - shiftOrdersCash);
+  const reconciledCashSales = totalShiftCashSales;
+  const reconciledPurePosCash = shiftPurePosCash;
 
   const totalOrdersDeposits = activeOrdersForKpi.reduce((sum, o) => sum + (Number(o.deposit) || 0), 0);
   const totalOrdersValue = activeOrdersForKpi.reduce((sum, o) => sum + (Number(o.total) || 0), 0);
@@ -1251,10 +1287,10 @@ export default function ExpensesModal({
 
   // Listados específicos para los modales emergentes de detalle: ventas regulares en mostrador (todos los métodos)
   const allShiftPureSales = useMemo(() => {
-    return effectiveSales.filter((s) => !s.isCustomOrder);
+    return effectiveSales.filter((s) => !isOrderSale(s));
   }, [effectiveSales]);
 
-  // Todos los pedidos especiales del turno activo (anticipos y liquidaciones de todos los métodos, excluyendo entregados/bajas)
+  // Todos los pedidos especiales del turno activo (anticipos y liquidaciones de todos los métodos)
   const allShiftOrdersList = useMemo(() => {
     const ordersMap = new Map<string, CustomOrder>();
     const storedAll = getStoredOrders();
@@ -1263,7 +1299,7 @@ export default function ExpensesModal({
     effectiveOrders.forEach((o) => {
       if (!o) return;
       const latest = storedAll.find((sto) => sto.id === o.id || sto.orderNumber === o.orderNumber) || o;
-      if (latest.status === "entregado" || latest.status === "cancelado") return;
+      if (latest.status === "cancelado") return;
       const hasDeposit = (Number(latest.deposit) || 0) > 0 || (Number(latest.total) || 0) > 0;
       if (hasDeposit) {
         ordersMap.set(latest.orderNumber || latest.id, latest);
@@ -1272,11 +1308,10 @@ export default function ExpensesModal({
 
     // 2. Pedidos especiales registrados en effectiveSales
     effectiveSales.forEach((s) => {
-      if (s.isCustomOrder) {
+      if (isOrderSale(s)) {
         const orderKey = s.orderNumber || s.id;
-        // Si ya está entregado o cancelado en el almacén de pedidos, no agregarlo a la lista de pedidos
         const storedMatch = storedAll.find((ord) => ord.id === s.id || ord.orderNumber === s.orderNumber);
-        if (storedMatch && (storedMatch.status === "entregado" || storedMatch.status === "cancelado")) {
+        if (storedMatch && storedMatch.status === "cancelado") {
           return;
         }
         if (storedMatch) {
@@ -2633,6 +2668,24 @@ export default function ExpensesModal({
                   <Store className="w-3 h-3 text-amber-400 shrink-0" />
                   <span>{effectiveBranchName}</span>
                 </span>
+                {isSuperUser && branches && branches.length > 1 && (
+                  <div className="flex items-center gap-1.5 bg-stone-950/80 border border-amber-400/50 rounded-xl px-2.5 py-1 shadow-xs">
+                    <span className="text-[10px] text-amber-300 font-black uppercase tracking-wider hidden sm:inline">Sucursal:</span>
+                    <select
+                      value={activeBranch?.id || "branch-matriz"}
+                      onChange={(e) => {
+                        if (switchBranch) switchBranch(e.target.value);
+                      }}
+                      className="bg-transparent text-amber-200 text-xs font-black border-none focus:outline-none cursor-pointer py-0.5"
+                    >
+                      {branches.map((b) => (
+                        <option key={b.id} value={b.id} className="bg-stone-900 text-stone-100 font-bold">
+                          {b.name} ({b.manager || b.currentShift?.cashier || "Cajero"})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
                 <span className="bg-amber-500/20 text-amber-300 border border-amber-400/40 text-xs font-black px-2.5 py-0.5 rounded-full">
                   👤 {effectiveCashier}
                 </span>

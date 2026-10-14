@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { Branch, AppUser } from "@/types";
 import { useAuth } from "@/context/AuthContext";
+import { formatTime24 } from "@/lib/utils";
 
 interface CreateBranchModalProps {
   isOpen: boolean;
@@ -120,7 +121,7 @@ export default function CreateBranchModal({
         id: `shift-${branchCode.toLowerCase()}-${Date.now()}`,
         name: shiftName,
         cashier: finalManager,
-        openedAt: new Date().toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" }),
+        openedAt: formatTime24(new Date()),
         initialFund: 0,
         cashSales: 0,
         cardSales: 0,

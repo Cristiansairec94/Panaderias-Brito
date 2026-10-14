@@ -32,7 +32,7 @@ import {
   FileText
 } from "lucide-react";
 import { Product, Sale, CashExpense, CashIncome, ShiftCutRecord, CustomOrder } from "@/types";
-import { formatCurrency, onlyNumbersKeyDown, cleanDecimalNumbers, formatDateTimeSafe, parseDateTimeSafe, matchesCashier, getStoredShiftStartBoundary, resolveBranchId } from "@/lib/utils";
+import { formatCurrency, onlyNumbersKeyDown, cleanDecimalNumbers, formatDateTimeSafe, parseDateTimeSafe, matchesCashier, getStoredShiftStartBoundary, resolveBranchId, isOrderSale } from "@/lib/utils";
 import { getStoredOrders, syncOrdersWithServer, normalizeOrder } from "@/lib/orders";
 import { useNotifications, FBNotification } from "@/context/NotificationContext";
 import { useBranch } from "@/context/BranchContext";
@@ -230,7 +230,7 @@ export default function CashDrawerShiftModal({
   );
   
   // Shift Times
-  const [shiftStartTime] = useState("06:00 AM");
+  const [shiftStartTime] = useState("06:00");
   const [currentTime, setCurrentTime] = useState("");
 
   // Shift Change & Cash Cut form state
@@ -506,10 +506,10 @@ export default function CashDrawerShiftModal({
   const branchOrdersDeposit = Number(targetBranch?.todayOrdersDeposit ?? 0);
   const branchCashInDrawerVal = targetBranchCash;
 
-  const calculatedPurePosCash = effectiveSales.filter((s) => s.paymentMethod === "efectivo" && !s.isCustomOrder).reduce((sum, s) => sum + s.total, 0);
-  const rawPurePosCash = branchDeskSales > 0 && calculatedPurePosCash === 0 ? branchDeskSales : calculatedPurePosCash > 0 ? calculatedPurePosCash : branchDeskSales;
+  const calculatedPurePosCash = effectiveSales.filter((s) => s.paymentMethod === "efectivo" && !isOrderSale(s)).reduce((sum, s) => sum + s.total, 0);
+  const rawPurePosCash = calculatedPurePosCash > 0 ? calculatedPurePosCash : (branchDeskSales > 0 ? branchDeskSales : 0);
 
-  const ordersInSalesCash = effectiveSales.filter((s) => s.paymentMethod === "efectivo" && s.isCustomOrder).reduce((sum, s) => sum + s.total, 0);
+  const ordersInSalesCash = effectiveSales.filter((s) => s.paymentMethod === "efectivo" && isOrderSale(s)).reduce((sum, s) => sum + s.total, 0);
   const calculatedOrdersCash = ordersCash + ordersInSalesCash;
   const totalOrdersCash = calculatedOrdersCash > 0 ? calculatedOrdersCash : (branchOrdersDeposit > 0 ? branchOrdersDeposit : 0);
 
@@ -572,20 +572,10 @@ export default function CashDrawerShiftModal({
 
   // 3. Dinero esperado en caja (Cajón: Fondo Inicial + Ventas Efectivo + Entradas Efectivo - Gastos Efectivo)
   const rawCalculatedExpectedCash = Math.max(0, effectiveInitialFund + rawPosCash + totalIncomesInCash - totalExpenses);
-  const expectedCashInDrawer = (rawPosCash > 0 || totalIncomesInCash > 0 || totalExpenses > 0)
-    ? Math.max(targetBranchCash, rawCalculatedExpectedCash)
-    : (targetBranchCash > 0 ? targetBranchCash : rawCalculatedExpectedCash);
+  const expectedCashInDrawer = rawCalculatedExpectedCash > 0 ? rawCalculatedExpectedCash : (targetBranchCash > 0 ? targetBranchCash : rawCalculatedExpectedCash);
 
-  const netNonFundCash = Math.max(0, expectedCashInDrawer - effectiveInitialFund - totalIncomesInCash + totalExpenses);
-  const posCash = (rawPosCash > 0 && Math.abs(effectiveInitialFund + rawPosCash + totalIncomesInCash - totalExpenses - expectedCashInDrawer) < 0.01)
-    ? rawPosCash
-    : (cashSalesTotal !== undefined && cashSalesTotal > 0 && Math.abs(effectiveInitialFund + cashSalesTotal + totalIncomesInCash - totalExpenses - expectedCashInDrawer) < 0.01
-        ? cashSalesTotal
-        : netNonFundCash);
-
-  const purePosCash = (rawPurePosCash > 0 && Math.abs(rawPurePosCash + totalOrdersCash - posCash) < 0.01)
-    ? rawPurePosCash
-    : Math.max(0, posCash - totalOrdersCash);
+  const purePosCash = rawPurePosCash;
+  const posCash = purePosCash + totalOrdersCash;
 
   const cashSales = posCash;
   const cardSales = effectiveSales.filter((s) => s.paymentMethod === "tarjeta").reduce((sum, s) => sum + s.total, 0);

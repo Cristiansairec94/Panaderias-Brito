@@ -1,3 +1,5 @@
+import { formatTime24 } from "@/lib/utils";
+
 export interface PrinterInfo {
   id: string;
   name: string;
@@ -162,11 +164,7 @@ export function printTestTicket(
     month: "short",
     year: "numeric",
   });
-  const timeStr = now.toLocaleTimeString("es-MX", {
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-  });
+  const timeStr = formatTime24(now, true);
 
   const is58mm = config.paperWidth === "58mm";
 
@@ -315,7 +313,7 @@ export function printTestTicket(
         // Actualizar última fecha de prueba
         const updatedConfig: PrinterConfig = {
           ...config,
-          lastTestDate: new Date().toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" }),
+          lastTestDate: formatTime24(new Date()),
           status: "connected",
         };
         saveStoredPrinterConfig(updatedConfig);

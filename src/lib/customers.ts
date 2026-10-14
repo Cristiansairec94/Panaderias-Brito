@@ -37,7 +37,7 @@ export const INITIAL_CUSTOMERS: Customer[] = [
     purchaseHistory: [
       {
         id: "comp-101",
-        date: "04/09/2026, 07:15 AM",
+        date: "04/09/2026, 07:15",
         total: 730,
         branchName: "Sucursal Matriz (Centro)",
         cashier: "Don Toño Brito",
@@ -49,7 +49,7 @@ export const INITIAL_CUSTOMERS: Customer[] = [
       },
       {
         id: "comp-102",
-        date: "03/09/2026, 07:20 AM",
+        date: "03/09/2026, 07:20",
         total: 730,
         branchName: "Sucursal Matriz (Centro)",
         cashier: "Don Toño Brito",
@@ -61,7 +61,7 @@ export const INITIAL_CUSTOMERS: Customer[] = [
       },
       {
         id: "comp-103",
-        date: "02/09/2026, 07:10 AM",
+        date: "02/09/2026, 07:10",
         total: 775,
         branchName: "Sucursal Matriz (Centro)",
         cashier: "Lupita Brito",
@@ -93,7 +93,7 @@ export const INITIAL_CUSTOMERS: Customer[] = [
     purchaseHistory: [
       {
         id: "comp-201",
-        date: "04/09/2026, 11:30 AM",
+        date: "04/09/2026, 11:30",
         total: 420,
         branchName: "Sucursal San Juan",
         cashier: "Cajero San Juan",
@@ -104,7 +104,7 @@ export const INITIAL_CUSTOMERS: Customer[] = [
       },
       {
         id: "comp-202",
-        date: "02/09/2026, 11:00 AM",
+        date: "02/09/2026, 11:00",
         total: 420,
         branchName: "Sucursal San Juan",
         cashier: "Cajero San Juan",
@@ -115,7 +115,7 @@ export const INITIAL_CUSTOMERS: Customer[] = [
       },
       {
         id: "comp-203",
-        date: "31/08/2026, 10:45 AM",
+        date: "31/08/2026, 10:45",
         total: 510,
         branchName: "Sucursal San Juan",
         cashier: "Cajero San Juan",
@@ -148,7 +148,7 @@ export const INITIAL_CUSTOMERS: Customer[] = [
     purchaseHistory: [
       {
         id: "comp-301",
-        date: "20/08/2026, 05:40 PM",
+        date: "20/08/2026, 17:40",
         total: 1450,
         branchName: "Sucursal Las Flores (Plaza)",
         cashier: "Elena Brito",
@@ -160,7 +160,7 @@ export const INITIAL_CUSTOMERS: Customer[] = [
       },
       {
         id: "comp-302",
-        date: "15/08/2026, 06:15 PM",
+        date: "15/08/2026, 18:15",
         total: 150,
         branchName: "Sucursal Matriz (Centro)",
         cashier: "Lupita Brito",
@@ -191,7 +191,7 @@ export const INITIAL_CUSTOMERS: Customer[] = [
     purchaseHistory: [
       {
         id: "comp-401",
-        date: "03/09/2026, 08:30 PM",
+        date: "03/09/2026, 20:30",
         total: 68,
         branchName: "Sucursal Matriz (Centro)",
         cashier: "Don Toño Brito",
@@ -204,7 +204,7 @@ export const INITIAL_CUSTOMERS: Customer[] = [
       },
       {
         id: "comp-402",
-        date: "02/09/2026, 08:45 PM",
+        date: "02/09/2026, 20:45",
         total: 60,
         branchName: "Sucursal Matriz (Centro)",
         cashier: "Lupita Brito",
@@ -216,7 +216,7 @@ export const INITIAL_CUSTOMERS: Customer[] = [
       },
       {
         id: "comp-403",
-        date: "01/09/2026, 08:15 PM",
+        date: "01/09/2026, 20:15",
         total: 76,
         branchName: "Sucursal Matriz (Centro)",
         cashier: "Don Toño Brito",

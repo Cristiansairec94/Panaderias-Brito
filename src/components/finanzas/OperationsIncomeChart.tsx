@@ -115,7 +115,7 @@ export default function OperationsIncomeChart({
   const handleTimeframeChange = (newTf: TimeframeMode) => {
     setTimeframe(newTf);
     if (newTf === "dia") {
-      setSelectedDayIndex(4); // 5:00 PM - 8:30 PM
+      setSelectedDayIndex(4); // 17:00 - 20:30
       onPeriodChange?.("hoy");
     } else if (newTf === "mes") {
       setSelectedDayIndex(5); // Sábado
@@ -154,12 +154,12 @@ export default function OperationsIncomeChart({
         : Math.round(pl.grossSales / (summary.period === "anio" ? 318 : summary.period === "mes" ? 26.5 : 6.2)) || 14500;
 
       const hourlyRatios = [
-        { day: "6:00 AM - 8:30 AM", shortDay: "6-8:30 AM", ratio: 0.15, isPeak: false, note: "Apertura y primera salida de bolillo caliente y conchas", rushDetail: "6:30 AM - 8:00 AM" },
-        { day: "8:30 AM - 11:30 AM", shortDay: "8:30-11:30", ratio: 0.14, isPeak: false, note: "Desayunos, donas, café y clientes de paso", rushDetail: "9:00 AM - 10:30 AM" },
-        { day: "11:30 AM - 2:00 PM", shortDay: "11:30-2 PM", ratio: 0.10, isPeak: false, note: "Pan blanco y teleras para el almuerzo y comidas", rushDetail: "12:30 PM - 1:45 PM" },
-        { day: "2:00 PM - 5:00 PM", shortDay: "2-5 PM", ratio: 0.16, isPeak: false, note: "Venta de pasteles de vitrina, pays y repostería", rushDetail: "3:30 PM - 4:45 PM" },
-        { day: "5:00 PM - 8:30 PM", shortDay: "5-8:30 PM", ratio: 0.32, isPeak: true, note: "Pico máximo familiar: salida de pan dulce caliente para la merienda", rushDetail: "5:30 PM - 8:00 PM" },
-        { day: "8:30 PM - 10:00 PM", shortDay: "8:30-10 PM", ratio: 0.13, isPeak: false, note: "Últimas compras nocturnas y arqueo de caja", rushDetail: "8:45 PM - 9:30 PM" },
+        { day: "06:00 - 08:30", shortDay: "06:00 - 08:30", ratio: 0.15, isPeak: false, note: "Apertura y primera salida de bolillo caliente y conchas", rushDetail: "06:30 - 08:00" },
+        { day: "08:30 - 11:30", shortDay: "08:30 - 11:30", ratio: 0.14, isPeak: false, note: "Desayunos, donas, café y clientes de paso", rushDetail: "09:00 - 10:30" },
+        { day: "11:30 - 14:00", shortDay: "11:30 - 14:00", ratio: 0.10, isPeak: false, note: "Pan blanco y teleras para el almuerzo y comidas", rushDetail: "12:30 - 13:45" },
+        { day: "14:00 - 17:00", shortDay: "14:00 - 17:00", ratio: 0.16, isPeak: false, note: "Venta de pasteles de vitrina, pays y repostería", rushDetail: "15:30 - 16:45" },
+        { day: "17:00 - 20:30", shortDay: "17:00 - 20:30", ratio: 0.32, isPeak: true, note: "Pico máximo familiar: salida de pan dulce caliente para la merienda", rushDetail: "17:30 - 20:00" },
+        { day: "20:30 - 22:00", shortDay: "20:30 - 22:00", ratio: 0.13, isPeak: false, note: "Últimas compras nocturnas y arqueo de caja", rushDetail: "20:45 - 21:30" },
       ];
 
       rawItems = hourlyRatios.map(h => ({
@@ -215,13 +215,13 @@ export default function OperationsIncomeChart({
 
       const days = cashFlow && cashFlow.length > 0 ? cashFlow : [];
       const defaultNotes: Record<string, { note: string; rush: string }> = {
-        Lunes: { note: "Inicio de semana laboral y reposición de mostrador", rush: "6:30 PM - 8:30 PM" },
-        Martes: { note: "Día constante en venta de bolillo y pan dulce", rush: "6:00 PM - 8:00 PM" },
-        Miércoles: { note: "Mitad de semana con buen flujo en repostería", rush: "5:30 PM - 8:00 PM" },
-        Jueves: { note: "Aumento de pedidos y anticipos para el fin de semana", rush: "5:30 PM - 8:30 PM" },
-        Viernes: { note: "Viernes social: sube venta de pasteles y pan de fiesta", rush: "5:00 PM - 8:30 PM" },
-        Sábado: { note: "Día récord de la semana con alta afluencia familiar", rush: "5:00 PM - 9:00 PM" },
-        Domingo: { note: "Desayunos familiares y meriendas dominicales", rush: "8:00 AM - 1:00 PM" },
+        Lunes: { note: "Inicio de semana laboral y reposición de mostrador", rush: "18:30 - 20:30" },
+        Martes: { note: "Día constante en venta de bolillo y pan dulce", rush: "18:00 - 20:00" },
+        Miércoles: { note: "Mitad de semana con buen flujo en repostería", rush: "17:30 - 20:00" },
+        Jueves: { note: "Aumento de pedidos y anticipos para el fin de semana", rush: "17:30 - 20:30" },
+        Viernes: { note: "Viernes social: sube venta de pasteles y pan de fiesta", rush: "17:00 - 20:30" },
+        Sábado: { note: "Día récord de la semana con alta afluencia familiar", rush: "17:00 - 21:00" },
+        Domingo: { note: "Desayunos familiares y meriendas dominicales", rush: "08:00 - 13:00" },
       };
 
       rawItems = days.map(d => ({
@@ -230,7 +230,7 @@ export default function OperationsIncomeChart({
         income: d.income,
         isPeak: d.isPeak,
         note: defaultNotes[d.day]?.note || "Operación regular en panadería",
-        rushDetail: defaultNotes[d.day]?.rush || "5:30 PM - 8:30 PM",
+        rushDetail: defaultNotes[d.day]?.rush || "17:30 - 20:30",
       }));
     }
 

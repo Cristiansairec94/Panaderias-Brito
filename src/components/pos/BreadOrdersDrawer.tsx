@@ -860,7 +860,7 @@ export default function BreadOrdersDrawer({
                 </label>
                 <input
                   type="text"
-                  placeholder="Ej. Entregar caliente a las 8 AM, bien dorado, en bolsas de 10 piezas..."
+                  placeholder="Ej. Entregar caliente a las 08:00, bien dorado, en bolsas de 10 piezas..."
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
                   className="w-full px-3 py-2 bg-white rounded-xl border border-stone-300 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-amber-500"

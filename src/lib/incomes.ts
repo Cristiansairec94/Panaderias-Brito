@@ -1,5 +1,5 @@
 import { CashIncome, CashIncomeCategory, Sale, SimulatedSale } from "@/types";
-import { formatDateTimeSafe, formatCurrency, resolveBranchId } from "@/lib/utils";
+import { formatDateTimeSafe, formatCurrency, resolveBranchId, formatTime24 } from "@/lib/utils";
 import { realtimeHub } from "@/lib/realtime/realtimeHub";
 import { createClient } from "@/lib/supabase/client";
 import { markRecordIdsAsSynced } from "@/lib/sync/syncService";
@@ -221,7 +221,7 @@ export function recordCashIncome(income: {
   }
 
   const formattedDate =
-    income.date || `Hoy, ${now.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })}`;
+    income.date || `Hoy, ${formatTime24(now)}`;
 
   const newIncome: CashIncome = {
     id: income.id || `ING-${Date.now().toString().slice(-6)}`,
@@ -286,7 +286,7 @@ export function recordCashIncome(income: {
           reason: newIncome.concept || "Entrada de dinero a caja",
           authorizedBy: newIncome.cashier || "Don Toño Brito",
           cashier: newIncome.cashier,
-          timestamp: newIncome.date || new Date().toLocaleTimeString("es-MX"),
+          timestamp: newIncome.date || formatTime24(new Date()),
         });
       }
     }
@@ -526,7 +526,7 @@ export async function fetchAndSyncIncomesFromSupabase(): Promise<{
       }
 
       const createdAtDate = mov.created_at ? new Date(mov.created_at) : new Date();
-      const timeStr = createdAtDate.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" });
+      const timeStr = formatTime24(createdAtDate);
 
       syncedIncomes.push({
         id: mov.id,

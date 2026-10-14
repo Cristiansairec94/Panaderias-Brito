@@ -1,6 +1,6 @@
 import { CLEAN_SLATE_EPOCH } from "@/lib/wipeOperationalData";
 import { CustomOrder, OrderItem, OrderPayment, CashIncome, Sale } from "@/types";
-import { formatCurrency, formatDateTimeSafe, parseDateTimeSafe, getStoredShiftStartBoundary, resolveBranchId } from "@/lib/utils";
+import { formatCurrency, formatDateTimeSafe, parseDateTimeSafe, getStoredShiftStartBoundary, resolveBranchId, formatTime24 } from "@/lib/utils";
 import { realtimeHub } from "@/lib/realtime/realtimeHub";
 import { createClient } from "@/lib/supabase/client";
 
@@ -829,7 +829,7 @@ function recordOrderCashIncome(params: {
     const currentIncomes: CashIncome[] = currentIncomesRaw ? JSON.parse(currentIncomesRaw) : [];
 
     const now = new Date();
-    const formattedDate = `Hoy, ${now.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })}`;
+    const formattedDate = `Hoy, ${formatTime24(now)}`;
 
     const newIncome: CashIncome = {
       id: `ING-${Date.now().toString().slice(-6)}`,
@@ -1137,7 +1137,7 @@ export function addCustomOrder(data: {
         reason: `${remaining === 0 ? "Liquidación final" : "Anticipo"} pedido ${orderNumber} - ${data.customerName}`,
         authorizedBy: data.cashier || "Cajero",
         cashier: data.cashier,
-        timestamp: new Date().toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" }),
+        timestamp: formatTime24(new Date()),
       });
     }
   }
@@ -1312,7 +1312,7 @@ export function addOrderPayment(
       reason: `${isFullLiquidation ? "Liquidación final" : "Abono"} pedido ${order.orderNumber} - ${order.customerName}`,
       authorizedBy: params.cashier || "Cajero",
       cashier: params.cashier,
-      timestamp: new Date().toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" }),
+      timestamp: formatTime24(new Date()),
     });
   }
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { ExpenseRecord, BranchCashMovement } from "@/types";
-import { formatCurrency, formatDateTimeSafe, resolveBranchId } from "@/lib/utils";
+import { formatCurrency, formatDateTimeSafe, resolveBranchId, formatTime24 } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import { realtimeHub } from "@/lib/realtime/realtimeHub";
 
@@ -143,7 +143,7 @@ export function recordCashOutflowAsExpense(options: {
   };
 
   const now = new Date();
-  const timeStr = now.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" });
+  const timeStr = formatTime24(now);
   const dateStr = options.date || getLocalDateISO(now);
 
   const existingExpenses = getStoredExpenses();
@@ -273,7 +273,7 @@ if (typeof window !== "undefined" && realtimeHub?.onCashMovement) {
       const remoteExpense: ExpenseRecord = {
         id: finalId,
         date: getLocalDateISO(new Date(payload.timestamp || Date.now())),
-        displayDate: `Hoy, ${payload.timestamp || new Date().toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })}`,
+        displayDate: `Hoy, ${payload.timestamp ? formatTime24(payload.timestamp) : formatTime24()}`,
         category: catDef.id,
         categoryLabel: catDef.label,
         branchId: resolveBranchId(payload.branchId, payload.authorizedBy),

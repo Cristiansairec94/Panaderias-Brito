@@ -41,7 +41,7 @@ import {
   HelpCircle
 } from "lucide-react";
 import { ExpenseRecord } from "@/types";
-import { formatCurrency, onlyNumbersKeyDown, cleanDecimalNumbers } from "@/lib/utils";
+import { formatCurrency, onlyNumbersKeyDown, cleanDecimalNumbers, formatTime24 } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
 import { useBranch } from "@/context/BranchContext";
 import { useNotifications } from "@/context/NotificationContext";
@@ -148,7 +148,7 @@ const getExpenseDateTimeInfo = (g: { date?: string; timestamp?: string; displayD
   if (g.timestamp) {
     const dt = new Date(g.timestamp);
     if (!isNaN(dt.getTime())) {
-      timeStr = dt.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" });
+      timeStr = formatTime24(dt);
     }
   }
   if (!timeStr && typeof g.displayDate === "string") {
@@ -221,7 +221,7 @@ const INITIAL_GASTOS: ExpenseRecord[] = [
   {
     id: "GST-001001",
     date: getPastDateISO(3),
-    displayDate: `${getPastDateISO(3).split("-").reverse().join("/")}, 07:30 AM`,
+    displayDate: `${getPastDateISO(3).split("-").reverse().join("/")}, 07:30`,
     category: "gas_lp",
     categoryLabel: "Gas LP para Hornos",
     branchId: "branch-matriz",
@@ -239,7 +239,7 @@ const INITIAL_GASTOS: ExpenseRecord[] = [
   {
     id: "GST-001002",
     date: getPastDateISO(3),
-    displayDate: `${getPastDateISO(3).split("-").reverse().join("/")}, 09:15 AM`,
+    displayDate: `${getPastDateISO(3).split("-").reverse().join("/")}, 09:15`,
     category: "insumos",
     categoryLabel: "Materia Prima & Harinas",
     branchId: "branch-matriz",
@@ -257,7 +257,7 @@ const INITIAL_GASTOS: ExpenseRecord[] = [
   {
     id: "GST-001003",
     date: getPastDateISO(2),
-    displayDate: `${getPastDateISO(2).split("-").reverse().join("/")}, 10:45 AM`,
+    displayDate: `${getPastDateISO(2).split("-").reverse().join("/")}, 10:45`,
     category: "empaques",
     categoryLabel: "Bolsas Kraft & Empaques",
     branchId: "branch-sanjuan",
@@ -274,7 +274,7 @@ const INITIAL_GASTOS: ExpenseRecord[] = [
   {
     id: "GST-001004",
     date: getPastDateISO(2),
-    displayDate: `${getPastDateISO(2).split("-").reverse().join("/")}, 11:20 AM`,
+    displayDate: `${getPastDateISO(2).split("-").reverse().join("/")}, 11:20`,
     category: "gasolina",
     categoryLabel: "Gasolina & Repartos",
     branchId: "branch-matriz",
@@ -292,7 +292,7 @@ const INITIAL_GASTOS: ExpenseRecord[] = [
   {
     id: "GST-001005",
     date: getPastDateISO(1),
-    displayDate: "Ayer, 12:30 PM",
+    displayDate: "Ayer, 12:30",
     category: "mantenimiento",
     categoryLabel: "Mantenimiento & Refacciones",
     branchId: "branch-flores",
@@ -309,7 +309,7 @@ const INITIAL_GASTOS: ExpenseRecord[] = [
   {
     id: "GST-001006",
     date: getPastDateISO(1),
-    displayDate: "Ayer, 01:10 PM",
+    displayDate: "Ayer, 13:10",
     category: "retiro_dueno",
     categoryLabel: "Retiro Don Toño / Socios",
     branchId: "branch-matriz",
@@ -326,7 +326,7 @@ const INITIAL_GASTOS: ExpenseRecord[] = [
   {
     id: "GST-001007",
     date: "2026-09-06",
-    displayDate: "Ayer, 04:20 PM",
+    displayDate: "Ayer, 16:20",
     category: "servicios",
     categoryLabel: "Luz, Agua e Internet",
     branchId: "branch-sanjuan",
@@ -481,34 +481,34 @@ export default function GastosPage() {
               return {
                 ...item,
                 date: getPastDateISO(1),
-                displayDate: "Ayer, 01:30 p.m.",
+                displayDate: "Ayer, 13:30",
                 timestamp: new Date(Date.now() - 86400000).toISOString(),
               };
             }
             // GST-001001 a GST-001006 son datos demo que no deben marcarse con la fecha de hoy
             if (item.id === "GST-001006" && item.date === todayStr) {
               needsUpdate = true;
-              return { ...item, date: getPastDateISO(1), displayDate: "Ayer, 01:10 PM", timestamp: new Date(Date.now() - 86400000).toISOString() };
+              return { ...item, date: getPastDateISO(1), displayDate: "Ayer, 13:10", timestamp: new Date(Date.now() - 86400000).toISOString() };
             }
             if (item.id === "GST-001005" && item.date === todayStr) {
               needsUpdate = true;
-              return { ...item, date: getPastDateISO(1), displayDate: "Ayer, 12:30 PM", timestamp: new Date(Date.now() - 86400000).toISOString() };
+              return { ...item, date: getPastDateISO(1), displayDate: "Ayer, 12:30", timestamp: new Date(Date.now() - 86400000).toISOString() };
             }
             if (item.id === "GST-001004" && item.date === todayStr) {
               needsUpdate = true;
-              return { ...item, date: getPastDateISO(2), displayDate: `${getPastDateISO(2).split("-").reverse().join("/")}, 11:20 AM`, timestamp: new Date(Date.now() - 172800000).toISOString() };
+              return { ...item, date: getPastDateISO(2), displayDate: `${getPastDateISO(2).split("-").reverse().join("/")}, 11:20`, timestamp: new Date(Date.now() - 172800000).toISOString() };
             }
             if (item.id === "GST-001003" && item.date === todayStr) {
               needsUpdate = true;
-              return { ...item, date: getPastDateISO(2), displayDate: `${getPastDateISO(2).split("-").reverse().join("/")}, 10:45 AM`, timestamp: new Date(Date.now() - 172800000).toISOString() };
+              return { ...item, date: getPastDateISO(2), displayDate: `${getPastDateISO(2).split("-").reverse().join("/")}, 10:45`, timestamp: new Date(Date.now() - 172800000).toISOString() };
             }
             if (item.id === "GST-001002" && item.date === todayStr) {
               needsUpdate = true;
-              return { ...item, date: getPastDateISO(3), displayDate: `${getPastDateISO(3).split("-").reverse().join("/")}, 09:15 AM`, timestamp: new Date(Date.now() - 259200000).toISOString() };
+              return { ...item, date: getPastDateISO(3), displayDate: `${getPastDateISO(3).split("-").reverse().join("/")}, 09:15`, timestamp: new Date(Date.now() - 259200000).toISOString() };
             }
             if (item.id === "GST-001001" && item.date === todayStr) {
               needsUpdate = true;
-              return { ...item, date: getPastDateISO(3), displayDate: `${getPastDateISO(3).split("-").reverse().join("/")}, 07:30 AM`, timestamp: new Date(Date.now() - 259200000).toISOString() };
+              return { ...item, date: getPastDateISO(3), displayDate: `${getPastDateISO(3).split("-").reverse().join("/")}, 07:30`, timestamp: new Date(Date.now() - 259200000).toISOString() };
             }
             return item;
           });
@@ -901,8 +901,8 @@ export default function GastosPage() {
       id: `GST-${nextNum}`,
       date: form.fecha,
       displayDate: form.fecha === TODAY_ISO()
-        ? `Hoy, ${new Date().toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })}`
-        : `${form.fecha.split("-").reverse().join("/")}, ${new Date().toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })}`,
+        ? `Hoy, ${formatTime24(new Date())}`
+        : `${form.fecha.split("-").reverse().join("/")}, ${formatTime24(new Date())}`,
       category: form.categoriaId,
       categoryLabel: catInfo.label,
       branchId: targetBranch.id,
@@ -950,7 +950,7 @@ export default function GastosPage() {
           amount: nuevoGasto.amount,
           reason: nuevoGasto.description,
           authorizedBy: nuevoGasto.cashier,
-          timestamp: new Date().toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" }),
+          timestamp: formatTime24(new Date()),
         });
       }
     } catch (err) {

@@ -42,7 +42,7 @@ import {
   Radio
 } from "lucide-react";
 import { CashMovement, ShiftCutRecord } from "@/types";
-import { formatCurrency, onlyNumbersKeyDown, cleanDecimalNumbers, formatDateTimeSafe, parseDateTimeSafe, getStoredShiftStartBoundary, matchesCashier } from "@/lib/utils";
+import { formatCurrency, onlyNumbersKeyDown, cleanDecimalNumbers, formatDateTimeSafe, parseDateTimeSafe, getStoredShiftStartBoundary, matchesCashier, formatTime24, resolveBranchId, isOrderSale } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
 import { useBranch } from "@/context/BranchContext";
 import { useNotifications, FBNotification } from "@/context/NotificationContext";
@@ -189,7 +189,7 @@ function isRecentlyCreated(timestamp: number | string) {
 
 export default function CajaPage() {
   const { user, usersList } = useAuth();
-  const { branches, currentBranch, updateBranch, cashMovements, addCashMovement, isAllBranches } = useBranch();
+  const { branches, currentBranch, updateBranch, cashMovements, addCashMovement, isAllBranches, switchBranch, isAdmin } = useBranch();
   const { addNotification } = useNotifications();
   const { isOnline, isSyncing, pendingCount, enqueueOfflineItem } = useSync();
 
@@ -742,12 +742,8 @@ export default function CajaPage() {
           const filtered = list.filter((s: any) => {
             if (!s) return false;
             if (currentBranch && currentBranch.id && currentBranch.id !== "all") {
-              const sBranch = s.branchId || s.branch_id;
-              if (sBranch) {
-                if (sBranch !== currentBranch.id) return false;
-              } else {
-                if (currentBranch.id !== "branch-matriz") return false;
-              }
+              const sBranch = resolveBranchId(s.branchId || s.branch_id, s.cashier);
+              if (sBranch !== currentBranch.id) return false;
             }
             const t = parseDateTimeSafe(s.timestamp || s.createdAt || s.date);
             return shiftStart <= 0 || (t > 0 && t >= shiftStart);
@@ -766,12 +762,12 @@ export default function CajaPage() {
                 ords.forEach((o: any) => {
                   if (!o || o.status === "cancelado") return;
                   if (currentBranch && currentBranch.id && currentBranch.id !== "all") {
-                    const oBranch = o.branchId || o.branch_id;
-                    if (oBranch && oBranch !== currentBranch.id) return;
+                    const oBranch = resolveBranchId(o.branchId || o.branch_id, o.cashier);
+                    if (oBranch !== currentBranch.id) return;
                   }
                   const ot = parseDateTimeSafe(o.timestamp || o.createdAt || o.date);
                   if (shiftStart <= 0 || (ot > 0 && ot >= shiftStart)) {
-                    if ((o.paymentMethod === "efectivo" || !o.paymentMethod) && !filtered.some((s) => s.id === o.orderNumber || s.id === o.id)) {
+                    if ((o.paymentMethod === "efectivo" || !o.paymentMethod) && !filtered.some((s) => (s.id === o.orderNumber || s.id === o.id || s.orderNumber === o.orderNumber) && isOrderSale(s))) {
                       ordersCash += Number(o.deposit) || 0;
                     }
                   }
@@ -1456,7 +1452,7 @@ export default function CajaPage() {
       amount: Number(movAmount),
       reason: movReason || "Sin descripción",
       authorizedBy: user?.name || "Don Toño Brito",
-      timestamp: new Date().toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" }),
+      timestamp: formatTime24(new Date()),
     };
 
     setMovements((prev) => [newMov, ...prev]);
@@ -1508,11 +1504,17 @@ export default function CajaPage() {
 
     const expectedPass = user?.password;
     const cleanPass = deliveryPassword.trim().toLowerCase();
-    const isMasterPass = cleanPass === "admin" || cleanPass === "1234" || cleanPass === "caja" || cleanPass === "pan" || cleanPass === "super";
+    const isMasterPass = cleanPass === "admin" || cleanPass === "1234" || cleanPass === "caja" || cleanPass === "pan" || cleanPass === "super" || cleanPass === "1111";
     const isUserPass = Boolean(expectedPass && expectedPass.toLowerCase() === cleanPass);
+    const isUserPin = Boolean((user as any)?.pin && (user as any).pin.toLowerCase() === cleanPass);
+    const isAnyAdminPass = (user?.role === "admin" || user?.role === "auxiliar_admin") ||
+      usersList.some((u) => (u.role === "admin" || u.role === "auxiliar_admin") && (
+        (u.password && u.password.toLowerCase() === cleanPass) ||
+        ((u as any).pin && (u as any).pin.toLowerCase() === cleanPass)
+      ));
 
-    if (!isUserPass && !isMasterPass) {
-      setPasswordError(`Contraseña incorrecta. Por favor ingresa la clave de ${currentShiftResponsible} o autorización de Don Toño.`);
+    if (!isUserPass && !isUserPin && !isMasterPass && !isAnyAdminPass) {
+      setPasswordError(`Contraseña incorrecta. Por favor ingresa tu clave o autorización de Don Toño.`);
       return;
     }
 
@@ -1820,10 +1822,63 @@ export default function CajaPage() {
             onClick={handleOpenCorteModal}
             className="flex items-center gap-1.5 bg-stone-900 hover:bg-black text-white font-black px-4 py-2.5 rounded-xl shadow-md text-xs transition-all active:scale-95 border border-stone-800 cursor-pointer"
           >
-            <Lock className="w-4 h-4 text-amber-400" /> + Realizar Corte de Turno
+            <Lock className="w-4 h-4 text-amber-400" /> + Realizar Corte de Turno {currentBranch?.shortName ? `(${currentBranch.shortName})` : ""}
           </button>
         </div>
       </div>
+
+      {/* Supervisión y Selección de Caja por Sucursal (Poder Total Administrador) */}
+      {(isAdmin || user?.role === "admin" || user?.role === "auxiliar_admin") && (
+        <div className="bg-stone-900 text-white p-3.5 sm:p-4 rounded-2xl border-2 border-amber-500/50 shadow-md">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-2.5">
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
+              <h3 className="text-xs sm:text-sm font-black text-amber-300 tracking-wide uppercase flex items-center gap-1.5">
+                <Store className="w-4 h-4 text-amber-400" />
+                <span>Supervisión de Cajas & Cierres de Turno (Poder Administrador)</span>
+              </h3>
+            </div>
+            <span className="text-[11px] text-stone-300 font-medium">
+              Sucursal activa en supervisión: <strong className="text-amber-300 font-black">{currentBranch?.name || "Todas"}</strong> (Cajero: <strong className="text-white">{currentBranch?.manager || currentBranch?.currentShift?.cashier || "Don Toño"}</strong>)
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2 overflow-x-auto pb-1">
+            <button
+              onClick={() => switchBranch("all")}
+              className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
+                isAllBranches || currentBranch?.id === "all"
+                  ? "bg-amber-400 text-stone-950 shadow-md scale-102"
+                  : "bg-stone-800 text-stone-300 hover:bg-stone-700 hover:text-white"
+              }`}
+            >
+              <span>🌐 Todas las Sucursales</span>
+            </button>
+            {branches.map((b) => {
+              const isSelected = !isAllBranches && currentBranch?.id === b.id;
+              return (
+                <button
+                  key={b.id}
+                  onClick={() => switchBranch(b.id)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
+                    isSelected
+                      ? "bg-amber-400 text-stone-950 shadow-md scale-102"
+                      : "bg-stone-800 text-stone-300 hover:bg-stone-700 hover:text-white border border-stone-700"
+                  }`}
+                >
+                  <Store className={`w-3.5 h-3.5 ${isSelected ? "text-stone-950" : "text-amber-400"}`} />
+                  <span>{b.shortName || b.name}</span>
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded-md font-black ${
+                    isSelected ? "bg-stone-950 text-amber-300" : "bg-stone-900 text-emerald-400 border border-stone-700"
+                  }`}>
+                    {formatCurrency(b.cashInDrawer || 0)}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Navigation Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-stone-200 gap-3 pb-0">

@@ -175,7 +175,7 @@ export interface Customer {
 
 export interface CashShift {
   id: string;
-  shiftName: string; // e.g. "Turno Mañana (6:00 AM - 2:00 PM)"
+  shiftName: string; // e.g. "Turno Mañana (06:00 - 14:00)"
   cashierName: string;
   openedAt: string;
   closedAt?: string;

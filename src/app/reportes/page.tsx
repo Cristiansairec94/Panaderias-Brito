@@ -122,7 +122,7 @@ export default function ReportesPage() {
               <Clock className="w-4 h-4" />
             </div>
           </div>
-          <p className="text-2xl font-black text-stone-900">6:30 - 8:30 PM</p>
+          <p className="text-2xl font-black text-stone-900">18:30 - 20:30</p>
           <p className="text-[11px] text-blue-600 font-semibold mt-1">
             Momento del café y cena familiar
           </p>

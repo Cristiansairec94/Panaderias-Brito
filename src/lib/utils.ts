@@ -128,12 +128,9 @@ export function formatDateTimeSafe(inputDate?: Date | string | number): string {
   const day = String(d.getDate()).padStart(2, "0");
   const month = String(d.getMonth() + 1).padStart(2, "0");
   const year = d.getFullYear();
-  let hours = d.getHours();
+  const hoursStr = String(d.getHours()).padStart(2, "0");
   const minutes = String(d.getMinutes()).padStart(2, "0");
-  const ampm = hours >= 12 ? "p. m." : "a. m.";
-  hours = hours % 12 || 12;
-  const hoursStr = String(hours).padStart(2, "0");
-  return `${day}/${month}/${year}, ${hoursStr}:${minutes} ${ampm}`;
+  return `${day}/${month}/${year}, ${hoursStr}:${minutes}`;
 }
 
 /**
@@ -223,6 +220,32 @@ export function parseDateTimeSafe(input?: Date | string | number | null): number
   }
 
   return 0;
+}
+
+/**
+ * Formatea una fecha u hora siempre en formato estricto de 24 horas (HH:mm o HH:mm:ss).
+ * Previene el formato de 12 horas (a. m. / p. m.) en cualquier navegador o entorno.
+ */
+export function formatTime24(date: Date | number | string = new Date(), includeSeconds: boolean = false): string {
+  let d: Date;
+  if (date instanceof Date) {
+    d = date;
+  } else if (typeof date === "number") {
+    d = new Date(date);
+  } else if (typeof date === "string") {
+    const ts = parseDateTimeSafe(date);
+    d = ts ? new Date(ts) : new Date(date);
+  } else {
+    d = new Date();
+  }
+  if (isNaN(d.getTime())) return "";
+  const h = String(d.getHours()).padStart(2, "0");
+  const m = String(d.getMinutes()).padStart(2, "0");
+  if (includeSeconds) {
+    const s = String(d.getSeconds()).padStart(2, "0");
+    return `${h}:${m}:${s}`;
+  }
+  return `${h}:${m}`;
 }
 
 export interface OrderCreationInfo {
@@ -573,7 +596,7 @@ export function getStoredShiftStartBoundary(branchId?: string): number {
               const resp = (cut.responsible || cut.outgoingCashier || "").toLowerCase();
               if (resp.includes("silvia") || resp.includes("ildefonso")) {
                 cutBranch = "branch-1790889237862";
-              } else if (resp.includes("angeles") || resp.includes("ángeles") || resp.includes("lazaro") || resp.includes("lázaro")) {
+              } else if (resp.includes("angeles") || resp.includes("ángeles") || resp.includes("lazaro") || resp.includes("lázaro") || resp.includes("andres") || resp.includes("andrés")) {
                 cutBranch = "branch-angeles";
               }
             }
@@ -868,4 +891,34 @@ export function resolveBranchId(rawBranchId: string | null | undefined, cashierN
   }
 
   return rawBranchId || "branch-matriz";
+}
+
+/**
+ * Determina de forma infalible si una venta registrada corresponde a un anticipo,
+ * abono o liquidación de un pedido especial (y NO a una venta pura de mostrador).
+ */
+export function isOrderSale(sale: any): boolean {
+  if (!sale) return false;
+  if (sale.isCustomOrder || sale.is_custom_order) return true;
+  if (sale.orderNumber || sale.order_number) return true;
+  const id = String(sale.id || "");
+  if (/^(LIQ-|PED-|ORD-|order-)/i.test(id)) return true;
+  if (Array.isArray(sale.items)) {
+    for (const item of sale.items) {
+      const pName = String(item.product?.name || item.name || item.product_name || "").toLowerCase();
+      if (
+        pName.includes("pedido") ||
+        pName.includes("liquidaci") ||
+        pName.includes("anticipo") ||
+        pName.includes("abono")
+      ) {
+        return true;
+      }
+      const pId = String(item.product?.id || item.productId || item.product_id || "");
+      if (/^(LIQ-|PED-|order-)/i.test(pId)) {
+        return true;
+      }
+    }
+  }
+  return false;
 }

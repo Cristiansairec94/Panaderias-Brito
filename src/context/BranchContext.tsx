@@ -6,7 +6,7 @@ import { realtimeHub } from "@/lib/realtime/realtimeHub";
 import { recordCashOutflowAsExpense } from "@/lib/expenses";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/context/AuthContext";
-import { parseDateTimeSafe, getStoredShiftStartBoundary, formatDateTimeSafe, compareMovementsDesc, resolveBranchId } from "@/lib/utils";
+import { parseDateTimeSafe, getStoredShiftStartBoundary, formatDateTimeSafe, compareMovementsDesc, resolveBranchId, formatTime24, isOrderSale } from "@/lib/utils";
 import { normalizeOrder } from "@/lib/orders";
 import { CLEAN_SLATE_EPOCH } from "@/lib/wipeOperationalData";
 
@@ -94,7 +94,7 @@ const DEFAULT_BRANCHES: Branch[] = [
       id: "shift-mat-101",
       name: "Turno Matutino (06:00 - 14:00)",
       cashier: "Lupita Brito",
-      openedAt: "06:00 AM",
+      openedAt: "06:00",
       initialFund: 1000,
       cashSales: 0,
       cardSales: 0,
@@ -131,7 +131,7 @@ const DEFAULT_BRANCHES: Branch[] = [
       id: "shift-ben-201",
       name: "Turno Matutino (06:30 - 14:30)",
       cashier: "Carlos Mendoza",
-      openedAt: "06:30 AM",
+      openedAt: "06:30",
       initialFund: 800,
       cashSales: 0,
       cardSales: 0,
@@ -206,7 +206,7 @@ const DEFAULT_BRANCHES: Branch[] = [
       id: "shift-flo-301",
       name: "Turno Matutino (07:00 - 15:00)",
       cashier: "Elena Brito",
-      openedAt: "07:00 AM",
+      openedAt: "07:00",
       initialFund: 1200,
       cashSales: 0,
       cardSales: 0,
@@ -243,7 +243,7 @@ const DEFAULT_BRANCHES: Branch[] = [
       id: "shift-ilf-401",
       name: "Turno Matutino (06:00 - 14:00)",
       cashier: "silvia puga",
-      openedAt: "06:00 AM",
+      openedAt: "06:00",
       initialFund: 1000,
       cashSales: 0,
       cardSales: 0,
@@ -280,7 +280,7 @@ const DEFAULT_BRANCHES: Branch[] = [
       id: "shift-ang-301",
       name: "Turno General",
       cashier: "andres sanchez",
-      openedAt: "06:00 AM",
+      openedAt: "06:00",
       initialFund: 1000,
       cashSales: 0,
       cardSales: 0,
@@ -933,8 +933,9 @@ function resolveBranchParam(param: string | null): string | null {
             return resolveBranchId(rawBranchId, cashierName);
           };
 
-          // 1. Agregar ventas de mostrador (filtrando turno activo vs acumulado)
+          // 1. Agregar ventas de mostrador (filtrando turno activo vs acumulado y excluyendo pedidos especiales)
           dbSales.forEach((s: any) => {
+            const isOrder = isOrderSale(s);
             const bId = resolveBranchForRecord(s.branch_id, s.cashier);
             let cur = branchAgg.get(bId);
             if (!cur) {
@@ -945,28 +946,43 @@ function resolveBranchParam(param: string | null): string | null {
             const saleTime = parseDateTimeSafe(s.created_at || s.date);
             const cutLimit = cutTimestampByBranch.get(bId) || 0;
 
-            cur.dayAccumulatedDeskSales += amt;
-            cur.dayAccumulatedDeskTickets += 1;
+            if (!isOrder) {
+              cur.dayAccumulatedDeskSales += amt;
+              cur.dayAccumulatedDeskTickets += 1;
 
-            // SOLO sumar al turno activo si la venta ocurrió DESPUÉS del corte cerrado
-            if (saleTime > cutLimit) {
-              cur.deskSales += amt;
-              cur.deskTickets += 1;
-              if (s.payment_method === "tarjeta") cur.deskCard += amt;
-              else if (s.payment_method === "transferencia") cur.deskTransfer += amt;
-              else cur.deskCash += amt;
-              if (s.cashier) cur.lastCashier = s.cashier;
+              // SOLO sumar al turno activo si la venta ocurrió DESPUÉS del corte cerrado
+              if (saleTime > cutLimit) {
+                cur.deskSales += amt;
+                cur.deskTickets += 1;
+                if (s.payment_method === "tarjeta") cur.deskCard += amt;
+                else if (s.payment_method === "transferencia") cur.deskTransfer += amt;
+                else cur.deskCash += amt;
+                if (s.cashier) cur.lastCashier = s.cashier;
+              }
+            } else {
+              // Si es venta generada por pedido especial y el pedido NO está en dbOrders, acumular aquí
+              if (saleTime > cutLimit) {
+                const ordNum = s.order_number || (s.id && s.id.startsWith("LIQ-") ? s.id.replace("LIQ-", "") : s.id);
+                const hasOrderInDb = dbOrders.some((o: any) => o.id === ordNum || o.order_number === ordNum);
+                if (!hasOrderInDb) {
+                  cur.orderTotalCobrado += amt;
+                  if (s.payment_method === "tarjeta") cur.orderCard += amt;
+                  else if (s.payment_method === "transferencia") cur.orderTransfer += amt;
+                  else cur.orderCash += amt;
+                  if (s.cashier && !cur.lastCashier) cur.lastCashier = s.cashier;
+                }
+              }
             }
           });
 
-          // 2. Agregar pedidos especiales (anticipos y liquidaciones en la sucursal donde se cobró)
+          // 2. Agregar pedidos especiales (anticipos y liquidaciones) desglosando por cajero y sucursal de pago
           const countedOrderNums = new Set<string>();
           dbOrders.forEach((o: any) => {
             const rawNotes = String(o.notes || "");
             const originMatch = rawNotes.match(/\[Origen:\s*([^\|\]]+)(?:\|([^\]]+))?\]/);
             const originBranchId = originMatch && originMatch[1] ? originMatch[1].trim() : undefined;
             const cashierBranchId = o.cashier && !/don toño|admin|carlos/i.test(String(o.cashier)) ? resolveBranchId(undefined, o.cashier) : undefined;
-            const bId = originBranchId
+            const defaultBranch = originBranchId
               ? resolveBranchId(originBranchId, o.cashier)
               : (o.operating_branch_id || o.operatingBranchId)
               ? resolveBranchId(o.operating_branch_id || o.operatingBranchId, o.cashier)
@@ -975,32 +991,91 @@ function resolveBranchParam(param: string | null): string | null {
             if (o.order_number) countedOrderNums.add(String(o.order_number).toUpperCase());
             if (o.id) countedOrderNums.add(String(o.id).toUpperCase());
 
-            let cur = branchAgg.get(bId);
-            if (!cur) {
-              cur = initBranchAgg();
-              branchAgg.set(bId, cur);
+            let curDefault = branchAgg.get(defaultBranch);
+            if (!curDefault) {
+              curDefault = initBranchAgg();
+              branchAgg.set(defaultBranch, curDefault);
             }
-            if (o.branch_name && !originBranchId) cur.branchName = o.branch_name;
-            const dep = Number(o.deposit) || 0;
+            if (o.branch_name && !originBranchId) curDefault.branchName = o.branch_name;
             const tot = Number(o.total) || 0;
             const orderTime = parseDateTimeSafe(o.created_at);
-            const cutLimit = cutTimestampByBranch.get(bId) || 0;
+            const defaultCutLimit = cutTimestampByBranch.get(defaultBranch) || 0;
 
-            if (dep > 0) cur.dayAccumulatedOrdersDeposit += dep;
+            if (orderTime > defaultCutLimit) {
+              curDefault.orderTotal += tot;
+              curDefault.orderCount += 1;
+              if (o.cashier && !curDefault.lastCashier) curDefault.lastCashier = o.cashier;
+            }
 
-            // SOLO sumar al turno activo si el pedido ocurrió DESPUÉS del corte cerrado
-            if (orderTime > cutLimit) {
-              cur.orderTotal += tot;
-              cur.orderCount += 1;
-              if (dep > 0) {
-                cur.orderTotalCobrado += dep;
-                if (o.payment_method === "tarjeta") cur.orderCard += dep;
-                else if (o.payment_method === "transferencia") cur.orderTransfer += dep;
-                else cur.orderCash += dep;
+            // Desglose exacto de cobros si el pedido tiene historial de pagos (payments)
+            if (Array.isArray(o.payments) && o.payments.length > 0) {
+              o.payments.forEach((p: any) => {
+                const pBranch = resolveBranchForRecord((p as any).branchId || (p as any).branch_id || o.branch_id, p.cashier || o.cashier);
+                let pCur = branchAgg.get(pBranch);
+                if (!pCur) {
+                  pCur = initBranchAgg();
+                  branchAgg.set(pBranch, pCur);
+                }
+                const pAmt = Number(p.amount) || 0;
+                const pTime = parseDateTimeSafe(p.date || p.timestamp || p.createdAt || o.created_at);
+                const pCutLimit = cutTimestampByBranch.get(pBranch) || 0;
+                if (pAmt > 0) pCur.dayAccumulatedOrdersDeposit += pAmt;
+                if (pTime > pCutLimit && pAmt > 0) {
+                  pCur.orderTotalCobrado += pAmt;
+                  const meth = (p.paymentMethod || p.payment_method || "efectivo").toLowerCase();
+                  if (meth === "tarjeta") pCur.orderCard += pAmt;
+                  else if (meth === "transferencia") pCur.orderTransfer += pAmt;
+                  else pCur.orderCash += pAmt;
+                  if (p.cashier && !pCur.lastCashier) pCur.lastCashier = p.cashier;
+                }
+              });
+            } else {
+              // Sin array de pagos, usar depósito global
+              const dep = Number(o.deposit) || 0;
+              if (dep > 0) curDefault.dayAccumulatedOrdersDeposit += dep;
+              if (orderTime > defaultCutLimit && dep > 0) {
+                curDefault.orderTotalCobrado += dep;
+                if (o.payment_method === "tarjeta") curDefault.orderCard += dep;
+                else if (o.payment_method === "transferencia") curDefault.orderTransfer += dep;
+                else curDefault.orderCash += dep;
               }
-              if (o.cashier && !cur.lastCashier) cur.lastCashier = o.cashier;
             }
           });
+
+          // Incorporar ventas locales del POS que aún no estén en dbSales
+          if (typeof window !== "undefined") {
+            try {
+              const rawLocalSales = localStorage.getItem("brito_pos_current_sales");
+              if (rawLocalSales) {
+                const localSales = JSON.parse(rawLocalSales);
+                if (Array.isArray(localSales)) {
+                  localSales.forEach((ls: any) => {
+                    if (!ls || !ls.id || dbSales.some((d: any) => d.id === ls.id)) return;
+                    const isOrd = isOrderSale(ls);
+                    const bId = resolveBranchForRecord(ls.branchId || ls.branch_id, ls.cashier);
+                    let cur = branchAgg.get(bId);
+                    if (!cur) {
+                      cur = initBranchAgg();
+                      branchAgg.set(bId, cur);
+                    }
+                    const amt = Number(ls.total) || 0;
+                    const saleTime = parseDateTimeSafe(ls.timestamp || ls.createdAt || ls.date);
+                    const cutLimit = cutTimestampByBranch.get(bId) || 0;
+                    if (saleTime > cutLimit) {
+                      if (!isOrd) {
+                        cur.deskSales += amt;
+                        cur.deskTickets += 1;
+                        if (ls.paymentMethod === "tarjeta") cur.deskCard += amt;
+                        else if (ls.paymentMethod === "transferencia") cur.deskTransfer += amt;
+                        else cur.deskCash += amt;
+                      }
+                      if (ls.cashier && !cur.lastCashier) cur.lastCashier = ls.cashier;
+                    }
+                  });
+                }
+              }
+            } catch {}
+          }
 
           // 3. Movimientos de caja (aportes / retiros fuera de ventas y de cortes, y respaldo de abono_pedido)
           dbMovs.forEach((m: any) => {
@@ -1230,7 +1305,7 @@ function resolveBranchParam(param: string | null): string | null {
                     id: `shift-${dbB.id}`,
                     name: "Turno General",
                     cashier: "Cajero",
-                    openedAt: "06:00 AM",
+                    openedAt: "06:00",
                     initialFund: 1000,
                     cashSales: 0,
                     cardSales: 0,
@@ -1314,7 +1389,7 @@ function resolveBranchParam(param: string | null): string | null {
                   id: b.currentShift?.id || `shift-${b.id}`,
                   name: latestCut?.nextShift || b.currentShift?.name || (b.id === "branch-1790889237862" ? "Turno Matutino" : "Turno General"),
                   cashier: activeCashier,
-                  openedAt: latestCut?.date || b.currentShift?.openedAt || "06:00 AM",
+                  openedAt: latestCut?.date || b.currentShift?.openedAt || "06:00",
                   initialFund: initialFund,
                   totalSales: totalCobrado,
                   ticketCount: totalTickets,
@@ -1700,7 +1775,7 @@ function resolveBranchParam(param: string | null): string | null {
                 id: `shift-${b.id}`,
                 name: "Turno General",
                 cashier: sale.cashier || "Cajero",
-                openedAt: "06:00 AM",
+                openedAt: "06:00",
                 initialFund: 1000,
                 status: "abierto",
                 totalSales: 0,
@@ -1755,7 +1830,7 @@ function resolveBranchParam(param: string | null): string | null {
             amount: sale.total,
             reason: `Ticket #${String(sale.id).slice(-6).toUpperCase()} • ${sale.itemsSummary || "Venta mostrador"} (${(sale.paymentMethod || "efectivo").toUpperCase()})`,
             authorizedBy: sale.cashier || "Cajero",
-            timestamp: sale.timestamp || new Date().toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" }),
+            timestamp: sale.timestamp || formatTime24(new Date()),
             createdAt: sale.createdAt || new Date().toISOString(),
             rawTimestamp: Date.now(),
             movementType: "venta",
@@ -1946,7 +2021,7 @@ function resolveBranchParam(param: string | null): string | null {
               amount: deposit,
               reason: `Pedido #${order.orderNumber || order.id} (${order.customerName}): ${order.description || "Pedido especial"}`,
               authorizedBy: order.cashier || "Cajero",
-              timestamp: payload.timestamp || new Date().toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" }),
+              timestamp: payload.timestamp || formatTime24(new Date()),
               createdAt: new Date().toISOString(),
               rawTimestamp: Date.now(),
               movementType: "pedido",
@@ -2077,7 +2152,7 @@ function resolveBranchParam(param: string | null): string | null {
             amount: Number(cut.countedCash || cut.totalSales || 0),
             reason: `Corte de turno (${cut.shiftRange || "Turno"}). Saliente: ${cut.outgoingCashier} → Entrante: ${cut.incomingCashier}. Fondo nuevo: $${cut.nextFund || 1000}`,
             authorizedBy: cut.outgoingCashier || "Cajero",
-            timestamp: cut.date || new Date().toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" }),
+            timestamp: cut.date || formatTime24(new Date()),
             createdAt: new Date(cut.timestamp || Date.now()).toISOString(),
             rawTimestamp: cut.timestamp || Date.now(),
             movementType: "corte",
@@ -2123,7 +2198,7 @@ function resolveBranchParam(param: string | null): string | null {
                     id: b.currentShift?.id || `shift-${b.id}`,
                     name: cut.nextShift || b.currentShift?.name || "Turno General",
                     cashier: nextCashier,
-                    openedAt: cut.date || b.currentShift?.openedAt || "06:00 AM",
+                    openedAt: cut.date || b.currentShift?.openedAt || "06:00",
                     initialFund: newFund,
                     totalSales: 0,
                     ticketCount: 0,
@@ -2478,7 +2553,7 @@ function resolveBranchParam(param: string | null): string | null {
             id: `shift-${b.id}`,
             name: "Turno General",
             cashier: cashier || "Cajero",
-            openedAt: "06:00 AM",
+            openedAt: "06:00",
             initialFund: 1000,
             status: "abierto",
             totalSales: 0,
@@ -2520,7 +2595,7 @@ function resolveBranchParam(param: string | null): string | null {
         return updated;
       });
 
-      const timeStr = new Date().toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+      const timeStr = formatTime24(new Date(), true);
       const targetBranch = branches.find((b) => b.id === branchId);
       const saleLog: SimulatedSale = {
         id: saleDetails?.id || `pos-${Date.now()}`,
@@ -2711,7 +2786,7 @@ function resolveBranchParam(param: string | null): string | null {
 
     const branch = branches.find((b) => b.id === effectiveBranchId) || branches[0];
     const now = new Date();
-    const timeStr = now.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+    const timeStr = formatTime24(now, true);
 
     const newSale: SimulatedSale = {
       id: `sim-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
@@ -2822,7 +2897,7 @@ function resolveBranchParam(param: string | null): string | null {
           id: `shift-${b.code.toLowerCase()}-${Date.now()}`,
           name: nextShiftName,
           cashier: nextCashier,
-          openedAt: new Date().toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" }),
+          openedAt: formatTime24(new Date()),
           initialFund: 1000,
           cashSales: 0,
           cardSales: 0,
@@ -2866,7 +2941,7 @@ function resolveBranchParam(param: string | null): string | null {
       const targetBranch = branches.find((b) => b.id === branchId);
       const branchName = targetBranch ? targetBranch.shortName : "Sucursal";
       const now = new Date();
-      const timeStr = now.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" });
+      const timeStr = formatTime24(now);
 
       const newMovement: BranchCashMovement = {
         id: `bmov-${Date.now()}`,
