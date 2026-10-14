@@ -38,7 +38,7 @@ import {
   Receipt
 } from "lucide-react";
 import { useSync } from "@/context/SyncContext";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, formatTime24, formatDateTimeSafe } from "@/lib/utils";
 import { HealthCheckResult } from "@/lib/sync/syncService";
 import { SyncItem } from "@/types";
 
@@ -152,11 +152,7 @@ export default function OfflineManagement() {
   };
 
   const formattedLastSync = lastSyncTime
-    ? new Date(lastSyncTime).toLocaleTimeString("es-MX", {
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit",
-      })
+    ? formatTime24(lastSyncTime, true)
     : "Al iniciar el sistema";
 
   return (
@@ -797,10 +793,7 @@ export default function OfflineManagement() {
                       {item.amount !== undefined ? formatCurrency(item.amount) : "-"}
                     </td>
                     <td className="p-3 text-stone-500">
-                      {new Date(item.createdAt).toLocaleTimeString("es-MX", {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
+                      {formatTime24(item.createdAt)}
                     </td>
                     <td className="p-3">
                       <span
@@ -883,7 +876,7 @@ export default function OfflineManagement() {
                 <div className="text-right">
                   <span className="text-[10px] font-bold text-stone-400 uppercase">Registrado Local</span>
                   <div className="text-xs font-bold text-stone-700">
-                    {new Date(viewingQueueItem.createdAt).toLocaleString("es-MX")}
+                    {formatDateTimeSafe(viewingQueueItem.createdAt)}
                   </div>
                 </div>
               </div>

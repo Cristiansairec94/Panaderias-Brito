@@ -38,7 +38,7 @@ import {
   Clock
 } from "lucide-react";
 import { CashIncome, CashIncomeCategory } from "@/types";
-import { formatCurrency, onlyNumbersKeyDown, cleanDecimalNumbers } from "@/lib/utils";
+import { formatCurrency, onlyNumbersKeyDown, cleanDecimalNumbers, formatTime24 } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
 import { useBranch } from "@/context/BranchContext";
 import { useNotifications } from "@/context/NotificationContext";
@@ -143,7 +143,7 @@ const getIncomeDateTimeInfo = (inc: Partial<CashIncome> | null | undefined) => {
   if (inc.timestamp) {
     const dt = new Date(inc.timestamp);
     if (!isNaN(dt.getTime())) {
-      timeStr = dt.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" });
+      timeStr = formatTime24(dt);
       cleanDate = dt.toLocaleDateString("es-MX", { day: "2-digit", month: "2-digit", year: "numeric" });
       if (isHoy) formattedDate = `Hoy, ${timeStr}`;
       else if (isAyer) formattedDate = `Ayer, ${timeStr}`;
@@ -520,7 +520,7 @@ export default function IngresosPage() {
     try {
       const res = await fetchAndSyncIncomesFromSupabase();
       setSupabaseSyncSuccess(res.success);
-      setLastSyncTime(new Date().toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit", second: "2-digit" }));
+      setLastSyncTime(formatTime24(new Date(), true));
       reloadIncomesFromStorage();
     } catch (err) {
       console.error("[Ingresos] Error al sincronizar con Supabase:", err);
@@ -966,7 +966,7 @@ export default function IngresosPage() {
         amount: newIncome.amount,
         reason: newIncome.concept,
         authorizedBy: newIncome.cashier,
-        timestamp: new Date().toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" }),
+        timestamp: formatTime24(new Date()),
       });
     }
 

@@ -25,6 +25,7 @@ import {
   printTestTicket,
   DEFAULT_PRINTER_CONFIG
 } from "@/lib/printer";
+import { formatTime24 } from "@/lib/utils";
 
 interface PrinterConfigModalProps {
   isOpen: boolean;
@@ -101,7 +102,7 @@ export default function PrinterConfigModal({
         // Actualizar estado local
         setConfig((prev) => ({
           ...prev,
-          lastTestDate: new Date().toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" }),
+          lastTestDate: formatTime24(new Date()),
           status: "connected",
         }));
       }, 1200);

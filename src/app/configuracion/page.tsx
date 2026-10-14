@@ -33,7 +33,7 @@ import {
   Wifi,
   Laptop
 } from "lucide-react";
-import { formatCurrency, onlyNumbersKeyDown, cleanDecimalNumbers, cleanOnlyNumbers } from "@/lib/utils";
+import { formatCurrency, onlyNumbersKeyDown, cleanDecimalNumbers, cleanOnlyNumbers, formatTime24 } from "@/lib/utils";
 import { useAuth, ROLE_PERMISSIONS, User } from "@/context/AuthContext";
 import { useBranch } from "@/context/BranchContext";
 import { UserRole, Branch } from "@/types";
@@ -185,7 +185,7 @@ function ConfiguracionContent() {
         id: `shift-${newId}-1`,
         name: "Turno Matutino (06:00 - 14:00)",
         cashier: assignedUser ? assignedUser.name : (bManager || "Cajero"),
-        openedAt: new Date().toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" }),
+        openedAt: formatTime24(new Date()),
         initialFund: fund,
         cashSales: 0,
         cardSales: 0,

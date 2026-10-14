@@ -159,6 +159,12 @@ export default function OrderDetailModal({
 
   const handleDeliver = () => {
     if (!order) return;
+    if (order.status !== "listo") {
+      alert(
+        `⚠️ El pedido #${order.orderNumber} aún no ha sido marcado como "Listo en Sucursal".\n\nPrimero debes presionar el botón azul "Marcar Listo" para confirmar que el pedido ya llegó físicamente a la sucursal antes de proceder a entregarlo.`
+      );
+      return;
+    }
     if (order.remainingBalance > 0) {
       alert(
         `⛔ No se puede entregar el pedido #${order.orderNumber}.\n\nEl pedido aún tiene un saldo pendiente de ${formatCurrency(order.remainingBalance)}.\n\nPara poder entregarlo, primero debe estar 100% pagado sin faltante.`
@@ -675,19 +681,32 @@ export default function OrderDetailModal({
               </div>
             )}
 
-            {/* Botón Entregado */}
+            {/* Botón Entregado: Antes de iluminar la palabra entregar, primero se debe seleccionar el botón azul */}
             {!isHistoryOrder && order.status !== "entregado" && order.status !== "cancelado" && (
-              isLiquidado ? (
+              order.status !== "listo" ? (
+                /* Aún no llega a sucursal -> Botón apagado en gris, no iluminado */
                 <button
                   type="button"
                   onClick={handleDeliver}
-                  className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-lg shadow-xs transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 ring-1 ring-emerald-400"
-                  title="Marcar pedido como entregado (100% Pagado)"
+                  className="px-3 py-1.5 bg-stone-100 hover:bg-stone-200 text-stone-400 hover:text-stone-600 border border-stone-300 font-bold text-xs rounded-lg transition-all flex items-center gap-1.5 cursor-pointer"
+                  title="Primero debes presionar el botón azul 'Marcar Listo' para confirmar que el pedido ya llegó a la sucursal"
+                >
+                  <Lock className="w-3.5 h-3.5 text-stone-400" />
+                  <span>Entregado</span>
+                </button>
+              ) : isLiquidado ? (
+                /* Ya llegó a sucursal y está 100% liquidado -> Se ilumina en verde brillante */
+                <button
+                  type="button"
+                  onClick={handleDeliver}
+                  className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-lg shadow-xs transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 ring-1 ring-emerald-400 animate-pulse"
+                  title="Marcar pedido como entregado (100% Pagado y confirmado en sucursal)"
                 >
                   <PackageCheck className="w-3.5 h-3.5" />
                   <span>Entregado</span>
                 </button>
               ) : (
+                /* Ya llegó a sucursal pero falta pago */
                 <button
                   type="button"
                   onClick={handleDeliver}

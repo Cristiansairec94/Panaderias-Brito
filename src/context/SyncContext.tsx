@@ -232,6 +232,7 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
       navigator.serviceWorker
         .register("/sw.js")
         .then((reg) => {
+          reg.update().catch(() => {});
           console.log("[ServiceWorker] Listo y protegiendo modo offline:", reg.scope);
         })
         .catch((err) => {

@@ -2306,6 +2306,19 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
             alert("Este pedido pertenece al historial.");
             return;
           }
+          if (o.status !== "listo") {
+            alert(
+              `⚠️ El pedido #${o.orderNumber} aún no ha sido marcado como "Listo en Sucursal".\n\nPrimero presiona el botón azul "Marcar Listo" para confirmar que el pedido ya llegó físicamente a la sucursal antes de proceder a entregarlo.`
+            );
+            return;
+          }
+          if ((o.remainingBalance || 0) > 0) {
+            alert(
+              `⛔ No se puede entregar el pedido #${o.orderNumber}.\n\nTiene un saldo pendiente de $${Number(o.remainingBalance).toFixed(2)}.\n\nPara poder entregarlo, primero debe estar 100% pagado sin faltante.`
+            );
+            setSelectedOrderForPayment(o);
+            return;
+          }
           const updated = updateOrderStatus(o.id, "entregado") || getStoredOrders().find((item) => item.id === o.id);
           if (updated) {
             setSelectedOrderForDetail(null);

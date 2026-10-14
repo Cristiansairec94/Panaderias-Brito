@@ -52,7 +52,7 @@ import {
   ArrowUpRight
 } from "lucide-react";
 import { Product, CartItem, Sale, CashExpense, Customer, BreadDeliveryRecord, TransferAccount, CardTerminalAccount, CashIncome, CustomOrder, OrderItem, ShiftCutRecord } from "@/types";
-import { formatCurrency, onlyNumbersKeyDown, cleanOnlyNumbers, cleanDecimalNumbers, playScanBeep, formatDateTimeSafe, parseDateTimeSafe, compareMovementsDesc, matchesCashier, getStoredShiftStartBoundary, deduplicateExpenses, deduplicateIncomes, resolveBranchId } from "@/lib/utils";
+import { formatCurrency, onlyNumbersKeyDown, cleanOnlyNumbers, cleanDecimalNumbers, playScanBeep, formatDateTimeSafe, parseDateTimeSafe, compareMovementsDesc, matchesCashier, getStoredShiftStartBoundary, deduplicateExpenses, deduplicateIncomes, resolveBranchId, formatTime24 } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import { CLEAN_SLATE_EPOCH } from "@/lib/wipeOperationalData";
 import { getStoredProducts, saveStoredProducts, DEFAULT_PRODUCTS, PRODUCT_CATEGORIES, findProductByBarcodeOrCode, fetchProductsFromDb, getDeletedProductIds } from "@/lib/products";
@@ -97,7 +97,7 @@ const INITIAL_BREAD_DELIVERIES: BreadDeliveryRecord[] = [
     driver: "Manuel Sánchez",
     cashier: "Cajera 1 - Turno Matutino",
     date: new Date().toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" }),
-    timestamp: `${new Date().toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" })} • 07:30 AM`,
+    timestamp: `${new Date().toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" })} • 07:30`,
     items: [
       { productId: "p-bolillo", productName: "Bolillo Tradicional Caliente", quantity: 200, unitPrice: 3, previousStock: 20, newStock: 220 },
       { productId: "p-telera", productName: "Telera para Torta", quantity: 120, unitPrice: 3.5, previousStock: 15, newStock: 135 },
@@ -113,7 +113,7 @@ const INITIAL_BREAD_DELIVERIES: BreadDeliveryRecord[] = [
     driver: "Pedro Ramírez",
     cashier: "Cajera 2 - Turno Vespertino",
     date: new Date().toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" }),
-    timestamp: `${new Date().toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" })} • 02:45 PM`,
+    timestamp: `${new Date().toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" })} • 14:45`,
     items: [
       { productId: "p-cuerno", productName: "Cuerno de Mantequilla", quantity: 60, unitPrice: 10, previousStock: 8, newStock: 68 },
       { productId: "p-dona", productName: "Dona de Azúcar", quantity: 50, unitPrice: 10, previousStock: 5, newStock: 55 },
@@ -2544,7 +2544,7 @@ export default function POSPage() {
                 paymentMethod: currentPaymentMethod,
                 cashier: cashierName,
                 itemsSummary: currentItems.map((ci) => `${ci.quantity}x ${ci.product.name}`).join(", "),
-                timestamp: new Date().toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" }),
+                timestamp: formatTime24(new Date()),
                 items: currentItems,
                 customerName: selectedCustomer.name,
                 date: newSaleRecord.date,

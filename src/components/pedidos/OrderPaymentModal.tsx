@@ -13,7 +13,6 @@ import {
   Store,
   Calendar,
   Sparkles,
-  Lock,
   History,
   Check
 } from "lucide-react";
@@ -45,7 +44,6 @@ export default function OrderPaymentModal({
   const [paymentMode, setPaymentMode] = useState<"abono" | "liquidar">("liquidar");
   const [amount, setAmount] = useState<string>("");
   const [paymentMethod, setPaymentMethod] = useState<"efectivo" | "tarjeta" | "transferencia">("efectivo");
-  const [markAsDelivered, setMarkAsDelivered] = useState(false);
   const [notes, setNotes] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
@@ -57,7 +55,6 @@ export default function OrderPaymentModal({
       // By default open in liquidar mode with full balance ready
       setPaymentMode("liquidar");
       setAmount(order.remainingBalance.toString());
-      setMarkAsDelivered(false);
       setNotes("");
       setShowHistory(false);
     }
@@ -75,7 +72,6 @@ export default function OrderPaymentModal({
       setAmount(order.remainingBalance.toString());
     } else {
       setAmount("");
-      setMarkAsDelivered(false);
     }
   };
 
@@ -112,8 +108,8 @@ export default function OrderPaymentModal({
       const pickupBranchId = order.branchId || paymentBranchId;
       const pickupBranchName = order.branchName || paymentBranchName;
 
-      // Delivery is strictly allowed ONLY if the remaining balance is fully covered ($0 remaining)
-      const isDeliveredNow = Boolean((forceDeliver || markAsDelivered) && isFullPayment);
+      // Delivery is strictly allowed ONLY if the order is already in branch ("listo") and 100% covered ($0 remaining)
+      const isDeliveredNow = Boolean(forceDeliver && isFullPayment && order.status === "listo");
 
       const updatedOrder = addOrderPayment(order.id, {
         amount: numericAmount,
@@ -414,55 +410,6 @@ export default function OrderPaymentModal({
             </div>
           </div>
 
-          {/* Real-time Resulting Balance Preview Box */}
-          {numericAmount > 0 && (
-            <div className={`p-3.5 rounded-2xl border transition-all ${
-              isFullPayment
-                ? "bg-emerald-50/90 border-emerald-300 text-emerald-950"
-                : "bg-amber-50/90 border-amber-300 text-amber-950"
-            }`}>
-              <div className="flex items-center justify-between text-xs font-black">
-                <span>{isFullPayment ? "Resultado tras este pago:" : "Nuevo saldo que quedará pendiente:"}</span>
-                <span className={`text-base font-black font-mono ${isFullPayment ? "text-emerald-800" : "text-amber-900"}`}>
-                  {isFullPayment ? "¡$0.00 (100% CUBIERTO)!" : formatCurrency(newRemaining)}
-                </span>
-              </div>
-
-              {!isFullPayment ? (
-                <div className="mt-2 pt-2 border-t border-amber-200/80 text-[11px] text-amber-800 flex items-start gap-1.5">
-                  <Lock className="w-3.5 h-3.5 text-amber-700 shrink-0 mt-0.5" />
-                  <span>
-                    El cliente aún deberá <strong>{formatCurrency(newRemaining)}</strong>. El pedido podrá seguir recibiendo más abonos en cualquier momento y <strong>no se podrá entregar hasta liquidar el 100%</strong>.
-                  </span>
-                </div>
-              ) : (
-                <div className="mt-2 pt-2 border-t border-emerald-200/80 space-y-2">
-                  <div className="text-[11px] text-emerald-800 flex items-center gap-1.5 font-medium">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                    <span>¡Excelente! Con este pago el pedido queda totalmente liquidado. Ya se autoriza la entrega al cliente.</span>
-                  </div>
-
-                  {/* Entrega inmediata checkbox */}
-                  <div className="bg-white/80 border border-emerald-300/80 rounded-xl p-2.5 flex items-start gap-2.5">
-                    <input
-                      type="checkbox"
-                      id="deliveredCheck"
-                      checked={markAsDelivered}
-                      onChange={(e) => setMarkAsDelivered(e.target.checked)}
-                      className="mt-0.5 rounded text-emerald-600 focus:ring-emerald-500 w-4 h-4 cursor-pointer"
-                    />
-                    <label htmlFor="deliveredCheck" className="text-xs text-emerald-950 font-bold cursor-pointer select-none">
-                      Marcar pedido como Entregado al cliente ahora mismo
-                      <span className="block text-[10.5px] font-normal text-emerald-700">
-                        El cliente se está llevando el pedido en mostrador o ya va en camino para entrega.
-                      </span>
-                    </label>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
           {/* Payment Method */}
           <div className="space-y-1.5">
             <label className="text-xs font-bold text-stone-800 block">
@@ -574,13 +521,13 @@ export default function OrderPaymentModal({
           </button>
 
           <div className="flex items-center gap-2 flex-wrap ml-auto">
-            {isFullPayment && !markAsDelivered && (
+            {isFullPayment && order.status === "listo" && (
               <button
                 type="button"
                 disabled={isSubmitting || numericAmount <= 0 || numericAmount > order.remainingBalance}
                 onClick={() => handleConfirmPayment(true)}
                 className="px-4 py-2.5 bg-teal-700 hover:bg-teal-800 active:scale-95 text-white font-black text-xs rounded-xl shadow-md transition-all flex items-center gap-1.5 disabled:opacity-50 cursor-pointer ring-2 ring-teal-400/40"
-                title="Liquidar el 100% del saldo y marcar el pedido como ENTREGADO al cliente ahora mismo"
+                title="Liquidar el 100% del saldo y marcar el pedido como ENTREGADO al cliente ahora mismo (pedido confirmado en sucursal)"
               >
                 <span>📦</span>
                 <span>{isSubmitting ? "Registrando..." : `Liquidar y Entregar (${formatCurrency(numericAmount)})`}</span>
@@ -599,9 +546,7 @@ export default function OrderPaymentModal({
                 : numericAmount <= 0
                 ? "Ingresa un monto"
                 : isFullPayment
-                ? markAsDelivered
-                  ? `Liquidar ${formatCurrency(numericAmount)} y Entregar`
-                  : `Solo Liquidar ${formatCurrency(numericAmount)}`
+                ? `Liquidar ${formatCurrency(numericAmount)}`
                 : `Registrar Abono de ${formatCurrency(numericAmount)} (Resta ${formatCurrency(newRemaining)})`
               }
             </button>

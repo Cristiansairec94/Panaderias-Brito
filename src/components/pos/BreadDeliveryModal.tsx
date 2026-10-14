@@ -20,7 +20,7 @@ import {
   Sparkles
 } from "lucide-react";
 import { Product, BreadDeliveryRecord, BreadDeliveryItem } from "@/types";
-import { formatCurrency, onlyNumbersKeyDown, cleanOnlyNumbers } from "@/lib/utils";
+import { formatCurrency, onlyNumbersKeyDown, cleanOnlyNumbers, formatTime24 } from "@/lib/utils";
 
 interface BreadDeliveryModalProps {
   isOpen: boolean;
@@ -371,7 +371,7 @@ export default function BreadDeliveryModal({
     }
 
     const now = new Date();
-    const timeFormatted = now.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" });
+    const timeFormatted = formatTime24(now);
     const dateFormatted = now.toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" });
 
     const itemsRecord: BreadDeliveryItem[] = selectedProductList.map((item) => ({
