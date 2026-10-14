@@ -898,12 +898,13 @@ export default function ExpensesModal({
       if (activeBranch && activeBranch.id !== "all") {
         const eBranch = resolveBranchId((e as any).branchId || (e as any).branch_id, e.cashier);
         if (eBranch !== activeBranch.id) return false;
+      } else {
+        const isOwnerOrAdmin = e.isOwner || e.category === "retiro_dueno" || (e.cashier && (e.cashier.toLowerCase().includes("don toño") || e.cashier.toLowerCase().includes("admin")));
+        if (!isOwnerOrAdmin && (!e.cashier || (!matchesCashier(e.cashier, effectiveCashier) && !matchesCashier(e.cashier, cashierName)))) return false;
       }
-      const isOwnerOrAdmin = e.isOwner || e.category === "retiro_dueno" || (e.cashier && (e.cashier.toLowerCase().includes("don toño") || e.cashier.toLowerCase().includes("admin")));
-      if (!isOwnerOrAdmin && (!e.cashier || (!matchesCashier(e.cashier, effectiveCashier) && !matchesCashier(e.cashier, cashierName)))) return false;
       const expTime = parseDateTimeSafe(e.timestamp || e.createdAt || e.date);
       if (shiftStartBoundary > 0) {
-        if (!expTime || expTime < shiftStartBoundary) {
+        if (!expTime || expTime <= shiftStartBoundary) {
           return false;
         }
       }
@@ -976,12 +977,13 @@ export default function ExpensesModal({
       if (activeBranch && activeBranch.id !== "all") {
         const incBranch = resolveBranchId((inc as any).branchId || (inc as any).branch_id, inc.cashier);
         if (incBranch !== activeBranch.id) return false;
+      } else {
+        const isOwnerOrAdmin = inc.cashier && (inc.cashier.toLowerCase().includes("don toño") || inc.cashier.toLowerCase().includes("admin"));
+        if (!isOwnerOrAdmin && (!inc.cashier || (!matchesCashier(inc.cashier, effectiveCashier) && !matchesCashier(inc.cashier, cashierName)))) return false;
       }
-      const isOwnerOrAdmin = inc.cashier && (inc.cashier.toLowerCase().includes("don toño") || inc.cashier.toLowerCase().includes("admin"));
-      if (!isOwnerOrAdmin && (!inc.cashier || (!matchesCashier(inc.cashier, effectiveCashier) && !matchesCashier(inc.cashier, cashierName)))) return false;
       const incTime = parseDateTimeSafe(inc.timestamp || inc.date || (inc as any).createdAt);
       if (shiftStartBoundary > 0) {
-        if (!incTime || incTime < shiftStartBoundary) {
+        if (!incTime || incTime <= shiftStartBoundary) {
           return false;
         }
       }
@@ -1020,17 +1022,17 @@ export default function ExpensesModal({
     const boundary = shiftStartBoundary > 0 ? shiftStartBoundary : getStoredShiftStartBoundary(activeBranch?.id);
     const branchFilteredSource = source.filter((s) => {
       if (!s) return false;
-      if (s.id && (s.id.includes("354644") || s.id.includes("299599") || s.id.includes("331037") || s.total > 500000)) return false;
+      const sId = String(s.id || "");
+      if (sId.includes("354644") || sId.includes("299599") || sId.includes("331037") || /^pos-\d{10,}$/i.test(sId) || s.total > 500000) return false;
       if (activeBranch && activeBranch.id !== "all") {
         const sBranch = resolveBranchId((s as any).branchId || (s as any).branch_id, s.cashier);
         if (sBranch !== activeBranch.id) return false;
-      }
-      if (effectiveCashier && s.cashier && !matchesCashier(s.cashier, effectiveCashier) && (!cashierName || !matchesCashier(s.cashier, cashierName))) {
+      } else if (effectiveCashier && s.cashier && !matchesCashier(s.cashier, effectiveCashier) && (!cashierName || !matchesCashier(s.cashier, cashierName))) {
         return false;
       }
       const sTime = parseDateTimeSafe(s.timestamp || s.createdAt || s.date);
       if (boundary > 0) {
-        if (!sTime || sTime < boundary) return false;
+        if (!sTime || sTime <= boundary) return false;
       }
       if (sTime > Date.now() + 60000) return false;
       return true;
@@ -1043,6 +1045,7 @@ export default function ExpensesModal({
   const effectiveSales = shiftSales;
 
   // Pedidos especiales del turno (anticipos y liquidaciones cobrados estrictamente en el turno activo)
+  const targetBranchForOrders = activeBranch?.id && activeBranch.id !== "all" ? activeBranch.id : undefined;
   const relevantOrders = useMemo(() => {
     const boundary = shiftStartBoundary > 0 ? shiftStartBoundary : getStoredShiftStartBoundary(activeBranch?.id);
     const sourceOrders = mergeOrdersList(orders, internalOrders);
@@ -1050,10 +1053,10 @@ export default function ExpensesModal({
       if (!o) return false;
       if (o.status === "cancelado") return false;
       if (!isOrderCashInBranch(o) && !isOrderInBranch(o)) return false;
-      const col = getOrderShiftCollection(o, boundary);
+      const col = getOrderShiftCollection(o, boundary, targetBranchForOrders);
       return col.isInShift;
     });
-  }, [orders, internalOrders, mergeOrdersList, isOrderCashInBranch, isOrderInBranch, shiftStartBoundary, shiftVersion, ordersVersion, activeBranch?.id]);
+  }, [orders, internalOrders, mergeOrdersList, isOrderCashInBranch, isOrderInBranch, shiftStartBoundary, shiftVersion, ordersVersion, activeBranch?.id, targetBranchForOrders]);
 
   const effectiveOrders = relevantOrders;
 
@@ -1114,7 +1117,7 @@ export default function ExpensesModal({
 
   // Métricas superiores sincronizadas con el alcance activo (ventas de mostrador sin pedidos)
   const activeSalesForKpi = useMemo(() => {
-    return salesPoolForTickets.filter((s) => !s.isCustomOrder && !String(s.id || "").startsWith("PED-") && !String(s.id || "").startsWith("LIQ-"));
+    return salesPoolForTickets.filter((s) => !s.isCustomOrder && !String(s.id || "").startsWith("PED-") && !String(s.id || "").startsWith("LIQ-") && !/^pos-\d{10,}$/i.test(String(s.id || "")));
   }, [salesPoolForTickets]);
   const activeOrdersForKpi = ordersPool;
 
@@ -1123,7 +1126,7 @@ export default function ExpensesModal({
   // Ventas de mostrador del turno (todas las formas de pago: efectivo, tarjeta, transferencia)
   const shiftPurePosTotal = useMemo(() => {
     const calculated = effectiveSales
-      .filter((s) => !s.isCustomOrder && !String(s.id || "").startsWith("PED-") && !String(s.id || "").startsWith("LIQ-"))
+      .filter((s) => !s.isCustomOrder && !String(s.id || "").startsWith("PED-") && !String(s.id || "").startsWith("LIQ-") && !/^pos-\d{10,}$/i.test(String(s.id || "")))
       .reduce((acc, s) => acc + (Number(s.total) || 0), 0);
     const branchDeskTotal = Number(activeBranch?.todayDeskSales ?? (activeBranch?.todaySales && (activeBranch?.todayOrdersDeposit ?? 0) === 0 ? activeBranch.todaySales : 0));
     return branchDeskTotal > 0 && calculated === 0 ? branchDeskTotal : calculated > 0 ? calculated : branchDeskTotal;
@@ -1132,7 +1135,7 @@ export default function ExpensesModal({
   // Ventas de mostrador puras en efectivo (excluyendo pedidos) - Para el balance contable del cajón
   const shiftPurePosCash = useMemo(() => {
     const calculated = effectiveSales
-      .filter((s) => s.paymentMethod === "efectivo" && !s.isCustomOrder && !String(s.id || "").startsWith("PED-") && !String(s.id || "").startsWith("LIQ-"))
+      .filter((s) => s.paymentMethod === "efectivo" && !s.isCustomOrder && !String(s.id || "").startsWith("PED-") && !String(s.id || "").startsWith("LIQ-") && !/^pos-\d{10,}$/i.test(String(s.id || "")))
       .reduce((acc, s) => acc + (Number(s.total) || 0), 0);
     const branchDeskCash = Number(activeBranch?.todayDeskSales ?? (activeBranch?.todaySales && (activeBranch?.todayOrdersDeposit ?? 0) === 0 ? activeBranch.todaySales : 0));
     return branchDeskCash > 0 && calculated === 0 ? branchDeskCash : calculated > 0 ? calculated : branchDeskCash;
@@ -1143,20 +1146,20 @@ export default function ExpensesModal({
     const boundary = shiftStartBoundary > 0 ? shiftStartBoundary : getStoredShiftStartBoundary(activeBranch?.id);
     const calculated = effectiveOrders
       .filter((o) => isOrderCashInBranch(o))
-      .reduce((sum, o) => sum + getOrderShiftCollection(o, boundary).collectedTotal, 0);
+      .reduce((sum, o) => sum + getOrderShiftCollection(o, boundary, targetBranchForOrders).collectedTotal, 0);
     const branchOrdersTotal = Number(activeBranch?.todayOrdersDeposit ?? 0);
     return branchOrdersTotal > 0 && calculated === 0 ? branchOrdersTotal : calculated > 0 ? calculated : branchOrdersTotal;
-  }, [effectiveOrders, isOrderCashInBranch, shiftStartBoundary, activeBranch?.id, activeBranch?.todayOrdersDeposit]);
+  }, [effectiveOrders, isOrderCashInBranch, shiftStartBoundary, activeBranch?.id, activeBranch?.todayOrdersDeposit, targetBranchForOrders]);
 
   // Pedidos especiales cobrados en efectivo (anticipos y liquidaciones) - Para el balance contable del cajón
   const shiftOrdersCash = useMemo(() => {
     const boundary = shiftStartBoundary > 0 ? shiftStartBoundary : getStoredShiftStartBoundary(activeBranch?.id);
     const calculated = effectiveOrders
       .filter((o) => isOrderCashInBranch(o))
-      .reduce((sum, o) => sum + getOrderShiftCollection(o, boundary).collectedCash, 0);
+      .reduce((sum, o) => sum + getOrderShiftCollection(o, boundary, targetBranchForOrders).collectedCash, 0);
     const branchOrdersCash = Number(activeBranch?.todayOrdersDeposit ?? 0);
     return branchOrdersCash > 0 && calculated === 0 ? branchOrdersCash : calculated > 0 ? calculated : branchOrdersCash;
-  }, [effectiveOrders, isOrderCashInBranch, shiftStartBoundary, activeBranch?.id, activeBranch?.todayOrdersDeposit]);
+  }, [effectiveOrders, isOrderCashInBranch, shiftStartBoundary, activeBranch?.id, activeBranch?.todayOrdersDeposit, targetBranchForOrders]);
 
   // Ventas totales en efectivo (mostrador + anticipos/liquidaciones de pedidos)
   const totalShiftCashSales = useMemo(() => {

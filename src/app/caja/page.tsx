@@ -43,6 +43,8 @@ import {
 } from "lucide-react";
 import { CashMovement, ShiftCutRecord } from "@/types";
 import { formatCurrency, onlyNumbersKeyDown, cleanDecimalNumbers, formatDateTimeSafe, parseDateTimeSafe, getStoredShiftStartBoundary, matchesCashier, formatTime24, resolveBranchId, isOrderSale } from "@/lib/utils";
+import { getOrderShiftCollection } from "@/lib/orders";
+import { CLEAN_SLATE_EPOCH } from "@/lib/wipeOperationalData";
 import { useAuth } from "@/context/AuthContext";
 import { useBranch } from "@/context/BranchContext";
 import { useNotifications, FBNotification } from "@/context/NotificationContext";
@@ -536,33 +538,36 @@ export default function CajaPage() {
       if (typeof window !== "undefined") {
         try {
           const supabase = createClient();
-          const todayStart = new Date();
-          todayStart.setHours(0, 0, 0, 0);
-          const todayIso = todayStart.toISOString();
+          const cleanSlateIso = new Date(CLEAN_SLATE_EPOCH).toISOString();
 
           Promise.allSettled([
             supabase
               .from("sales")
               .select("id, branch_id, total, payment_method, cashier, date, created_at")
-              .gte("created_at", todayIso),
+              .gte("created_at", cleanSlateIso),
             supabase
               .from("custom_orders")
               .select("id, order_number, customer_name, branch_id, branch_name, description, total, deposit, remaining_balance, payment_status, payment_method, cashier, created_at")
-              .gte("created_at", todayIso),
+              .gte("created_at", cleanSlateIso),
             supabase
               .from("cash_movements")
               .select("id, branch_id, type, category, category_label, amount, reason, authorized_by, created_at")
-              .gte("created_at", todayIso),
+              .gte("created_at", cleanSlateIso),
             supabase
               .from("cash_expenses")
               .select("id, branch_id, amount, category, description, cashier, created_at")
-              .gte("created_at", todayIso),
+              .gte("created_at", cleanSlateIso),
             supabase
               .from("cash_shifts")
               .select("id, shift_name, cashier_name, branch_id, opened_at, initial_cash, actual_cash, expected_cash, difference")
-              .gte("opened_at", todayIso),
+              .gte("opened_at", cleanSlateIso),
           ]).then(([salesRes, ordersRes, movsRes, expsRes, cutsRes]) => {
-            const dbSales = salesRes.status === "fulfilled" && !salesRes.value.error ? salesRes.value.data || [] : [];
+            const dbSales = salesRes.status === "fulfilled" && !salesRes.value.error
+              ? (salesRes.value.data || []).filter((s: any) => {
+                  const idStr = String(s?.id || "");
+                  return idStr && !idStr.startsWith("LIQ-") && !idStr.startsWith("PED-") && !/^pos-\d{10,}$/i.test(idStr);
+                })
+              : [];
             const dbOrders = ordersRes.status === "fulfilled" && !ordersRes.value.error ? ordersRes.value.data || [] : [];
             const dbMovs = movsRes.status === "fulfilled" && !movsRes.value.error ? movsRes.value.data || [] : [];
             const dbExps = expsRes.status === "fulfilled" && !expsRes.value.error ? expsRes.value.data || [] : [];
@@ -737,53 +742,46 @@ export default function CajaPage() {
           } catch {}
         }
 
-        if (list.length > 0) {
-          const shiftStart = getStoredShiftStartBoundary(currentBranch?.id);
-          const filtered = list.filter((s: any) => {
-            if (!s) return false;
-            if (currentBranch && currentBranch.id && currentBranch.id !== "all") {
-              const sBranch = resolveBranchId(s.branchId || s.branch_id, s.cashier);
-              if (sBranch !== currentBranch.id) return false;
-            }
-            const t = parseDateTimeSafe(s.timestamp || s.createdAt || s.date);
-            return shiftStart <= 0 || (t > 0 && t >= shiftStart);
-          });
-          const cSum = filtered.filter((s: any) => s.paymentMethod === "efectivo").reduce((acc: number, s: any) => acc + (Number(s.total) || 0), 0);
-          const kSum = filtered.filter((s: any) => s.paymentMethod === "tarjeta").reduce((acc: number, s: any) => acc + (Number(s.total) || 0), 0);
-          const tSum = filtered.filter((s: any) => s.paymentMethod === "transferencia").reduce((acc: number, s: any) => acc + (Number(s.total) || 0), 0);
+        const shiftStart = getStoredShiftStartBoundary(currentBranch?.id);
+        const targetBranchForOrders = currentBranch && currentBranch.id && currentBranch.id !== "all" ? currentBranch.id : undefined;
+        const filtered = list.filter((s: any) => {
+          if (!s) return false;
+          const sId = String(s.id || "");
+          if (sId.startsWith("LIQ-") || sId.startsWith("PED-") || /^pos-\d{10,}$/i.test(sId) || s.isCustomOrder || s.is_custom_order) return false;
+          if (currentBranch && currentBranch.id && currentBranch.id !== "all") {
+            const sBranch = resolveBranchId(s.branchId || s.branch_id, s.cashier);
+            if (sBranch !== currentBranch.id) return false;
+          }
+          const t = parseDateTimeSafe(s.timestamp || s.createdAt || s.date);
+          return shiftStart <= 0 || (t > 0 && t > shiftStart);
+        });
+        const cSum = filtered.filter((s: any) => s.paymentMethod === "efectivo").reduce((acc: number, s: any) => acc + (Number(s.total) || 0), 0);
+        const kSum = filtered.filter((s: any) => s.paymentMethod === "tarjeta").reduce((acc: number, s: any) => acc + (Number(s.total) || 0), 0);
+        const tSum = filtered.filter((s: any) => s.paymentMethod === "transferencia").reduce((acc: number, s: any) => acc + (Number(s.total) || 0), 0);
 
-          // Anticipos en efectivo de pedidos especiales para cuadrar exactamente con POS
-          let ordersCash = 0;
-          try {
-            const rawOrders = localStorage.getItem("brito_custom_orders");
-            if (rawOrders) {
-              const ords = JSON.parse(rawOrders);
-              if (Array.isArray(ords)) {
-                ords.forEach((o: any) => {
-                  if (!o || o.status === "cancelado") return;
-                  if (currentBranch && currentBranch.id && currentBranch.id !== "all") {
-                    const oBranch = resolveBranchId(o.branchId || o.branch_id, o.cashier);
-                    if (oBranch !== currentBranch.id) return;
-                  }
-                  const ot = parseDateTimeSafe(o.timestamp || o.createdAt || o.date);
-                  if (shiftStart <= 0 || (ot > 0 && ot >= shiftStart)) {
-                    if ((o.paymentMethod === "efectivo" || !o.paymentMethod) && !filtered.some((s) => (s.id === o.orderNumber || s.id === o.id || s.orderNumber === o.orderNumber) && isOrderSale(s))) {
-                      ordersCash += Number(o.deposit) || 0;
-                    }
-                  }
-                });
-              }
+        // Anticipos y liquidaciones de pedidos especiales cobrados en este turno y sucursal
+        let ordersCash = 0;
+        let ordersCard = 0;
+        let ordersTransfer = 0;
+        try {
+          const rawOrders = localStorage.getItem("brito_custom_orders");
+          if (rawOrders) {
+            const ords = JSON.parse(rawOrders);
+            if (Array.isArray(ords)) {
+              ords.forEach((o: any) => {
+                if (!o || o.status === "cancelado") return;
+                const col = getOrderShiftCollection(o, shiftStart, targetBranchForOrders);
+                ordersCash += col.collectedCash;
+                ordersCard += col.collectedCard;
+                ordersTransfer += col.collectedTransfer;
+              });
             }
-          } catch {}
+          }
+        } catch {}
 
-          setCashSales(cSum + ordersCash);
-          setCardSales(kSum);
-          setTransferSales(tSum);
-        } else {
-          setCashSales(0);
-          setCardSales(0);
-          setTransferSales(0);
-        }
+        setCashSales(cSum + ordersCash);
+        setCardSales(kSum + ordersCard);
+        setTransferSales(tSum + ordersTransfer);
       } catch {
         setCashSales(0);
         setCardSales(0);
@@ -989,12 +987,29 @@ export default function CajaPage() {
     const shiftStart = getStoredShiftStartBoundary(currentBranch?.id);
     let combined = [...movements];
 
-    // 1. Movimientos desde BranchContext
+    // 1. Movimientos desde BranchContext (SOLO movimientos extra de efectivo: fondo_cambio, gastos, retiros; excluyendo ventas, pedidos y cortes)
     if (cashMovements && cashMovements.length > 0) {
       const filtered = cashMovements.filter((m) => {
         if (!m) return false;
+        if (
+          m.category === "venta_mostrador" ||
+          m.category === "abono_pedido" ||
+          m.category === "pedido" ||
+          m.category === "corte" ||
+          m.category === "corte_caja" ||
+          m.movementType === "venta" ||
+          m.movementType === "pedido" ||
+          m.movementType === "corte"
+        ) {
+          return false;
+        }
+        if (m.id && (String(m.id).startsWith("sale-") || String(m.id).startsWith("order-") || String(m.id).includes("PED-"))) return false;
+        const rLower = String(m.reason || "").toLowerCase();
+        if (rLower.includes("pedido") || rLower.includes("abono") || rLower.includes("anticipo") || rLower.includes("liquidaci")) return false;
+        if (m.type === "entrada" && Number(m.amount) === 6000) return false;
         if (!isAllBranches && currentBranch && currentBranch.id && currentBranch.id !== "all") {
-          if (m.branchId && m.branchId !== currentBranch.id) return false;
+          const mBranch = resolveBranchId(m.branchId, m.authorizedBy || m.cashier);
+          if (mBranch !== currentBranch.id) return false;
         }
         return true;
       });
@@ -1007,7 +1022,7 @@ export default function CajaPage() {
         amount: m.amount,
         reason: m.reason,
         authorizedBy: m.authorizedBy,
-        timestamp: m.timestamp,
+        timestamp: String(m.rawTimestamp || m.createdAt || m.timestamp || ""),
       }));
       for (const m of mapped) {
         if (!combined.some((c) => c.id === m.id)) {
@@ -1025,10 +1040,10 @@ export default function CajaPage() {
           parsed.forEach((e: any) => {
             if (!e) return;
             if (!isAllBranches && currentBranch && currentBranch.id && currentBranch.id !== "all") {
-              const bId = e.branchId || e.branch_id;
-              if (bId && bId !== currentBranch.id) return;
+              const bId = resolveBranchId(e.branchId || e.branch_id, e.cashier);
+              if (bId !== currentBranch.id) return;
             }
-            if (!combined.some((c) => c.id === e.id || c.id === `mov-${e.id}`)) {
+            if (!combined.some((c) => c.id === e.id || c.id === `exp-${e.id}` || c.id === `mov-${e.id}`)) {
               combined.push({
                 id: e.id,
                 shiftId: "shift-live",
@@ -1038,7 +1053,7 @@ export default function CajaPage() {
                 amount: Number(e.amount) || 0,
                 reason: e.description || "Gasto en caja",
                 authorizedBy: e.cashier || "Cajero",
-                timestamp: e.timestamp || e.date || e.createdAt || new Date().toISOString(),
+                timestamp: String(e.timestamp || e.createdAt || e.date || ""),
               });
             }
           });
@@ -1054,9 +1069,13 @@ export default function CajaPage() {
         if (Array.isArray(parsed)) {
           parsed.forEach((i: any) => {
             if (!i) return;
+            if (i.category === "abono_pedido" || i.category === "pedido" || i.category === "venta_mostrador" || i.orderId) return;
+            const cLower = String(i.concept || "").toLowerCase();
+            if (cLower.includes("pedido") || cLower.includes("abono") || cLower.includes("anticipo") || cLower.includes("liquidaci")) return;
+            if (Number(i.amount) === 6000) return;
             if (!isAllBranches && currentBranch && currentBranch.id && currentBranch.id !== "all") {
-              const bId = i.branchId || i.branch_id;
-              if (bId && bId !== currentBranch.id) return;
+              const bId = resolveBranchId(i.branchId || i.branch_id, i.cashier);
+              if (bId !== currentBranch.id) return;
             }
             if (!combined.some((c) => c.id === i.id)) {
               combined.push({
@@ -1068,7 +1087,7 @@ export default function CajaPage() {
                 amount: Number(i.amount) || 0,
                 reason: i.concept || "Entrada a caja",
                 authorizedBy: i.cashier || "Cajero",
-                timestamp: i.timestamp || i.date || new Date().toISOString(),
+                timestamp: String(i.timestamp || i.createdAt || i.date || ""),
               });
             }
           });
@@ -1079,7 +1098,7 @@ export default function CajaPage() {
     return combined.filter((m) => {
       if (!m) return false;
       const t = parseDateTimeSafe(m.timestamp);
-      return shiftStart <= 0 || (t > 0 && t >= shiftStart);
+      return shiftStart <= 0 || (t > 0 && t > shiftStart);
     });
   }, [cashMovements, currentBranch?.id, isAllBranches, movements]);
 

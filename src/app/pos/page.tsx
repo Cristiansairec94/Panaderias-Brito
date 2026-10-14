@@ -2000,17 +2000,17 @@ export default function POSPage() {
       const targetCashier = activeBranch?.currentShift?.cashier || cashierName;
       return pool.filter((s) => {
         if (!s) return false;
-        if (s.id && (s.id.includes("354644") || s.id.includes("299599") || s.id.includes("331037") || s.total > 500000)) return false;
+        const sId = String(s.id || "");
+        if (sId.includes("354644") || sId.includes("299599") || sId.includes("331037") || /^pos-\d{10,}$/i.test(sId) || s.total > 500000) return false;
         if (activeBranch && activeBranch.id !== "all") {
           const sBranch = resolveBranchId((s as any).branchId || (s as any).branch_id, s.cashier);
           if (sBranch !== activeBranch.id) return false;
-        }
-        if (targetCashier && s.cashier && !matchesCashier(s.cashier, targetCashier) && (!cashierName || !matchesCashier(s.cashier, cashierName))) {
+        } else if (targetCashier && s.cashier && !matchesCashier(s.cashier, targetCashier) && (!cashierName || !matchesCashier(s.cashier, cashierName))) {
           return false;
         }
         const t = parseDateTimeSafe(s.timestamp || s.createdAt || s.date);
         if (shiftStartBoundary > 0) {
-          if (!t || t < shiftStartBoundary) return false;
+          if (!t || t <= shiftStartBoundary) return false;
         }
         if (t > Date.now() + 60000) return false;
         return true;
@@ -2055,12 +2055,13 @@ export default function POSPage() {
         if (activeBranch && activeBranch.id !== "all") {
           const eBranch = resolveBranchId((e as any).branchId || (e as any).branch_id, e.cashier);
           if (eBranch !== activeBranch.id) return false;
+        } else {
+          const isOwnerOrAdmin = e.isOwner || e.category === "retiro_dueno" || (e.cashier && (e.cashier.toLowerCase().includes("don toño") || e.cashier.toLowerCase().includes("admin")));
+          if (!isOwnerOrAdmin && (!e.cashier || (!matchesCashier(e.cashier, targetCashier) && !matchesCashier(e.cashier, cashierName)))) return false;
         }
-        const isOwnerOrAdmin = e.isOwner || e.category === "retiro_dueno" || (e.cashier && (e.cashier.toLowerCase().includes("don toño") || e.cashier.toLowerCase().includes("admin")));
-        if (!isOwnerOrAdmin && (!e.cashier || (!matchesCashier(e.cashier, targetCashier) && !matchesCashier(e.cashier, cashierName)))) return false;
         const t = parseDateTimeSafe(e.timestamp || e.createdAt || e.date);
         if (shiftStartBoundary > 0) {
-          if (!t || t < shiftStartBoundary) return false;
+          if (!t || t <= shiftStartBoundary) return false;
         }
         if (t > Date.now() + 60000) return false;
         return true;
@@ -2125,12 +2126,13 @@ export default function POSPage() {
         if (activeBranch && activeBranch.id !== "all") {
           const incBranch = resolveBranchId((inc as any).branchId || (inc as any).branch_id, inc.cashier);
           if (incBranch !== activeBranch.id) return false;
+        } else {
+          const isOwnerOrAdmin = inc.cashier && (inc.cashier.toLowerCase().includes("don toño") || inc.cashier.toLowerCase().includes("admin"));
+          if (!isOwnerOrAdmin && (!inc.cashier || (!matchesCashier(inc.cashier, targetCashier) && !matchesCashier(inc.cashier, cashierName)))) return false;
         }
-        const isOwnerOrAdmin = inc.cashier && (inc.cashier.toLowerCase().includes("don toño") || inc.cashier.toLowerCase().includes("admin"));
-        if (!isOwnerOrAdmin && (!inc.cashier || (!matchesCashier(inc.cashier, targetCashier) && !matchesCashier(inc.cashier, cashierName)))) return false;
         const t = parseDateTimeSafe(inc.timestamp || (inc as any).createdAt || inc.date);
         if (shiftStartBoundary > 0) {
-          if (!t || t < shiftStartBoundary) return false;
+          if (!t || t <= shiftStartBoundary) return false;
         }
         if (t > Date.now() + 60000) return false;
         return true;
@@ -2183,35 +2185,17 @@ export default function POSPage() {
 
   const totalCashSales = useMemo(() => {
     let posCash = (currentShiftSales || [])
-      .filter((s) => s && s.paymentMethod === "efectivo" && !s.isCustomOrder && !String(s.id || "").startsWith("PED-") && !String(s.id || "").startsWith("LIQ-"))
+      .filter((s) => s && s.paymentMethod === "efectivo" && !s.isCustomOrder && !String(s.id || "").startsWith("PED-") && !String(s.id || "").startsWith("LIQ-") && !/^pos-\d{10,}$/i.test(String(s.id || "")))
       .reduce((sum, s) => sum + (Number(s.total) || 0), 0);
     const branchDeskCash = Number(activeBranch?.todayDeskSales ?? (activeBranch?.todaySales && (activeBranch?.todayOrdersDeposit ?? 0) === 0 ? activeBranch.todaySales : 0));
     if (branchDeskCash > 0 && posCash === 0) {
       posCash = branchDeskCash;
     }
+    const targetBranchForOrders = activeBranch && activeBranch.id !== "all" ? activeBranch.id : undefined;
     // Para el conteo de efectivo en cajón, sumar anticipos y liquidaciones cobrados en efectivo estrictamente en este turno y sucursal operativa
     const ordersCashCalc = getStoredOrders().reduce((sum, o) => {
       if (!o || o.status === "cancelado") return sum;
-      if (activeBranch && activeBranch.id !== "all") {
-        const bId = activeBranch.id.toLowerCase().trim();
-        const rawNotes = String(o.notes || "");
-        const originMatch = rawNotes.match(/\[Origen:\s*([^\|\]\r\n]+)(?:\|([^\]\r\n]+))?\]/);
-        const originBranchId = originMatch && originMatch[1] ? originMatch[1].trim() : undefined;
-        const opId = (o as any).operatingBranchId || (o as any).operating_branch_id;
-        const pId = o.branchId || (o as any).branch_id;
-        const cashierBranchId = o.cashier && !/don toño|admin|carlos/i.test(String(o.cashier))
-          ? resolveBranchId(undefined, o.cashier)
-          : undefined;
-        const cashBranchId = originBranchId
-          ? resolveBranchId(originBranchId, o.cashier)
-          : opId
-          ? resolveBranchId(opId, o.cashier)
-          : (cashierBranchId || resolveBranchId(pId, o.cashier));
-        if (cashBranchId !== bId) {
-          return sum;
-        }
-      }
-      const col = getOrderShiftCollection(o, shiftStartBoundary);
+      const col = getOrderShiftCollection(o, shiftStartBoundary, targetBranchForOrders);
       return sum + col.collectedCash;
     }, 0);
     const branchOrdersDeposit = Number(activeBranch?.todayOrdersDeposit ?? 0);

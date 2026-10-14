@@ -417,31 +417,32 @@ export default function CashDrawerShiftModal({
 
   if (!isOpen) return null;
 
-  // Límite temporal estricto del turno actual (timestamp en ms con soporte por sucursal, mínimo 00:00:00 de hoy)
-  const todayStart = new Date();
-  todayStart.setHours(0, 0, 0, 0);
-  const todayStartTs = todayStart.getTime();
+  // Límite temporal estricto del turno actual (timestamp en ms con soporte por sucursal)
   const activeCutTs = parseDateTimeSafe(currentBranch?.lastCut?.timestamp || currentBranch?.lastCut?.date);
-  const validLastCut = (lastCutTimestamp && lastCutTimestamp >= todayStartTs && lastCutTimestamp <= Date.now()) 
+  const validLastCut = (lastCutTimestamp && lastCutTimestamp >= CLEAN_SLATE_EPOCH && lastCutTimestamp <= Date.now()) 
     ? lastCutTimestamp 
-    : (activeCutTs >= todayStartTs && activeCutTs <= Date.now() ? activeCutTs : 0);
-  const shiftStartBoundary = Math.max(todayStartTs, validLastCut, getStoredShiftStartBoundary(effectiveBranchId || currentBranch?.id));
+    : (activeCutTs >= CLEAN_SLATE_EPOCH && activeCutTs <= Date.now() ? activeCutTs : 0);
+  const shiftStartBoundary = Math.max(CLEAN_SLATE_EPOCH, validLastCut, getStoredShiftStartBoundary(effectiveBranchId || currentBranch?.id));
+  const targetBranchForOrders = effectiveBranchId && effectiveBranchId !== "all" ? effectiveBranchId : undefined;
 
   // 1. Cálculos de Ventas del Turno (todas las ventas de mostrador del turno en esta sucursal)
   const shiftSales = (sales || []).filter((s) => {
     if (!s) return false;
+    const sId = String(s.id || "");
+    if (/^pos-\d{10,}$/i.test(sId) || sId.startsWith("LIQ-") || sId.startsWith("PED-") || s.isCustomOrder) return false;
     const sBranch = resolveBranchId((s as any).branchId || (s as any).branch_id, s.cashier);
     if (effectiveBranchId && effectiveBranchId !== "all") {
       if (sBranch !== effectiveBranchId) return false;
-    }
-    const belongsToBranchStaff = branchUsers.some((u) => s.cashier && matchesCashier(s.cashier, u.name));
-    if (outgoingCashier && s.cashier && !matchesCashier(s.cashier, outgoingCashier) && !belongsToBranchStaff && sBranch !== effectiveBranchId) {
-      return false;
+    } else {
+      const belongsToBranchStaff = branchUsers.some((u) => s.cashier && matchesCashier(s.cashier, u.name));
+      if (outgoingCashier && s.cashier && !matchesCashier(s.cashier, outgoingCashier) && !belongsToBranchStaff) {
+        return false;
+      }
     }
     const sTime = parseDateTimeSafe(s.timestamp || s.createdAt || s.date);
     if (!sTime || sTime < CLEAN_SLATE_EPOCH) return false;
     if (shiftStartBoundary > 0) {
-      if (!sTime || sTime < shiftStartBoundary) return false;
+      if (!sTime || sTime <= shiftStartBoundary) return false;
     }
     if (sTime > Date.now() + 60000) return false;
     return true;
@@ -469,29 +470,12 @@ export default function CashDrawerShiftModal({
   // Pedidos especiales del turno (anticipos y liquidaciones de pedidos cobrados estrictamente en este turno y sucursal)
   const shiftOrders = allOrdersPool.filter((o) => {
     if (!o || o.status === "cancelado") return false;
-    const rawNotes = String(o.notes || "");
-    const originMatch = rawNotes.match(/\[Origen:\s*([^\|\]]+)(?:\|([^\]]+))?\]/);
-    const originBranchId = originMatch && originMatch[1] ? originMatch[1].trim() : undefined;
-    const cashierBranchId = o.cashier && !/don toño|admin|carlos/i.test(String(o.cashier)) ? resolveBranchId(undefined, o.cashier) : undefined;
-    const oBranch = originBranchId
-      ? resolveBranchId(originBranchId, o.cashier)
-      : (o as any).operatingBranchId || (o as any).operating_branch_id
-      ? resolveBranchId((o as any).operatingBranchId || (o as any).operating_branch_id, o.cashier)
-      : (cashierBranchId || resolveBranchId((o as any).branchId || (o as any).branch_id, o.cashier));
-
-    if (effectiveBranchId && effectiveBranchId !== "all") {
-      if (oBranch !== effectiveBranchId) return false;
-    }
-    const belongsToBranchStaff = branchUsers.some((u) => o.cashier && matchesCashier(o.cashier, u.name));
-    if (outgoingCashier && o.cashier && !matchesCashier(o.cashier, outgoingCashier) && !belongsToBranchStaff && oBranch !== effectiveBranchId) {
-      return false;
-    }
-    const col = getOrderShiftCollection(o, shiftStartBoundary);
+    const col = getOrderShiftCollection(o, shiftStartBoundary, targetBranchForOrders);
     return col.isInShift;
   });
 
   const ordersCash = shiftOrders.reduce(
-    (sum, o) => sum + getOrderShiftCollection(o, shiftStartBoundary).collectedCash,
+    (sum, o) => sum + getOrderShiftCollection(o, shiftStartBoundary, targetBranchForOrders).collectedCash,
     0
   );
 
@@ -501,7 +485,7 @@ export default function CashDrawerShiftModal({
   const branchOrdersDeposit = Number(targetBranch?.todayOrdersDeposit ?? 0);
 
   const calculatedPurePosCash = effectiveSales
-    .filter((s) => s.paymentMethod === "efectivo" && !s.isCustomOrder && !String(s.id || "").startsWith("PED-") && !String(s.id || "").startsWith("LIQ-"))
+    .filter((s) => s.paymentMethod === "efectivo" && !s.isCustomOrder && !String(s.id || "").startsWith("PED-") && !String(s.id || "").startsWith("LIQ-") && !/^pos-\d{10,}$/i.test(String(s.id || "")))
     .reduce((sum, s) => sum + s.total, 0);
   const rawPurePosCash = branchDeskSales > 0 && calculatedPurePosCash === 0 ? branchDeskSales : calculatedPurePosCash > 0 ? calculatedPurePosCash : branchDeskSales;
 
@@ -522,12 +506,13 @@ export default function CashDrawerShiftModal({
     if (targetBranch && targetBranch.id && targetBranch.id !== "all") {
       const eBranch = resolveBranchId((e as any).branchId || (e as any).branch_id, e.cashier);
       if (eBranch !== targetBranch.id) return false;
+    } else {
+      const isOwnerOrAdmin = e.isOwner || e.category === "retiro_dueno" || outgoingCashier.toLowerCase().includes("don toño") || outgoingCashier.toLowerCase().includes("admin") || (e.cashier && (e.cashier.toLowerCase().includes("don toño") || e.cashier.toLowerCase().includes("admin")));
+      if (!isOwnerOrAdmin && (!e.cashier || !matchesCashier(e.cashier, outgoingCashier))) return false;
     }
-    const isOwnerOrAdmin = e.isOwner || e.category === "retiro_dueno" || outgoingCashier.toLowerCase().includes("don toño") || outgoingCashier.toLowerCase().includes("admin") || (e.cashier && (e.cashier.toLowerCase().includes("don toño") || e.cashier.toLowerCase().includes("admin")));
-    if (!isOwnerOrAdmin && (!e.cashier || !matchesCashier(e.cashier, outgoingCashier))) return false;
     const expTime = parseDateTimeSafe(e.timestamp || e.createdAt || e.date);
     if (!expTime || expTime < CLEAN_SLATE_EPOCH) return false;
-    if (shiftStartBoundary > 0 && expTime && expTime < shiftStartBoundary) return false;
+    if (shiftStartBoundary > 0 && expTime && expTime <= shiftStartBoundary) return false;
     return true;
   });
   const totalExpenses = shiftExpenses.reduce((sum, e) => sum + e.amount, 0);
@@ -543,12 +528,13 @@ export default function CashDrawerShiftModal({
     if (targetBranch && targetBranch.id && targetBranch.id !== "all") {
       const incBranch = resolveBranchId((inc as any).branchId || (inc as any).branch_id, inc.cashier);
       if (incBranch !== targetBranch.id) return false;
+    } else {
+      const isOwnerOrAdmin = outgoingCashier.toLowerCase().includes("don toño") || outgoingCashier.toLowerCase().includes("admin") || (inc.cashier && (inc.cashier.toLowerCase().includes("don toño") || inc.cashier.toLowerCase().includes("admin")));
+      if (!isOwnerOrAdmin && (!inc.cashier || !matchesCashier(inc.cashier, outgoingCashier))) return false;
     }
-    const isOwnerOrAdmin = outgoingCashier.toLowerCase().includes("don toño") || outgoingCashier.toLowerCase().includes("admin") || (inc.cashier && (inc.cashier.toLowerCase().includes("don toño") || inc.cashier.toLowerCase().includes("admin")));
-    if (!isOwnerOrAdmin && (!inc.cashier || !matchesCashier(inc.cashier, outgoingCashier))) return false;
     const incTime = parseDateTimeSafe(inc.timestamp || inc.date || (inc as any).createdAt);
     if (!incTime || incTime < CLEAN_SLATE_EPOCH) return false;
-    if (shiftStartBoundary > 0 && incTime && incTime < shiftStartBoundary) return false;
+    if (shiftStartBoundary > 0 && incTime && incTime <= shiftStartBoundary) return false;
     return true;
   });
   const totalIncomesInCash = shiftIncomes
@@ -572,14 +558,14 @@ export default function CashDrawerShiftModal({
   const cashSales = posCash;
   const cardSales =
     effectiveSales
-      .filter((s) => s.paymentMethod === "tarjeta" && !s.isCustomOrder && !String(s.id || "").startsWith("PED-") && !String(s.id || "").startsWith("LIQ-"))
+      .filter((s) => s.paymentMethod === "tarjeta" && !s.isCustomOrder && !String(s.id || "").startsWith("PED-") && !String(s.id || "").startsWith("LIQ-") && !/^pos-\d{10,}$/i.test(String(s.id || "")))
       .reduce((sum, s) => sum + s.total, 0) +
-    shiftOrders.reduce((sum, o) => sum + getOrderShiftCollection(o, shiftStartBoundary).collectedCard, 0);
+    shiftOrders.reduce((sum, o) => sum + getOrderShiftCollection(o, shiftStartBoundary, targetBranchForOrders).collectedCard, 0);
   const transferSales =
     effectiveSales
-      .filter((s) => s.paymentMethod === "transferencia" && !s.isCustomOrder && !String(s.id || "").startsWith("PED-") && !String(s.id || "").startsWith("LIQ-"))
+      .filter((s) => s.paymentMethod === "transferencia" && !s.isCustomOrder && !String(s.id || "").startsWith("PED-") && !String(s.id || "").startsWith("LIQ-") && !/^pos-\d{10,}$/i.test(String(s.id || "")))
       .reduce((sum, s) => sum + s.total, 0) +
-    shiftOrders.reduce((sum, o) => sum + getOrderShiftCollection(o, shiftStartBoundary).collectedTransfer, 0);
+    shiftOrders.reduce((sum, o) => sum + getOrderShiftCollection(o, shiftStartBoundary, targetBranchForOrders).collectedTransfer, 0);
   const totalSalesAll = cashSales + cardSales + transferSales;
 
   // 4. Conteo y Diferencia (Arqueo)

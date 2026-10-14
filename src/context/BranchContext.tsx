@@ -1095,6 +1095,7 @@ function resolveBranchParam(param: string | null): string | null {
           const branchAgg = new Map<string, {
             deskSales: number;
             deskTickets: number;
+            deskPieces: number;
             deskCash: number;
             deskCard: number;
             deskTransfer: number;
@@ -1104,6 +1105,7 @@ function resolveBranchParam(param: string | null): string | null {
             orderTotalCobrado: number;
             orderTotal: number;
             orderCount: number;
+            orderPieces: number;
             cashInflow: number;
             cashOutflow: number;
             movNet: number;
@@ -1111,6 +1113,7 @@ function resolveBranchParam(param: string | null): string | null {
             dayAccumulatedDeskSales: number;
             dayAccumulatedDeskTickets: number;
             dayAccumulatedOrdersDeposit: number;
+            dayAccumulatedPieces: number;
             lastCashier?: string;
             branchName?: string;
           }>();
@@ -1118,6 +1121,7 @@ function resolveBranchParam(param: string | null): string | null {
           const initBranchAgg = () => ({
             deskSales: 0,
             deskTickets: 0,
+            deskPieces: 0,
             deskCash: 0,
             deskCard: 0,
             deskTransfer: 0,
@@ -1127,6 +1131,7 @@ function resolveBranchParam(param: string | null): string | null {
             orderTotalCobrado: 0,
             orderTotal: 0,
             orderCount: 0,
+            orderPieces: 0,
             cashInflow: 0,
             cashOutflow: 0,
             movNet: 0,
@@ -1134,6 +1139,7 @@ function resolveBranchParam(param: string | null): string | null {
             dayAccumulatedDeskSales: 0,
             dayAccumulatedDeskTickets: 0,
             dayAccumulatedOrdersDeposit: 0,
+            dayAccumulatedPieces: 0,
             lastCashier: undefined as string | undefined,
             branchName: undefined as string | undefined,
           });
@@ -1159,7 +1165,7 @@ function resolveBranchParam(param: string | null): string | null {
           dbSales.forEach((s: any) => {
             if (!s) return;
             const sId = String(s.id || "");
-            if (sId.startsWith("PED-") || sId.startsWith("LIQ-") || s.is_custom_order || s.isCustomOrder) return;
+            if (sId.startsWith("PED-") || sId.startsWith("LIQ-") || /^pos-\d{10,}$/i.test(sId) || s.is_custom_order || s.isCustomOrder) return;
             if (sId) seenSaleIds.add(sId);
 
             const bId = resolveBranchForRecord(s.branch_id, s.cashier);
@@ -1171,16 +1177,20 @@ function resolveBranchParam(param: string | null): string | null {
             const amt = Number(s.total) || 0;
             const saleTime = parseDateTimeSafe(s.created_at || s.date);
             const shiftLimit = getShiftLimit(bId);
+            const rawItems = Array.isArray(s.sale_items) ? s.sale_items : Array.isArray(s.items) ? s.items : [];
+            const salePieces = rawItems.reduce((acc: number, it: any) => acc + (Number(it.quantity) || 0), 0);
 
             if (saleTime >= todayStartTs) {
               cur.dayAccumulatedDeskSales += amt;
               cur.dayAccumulatedDeskTickets += 1;
+              cur.dayAccumulatedPieces += salePieces;
             }
 
-            // SOLO sumar al turno activo si la venta ocurrió en el turno actual (>= shiftLimit)
-            if (saleTime >= shiftLimit) {
+            // SOLO sumar al turno activo si la venta ocurrió en el turno actual (> shiftLimit)
+            if (saleTime > shiftLimit) {
               cur.deskSales += amt;
               cur.deskTickets += 1;
+              cur.deskPieces += salePieces;
               if (s.payment_method === "tarjeta") cur.deskCard += amt;
               else if (s.payment_method === "transferencia") cur.deskTransfer += amt;
               else cur.deskCash += amt;
@@ -1198,7 +1208,7 @@ function resolveBranchParam(param: string | null): string | null {
                   localSales.forEach((s: any) => {
                     if (!s) return;
                     const sId = String(s.id || "");
-                    if (sId.startsWith("PED-") || sId.startsWith("LIQ-") || s.isCustomOrder || s.is_custom_order) return;
+                    if (sId.startsWith("PED-") || sId.startsWith("LIQ-") || /^pos-\d{10,}$/i.test(sId) || s.isCustomOrder || s.is_custom_order) return;
                     if (sId && seenSaleIds.has(sId)) return;
                     if (sId) seenSaleIds.add(sId);
 
@@ -1211,14 +1221,18 @@ function resolveBranchParam(param: string | null): string | null {
                     const amt = Number(s.total) || 0;
                     const saleTime = parseDateTimeSafe(s.timestamp || s.createdAt || s.date);
                     const shiftLimit = getShiftLimit(bId);
+                    const rawItems = Array.isArray(s.items) ? s.items : Array.isArray(s.sale_items) ? s.sale_items : [];
+                    const salePieces = rawItems.reduce((acc: number, it: any) => acc + (Number(it.quantity) || 0), 0);
 
                     if (saleTime >= todayStartTs) {
                       cur.dayAccumulatedDeskSales += amt;
                       cur.dayAccumulatedDeskTickets += 1;
+                      cur.dayAccumulatedPieces += salePieces;
                     }
-                    if (saleTime >= shiftLimit) {
+                    if (saleTime > shiftLimit) {
                       cur.deskSales += amt;
                       cur.deskTickets += 1;
+                      cur.deskPieces += salePieces;
                       const pm = s.paymentMethod || s.payment_method || "efectivo";
                       if (pm === "tarjeta") cur.deskCard += amt;
                       else if (pm === "transferencia") cur.deskTransfer += amt;
@@ -1231,48 +1245,42 @@ function resolveBranchParam(param: string | null): string | null {
             } catch {}
           }
 
-          // 2. Agregar pedidos especiales (SOLO los levantados o abonados dentro del turno actual de hoy)
+          // 2. Agregar pedidos especiales (atribuyendo cada abono/liquidación a la sucursal y turno exactos que lo cobraron)
           const countedOrderNums = new Set<string>();
           unifiedOrdersList.forEach((o: any) => {
             if (!o || o.status === "cancelado") return;
-            const rawNotes = String(o.notes || "");
-            const originMatch = rawNotes.match(/\[Origen:\s*([^\|\]]+)(?:\|([^\]]+))?\]/);
-            const originBranchId = originMatch && originMatch[1] ? originMatch[1].trim() : undefined;
-            const cashierBranchId = o.cashier && !/don toño|admin|carlos/i.test(String(o.cashier)) ? resolveBranchId(undefined, o.cashier) : undefined;
-            const bId = originBranchId
-              ? resolveBranchId(originBranchId, o.cashier)
-              : (o.operating_branch_id || o.operatingBranchId)
-              ? resolveBranchId(o.operating_branch_id || o.operatingBranchId, o.cashier)
-              : (cashierBranchId || resolveBranchForRecord(o.branch_id || o.branchId, o.cashier));
-
             if (o.order_number || o.orderNumber) countedOrderNums.add(String(o.order_number || o.orderNumber).toUpperCase());
             if (o.id) countedOrderNums.add(String(o.id).toUpperCase());
 
-            let cur = branchAgg.get(bId);
-            if (!cur) {
-              cur = initBranchAgg();
-              branchAgg.set(bId, cur);
-            }
-            if ((o.branch_name || o.branchName) && !originBranchId) cur.branchName = o.branch_name || o.branchName;
+            const ordItems = Array.isArray(o.items) ? o.items : [];
+            const ordPieces = ordItems.reduce((acc: number, it: any) => acc + (Number(it.quantity) || 0), 0);
 
-            const shiftLimit = getShiftLimit(bId);
-            const dayCol = getOrderShiftCollection(o, todayStartTs);
-            if (dayCol.collectedTotal > 0) {
-              cur.dayAccumulatedOrdersDeposit += dayCol.collectedTotal;
-            }
-
-            const shiftCol = getOrderShiftCollection(o, shiftLimit);
-            if (shiftCol.isInShift) {
-              cur.orderTotal += shiftCol.orderTotalInShift;
-              cur.orderCount += 1;
-              if (shiftCol.collectedTotal > 0) {
-                cur.orderTotalCobrado += shiftCol.collectedTotal;
-                cur.orderCash += shiftCol.collectedCash;
-                cur.orderCard += shiftCol.collectedCard;
-                cur.orderTransfer += shiftCol.collectedTransfer;
+            branchAgg.forEach((cur, bId) => {
+              const shiftLimit = getShiftLimit(bId);
+              const dayCol = getOrderShiftCollection(o, todayStartTs, bId);
+              if (dayCol.collectedTotal > 0) {
+                cur.dayAccumulatedOrdersDeposit += dayCol.collectedTotal;
               }
-              if (o.cashier && !cur.lastCashier) cur.lastCashier = o.cashier;
-            }
+              if (dayCol.isCreatedInShift) {
+                cur.dayAccumulatedPieces += ordPieces;
+              }
+
+              const shiftCol = getOrderShiftCollection(o, shiftLimit, bId);
+              if (shiftCol.isInShift) {
+                cur.orderTotal += shiftCol.orderTotalInShift;
+                cur.orderCount += 1;
+                if (shiftCol.isCreatedInShift) {
+                  cur.orderPieces += ordPieces;
+                }
+                if (shiftCol.collectedTotal > 0) {
+                  cur.orderTotalCobrado += shiftCol.collectedTotal;
+                  cur.orderCash += shiftCol.collectedCash;
+                  cur.orderCard += shiftCol.collectedCard;
+                  cur.orderTransfer += shiftCol.collectedTransfer;
+                }
+                if (o.cashier && !cur.lastCashier) cur.lastCashier = o.cashier;
+              }
+            });
           });
 
           // 3. Movimientos de caja (aportes / retiros fuera de ventas y de cortes, y respaldo de abono_pedido)
@@ -1292,7 +1300,7 @@ function resolveBranchParam(param: string | null): string | null {
                 const movTime = parseDateTimeSafe(m.created_at);
                 const shiftLimit = getShiftLimit(bId);
                 if (movTime >= todayStartTs && amt > 0) cur.dayAccumulatedOrdersDeposit += amt;
-                if (movTime >= shiftLimit && amt > 0) {
+                if (movTime > shiftLimit && amt > 0) {
                   cur.orderTotal += amt;
                   cur.orderCount += 1;
                   cur.orderTotalCobrado += amt;
@@ -1320,7 +1328,7 @@ function resolveBranchParam(param: string | null): string | null {
             const amt = Number(m.amount) || 0;
             const movTime = parseDateTimeSafe(m.created_at);
             const shiftLimit = getShiftLimit(bId);
-            if (movTime >= shiftLimit) {
+            if (movTime > shiftLimit) {
               if (m.type === "entrada") {
                 cur.cashInflow += amt;
                 cur.movNet += amt;
@@ -1355,7 +1363,7 @@ function resolveBranchParam(param: string | null): string | null {
                     const amt = Number(inc.amount) || 0;
                     const t = parseDateTimeSafe(inc.timestamp || inc.date || inc.createdAt);
                     const shiftLimit = getShiftLimit(bId);
-                    if (t >= shiftLimit && (inc.paymentMethod === "efectivo" || !inc.paymentMethod)) {
+                    if (t > shiftLimit && (inc.paymentMethod === "efectivo" || !inc.paymentMethod)) {
                       cur.cashInflow += amt;
                       cur.movNet += amt;
                     }
@@ -1378,7 +1386,7 @@ function resolveBranchParam(param: string | null): string | null {
             }
             const expTime = parseDateTimeSafe(e.created_at);
             const shiftLimit = getShiftLimit(bId);
-            if (expTime >= shiftLimit) {
+            if (expTime > shiftLimit) {
               cur.expCash += Number(e.amount) || 0;
               if (e.cashier && !cur.lastCashier) cur.lastCashier = e.cashier;
             }
@@ -1404,7 +1412,7 @@ function resolveBranchParam(param: string | null): string | null {
                     }
                     const expTime = parseDateTimeSafe(e.timestamp || e.createdAt || e.date);
                     const shiftLimit = getShiftLimit(bId);
-                    if (expTime >= shiftLimit) {
+                    if (expTime > shiftLimit) {
                       cur.expCash += Number(e.amount) || 0;
                       if (e.cashier && !cur.lastCashier) cur.lastCashier = e.cashier;
                     }
@@ -1515,11 +1523,12 @@ function resolveBranchParam(param: string | null): string | null {
               // TOTAL GENERAL COBRADO DEL TURNO ACTIVO
               const totalCobrado = agg.deskSales + agg.orderTotalCobrado;
               const totalTickets = agg.deskTickets + agg.orderCount;
+              const totalPieces = agg.deskPieces + agg.orderPieces;
 
               // Fondo inicial sincronizado 100% con Caja y Corte de Turno
               const standardFund = b.id === "branch-benito" ? 800 : b.id === "branch-flores" ? 1200 : 1000;
               let initialFund = standardFund;
-              if (latestCut && latestCutTs >= todayStartTs && latestCut.nextFund !== undefined && latestCut.nextFund !== null && Number(latestCut.nextFund) > 0) {
+              if (latestCut && latestCutTs >= CLEAN_SLATE_EPOCH && latestCut.nextFund !== undefined && latestCut.nextFund !== null && Number(latestCut.nextFund) > 0) {
                 const parsed = Number(latestCut.nextFund);
                 initialFund = (b.id === "branch-matriz" && parsed === 800) ? 1000 : parsed;
               } else {
@@ -1573,6 +1582,7 @@ function resolveBranchParam(param: string | null): string | null {
                 assignedUserId: assignedEmployee?.id || b.assignedUserId,
                 todaySales: totalCobrado,
                 todayTickets: totalTickets,
+                todayPieces: totalPieces,
                 cashInDrawer: calculatedCash,
                 todayDeskSales: agg.deskSales,
                 todayDeskTickets: agg.deskTickets,
@@ -1582,6 +1592,7 @@ function resolveBranchParam(param: string | null): string | null {
                 lastCut: latestCut,
                 dayAccumulatedSales: agg.dayAccumulatedDeskSales + agg.dayAccumulatedOrdersDeposit,
                 dayAccumulatedTickets: agg.dayAccumulatedDeskTickets,
+                dayAccumulatedPieces: agg.dayAccumulatedPieces,
                 currentShift: {
                   id: b.currentShift?.id || `shift-${b.id}`,
                   name: latestCut?.nextShift || b.currentShift?.name || (b.id === "branch-1790889237862" ? "Turno Matutino" : "Turno General"),
@@ -1607,6 +1618,7 @@ function resolveBranchParam(param: string | null): string | null {
                 return (
                   b.todaySales === u.todaySales &&
                   b.todayTickets === u.todayTickets &&
+                  b.todayPieces === u.todayPieces &&
                   b.cashInDrawer === u.cashInDrawer &&
                   b.name === u.name &&
                   b.status === u.status &&
