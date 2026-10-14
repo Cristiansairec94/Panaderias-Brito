@@ -1127,6 +1127,12 @@ export default function PedidosPage() {
       alert("Este pedido ya pertenece al historial y no puede ser modificado.");
       return;
     }
+    if (order.status !== "listo") {
+      alert(
+        `⚠️ El pedido #${order.orderNumber} aún no ha sido marcado como "Listo en Sucursal".\n\nPrimero debes presionar el botón azul "Marcar Listo" para confirmar que el pedido ya llegó físicamente a la sucursal antes de proceder a entregarlo.`
+      );
+      return;
+    }
     if (order.remainingBalance > 0) {
       alert(
         `⛔ No se puede entregar el pedido #${order.orderNumber}.\n\nTiene un saldo pendiente de ${formatCurrency(order.remainingBalance)}.\n\nPara poder entregarlo, primero debe estar 100% pagado sin faltante.`
@@ -2907,10 +2913,10 @@ export default function PedidosPage() {
                                 <button
                                   type="button"
                                   onClick={() => handleMarkAsReady(order)}
-                                  className="py-2 px-3 bg-white hover:bg-amber-50 active:scale-[0.98] text-stone-700 hover:text-amber-800 border border-stone-200 hover:border-amber-300 font-bold text-xs rounded-xl transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap shadow-2xs shrink-0"
+                                  className="py-2 px-3 bg-blue-600 hover:bg-blue-700 active:scale-[0.98] text-white font-bold text-xs rounded-xl transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap shadow-2xs shrink-0"
                                   title="Marcar que el pedido ya llegó y está listo en sucursal"
                                 >
-                                  <CheckCircle2 className="w-3.5 h-3.5 text-stone-400 group-hover:text-amber-600 shrink-0" />
+                                  <CheckCircle2 className="w-3.5 h-3.5 text-white shrink-0" />
                                   <span>Listo</span>
                                 </button>
                               ) : (
@@ -2926,26 +2932,38 @@ export default function PedidosPage() {
                               )}
                             </div>
                           ) : (
-                            /* 100% Liquidado -> Botón 'Entregar Pedido' */
+                            /* 100% Liquidado -> Botón 'Entregar Pedido' (Se ilumina solo si ya está listo en sucursal) */
                             <div className="flex items-center gap-2">
-                              <button
-                                type="button"
-                                onClick={() => handleDeliverOrder(order)}
-                                className="flex-1 py-2 px-3 bg-teal-600 hover:bg-teal-700 active:scale-[0.98] text-white font-bold text-xs rounded-xl shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap font-mono"
-                                title="Entregar pedido al cliente y archivarlo en el Historial"
-                              >
-                                <PackageCheck className="w-4 h-4 shrink-0 text-white" />
-                                <span>Entregar Pedido</span>
-                              </button>
+                              {order.status !== "listo" ? (
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeliverOrder(order)}
+                                  className="flex-1 py-2 px-3 bg-stone-100 hover:bg-stone-200 text-stone-400 hover:text-stone-600 border border-stone-200 font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap font-mono"
+                                  title="Primero presiona el botón azul 'Listo' para confirmar que ya llegó a la sucursal"
+                                >
+                                  <Lock className="w-3.5 h-3.5 text-stone-400 shrink-0" />
+                                  <span>Entregar (Falta llegada)</span>
+                                </button>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeliverOrder(order)}
+                                  className="flex-1 py-2 px-3 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] text-white font-bold text-xs rounded-xl shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap font-mono ring-1 ring-emerald-400"
+                                  title="Entregar pedido al cliente y archivarlo en el Historial"
+                                >
+                                  <PackageCheck className="w-4 h-4 shrink-0 text-white" />
+                                  <span>Entregar Pedido</span>
+                                </button>
+                              )}
 
                               {order.status !== "listo" ? (
                                 <button
                                   type="button"
                                   onClick={() => handleMarkAsReady(order)}
-                                  className="py-2 px-3 bg-white hover:bg-amber-50 active:scale-[0.98] text-stone-700 hover:text-amber-800 border border-stone-200 hover:border-amber-300 font-bold text-xs rounded-xl transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap shadow-2xs shrink-0"
-                                  title="Marcar que ya llegó a la sucursal"
+                                  className="py-2 px-3 bg-blue-600 hover:bg-blue-700 active:scale-[0.98] text-white font-bold text-xs rounded-xl transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap shadow-2xs shrink-0"
+                                  title="Marcar que ya llegó a la sucursal (Botón azul)"
                                 >
-                                  <CheckCircle2 className="w-3.5 h-3.5 text-stone-400 group-hover:text-amber-600 shrink-0" />
+                                  <CheckCircle2 className="w-3.5 h-3.5 text-white shrink-0" />
                                   <span>Listo</span>
                                 </button>
                               ) : (
@@ -3314,7 +3332,7 @@ export default function PedidosPage() {
                             <button
                               type="button"
                               onClick={() => handleMarkAsReady(order)}
-                              className="w-full py-2 px-2.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-black text-xs rounded-xl shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap"
+                              className="w-full py-2 px-2.5 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-black text-xs rounded-xl shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap"
                               title="Marcar que el pedido ya llegó físicamente y está listo en sucursal (uso único)"
                             >
                               <CheckCircle2 className="w-4 h-4" />
@@ -3341,11 +3359,21 @@ export default function PedidosPage() {
                               <DollarSign className="w-4 h-4" />
                               <span>Abonar / Liquidar {formatCurrency(order.remainingBalance)}</span>
                             </button>
+                          ) : order.status !== "listo" ? (
+                            <button
+                              type="button"
+                              onClick={() => handleDeliverOrder(order)}
+                              className="w-full py-2 px-2.5 bg-stone-100 hover:bg-stone-200 text-stone-400 hover:text-stone-600 border border-stone-200 font-black text-xs rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap"
+                              title="Primero presiona el botón azul 'Marcar Listo' para confirmar la llegada a sucursal"
+                            >
+                              <Lock className="w-4 h-4 text-stone-400 shrink-0" />
+                              <span>Entregar (Falta llegada)</span>
+                            </button>
                           ) : (
                             <button
                               type="button"
                               onClick={() => handleDeliverOrder(order)}
-                              className="w-full py-2 px-2.5 bg-teal-600 hover:bg-teal-700 active:scale-95 text-white font-black text-xs rounded-xl shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap"
+                              className="w-full py-2 px-2.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-black text-xs rounded-xl shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap ring-1 ring-emerald-400"
                               title="Entregar pedido al cliente y archivarlo en Pedidos entregados con éxito"
                             >
                               <PackageCheck className="w-4 h-4 text-white shrink-0" />
@@ -3682,7 +3710,7 @@ export default function PedidosPage() {
                                 <button
                                   type="button"
                                   onClick={() => handleMarkAsReady(order)}
-                                  className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-black text-xs rounded-xl shadow-xs transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
+                                  className="px-2.5 py-1.5 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-black text-xs rounded-xl shadow-xs transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
                                   title="Marcar que el pedido ya llegó físicamente y está listo en sucursal (uso único)"
                                 >
                                   <CheckCircle2 className="w-3.5 h-3.5" />
@@ -3722,11 +3750,21 @@ export default function PedidosPage() {
                                   <DollarSign className="w-3.5 h-3.5" />
                                   <span>Abonar / Liquidar ({formatCurrency(order.remainingBalance)})</span>
                                 </button>
+                              ) : order.status !== "listo" ? (
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeliverOrder(order)}
+                                  className="px-2.5 py-1.5 bg-stone-100 hover:bg-stone-200 text-stone-400 hover:text-stone-600 border border-stone-200 font-bold text-xs rounded-xl transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap shadow-2xs"
+                                  title="Primero presiona el botón azul 'Marcar Listo' para confirmar la llegada a sucursal"
+                                >
+                                  <Lock className="w-3.5 h-3.5 text-stone-400" />
+                                  <span>Entregar (Falta llegada)</span>
+                                </button>
                               ) : (
                                 <button
                                   type="button"
                                   onClick={() => handleDeliverOrder(order)}
-                                  className="px-2.5 py-1.5 bg-teal-600 hover:bg-teal-700 active:scale-95 text-white font-black text-xs rounded-xl transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap shadow-2xs"
+                                  className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-black text-xs rounded-xl transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap shadow-2xs ring-1 ring-emerald-400"
                                   title="Entregar pedido al cliente y archivarlo en Pedidos entregados con éxito"
                                 >
                                   <PackageCheck className="w-3.5 h-3.5 text-white" />

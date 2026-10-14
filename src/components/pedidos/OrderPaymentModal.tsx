@@ -108,8 +108,8 @@ export default function OrderPaymentModal({
       const pickupBranchId = order.branchId || paymentBranchId;
       const pickupBranchName = order.branchName || paymentBranchName;
 
-      // Delivery is strictly allowed ONLY if the remaining balance is fully covered ($0 remaining)
-      const isDeliveredNow = Boolean(forceDeliver && isFullPayment);
+      // Delivery is strictly allowed ONLY if the order is already in branch ("listo") and 100% covered ($0 remaining)
+      const isDeliveredNow = Boolean(forceDeliver && isFullPayment && order.status === "listo");
 
       const updatedOrder = addOrderPayment(order.id, {
         amount: numericAmount,
@@ -533,13 +533,13 @@ export default function OrderPaymentModal({
           </button>
 
           <div className="flex items-center gap-2 flex-wrap ml-auto">
-            {isFullPayment && (
+            {isFullPayment && order.status === "listo" && (
               <button
                 type="button"
                 disabled={isSubmitting || numericAmount <= 0 || numericAmount > order.remainingBalance}
                 onClick={() => handleConfirmPayment(true)}
                 className="px-4 py-2.5 bg-teal-700 hover:bg-teal-800 active:scale-95 text-white font-black text-xs rounded-xl shadow-md transition-all flex items-center gap-1.5 disabled:opacity-50 cursor-pointer ring-2 ring-teal-400/40"
-                title="Liquidar el 100% del saldo y marcar el pedido como ENTREGADO al cliente ahora mismo"
+                title="Liquidar el 100% del saldo y marcar el pedido como ENTREGADO al cliente ahora mismo (pedido confirmado en sucursal)"
               >
                 <span>📦</span>
                 <span>{isSubmitting ? "Registrando..." : `Liquidar y Entregar (${formatCurrency(numericAmount)})`}</span>
