@@ -87,6 +87,7 @@ import OrderPaymentModal from "@/components/pedidos/OrderPaymentModal";
 import { getStoredOrders, syncOrdersWithServer, getOrderShiftCollection } from "@/lib/orders";
 import { recordPosSaleIncome, removePosSaleIncome, getStoredIncomes, cleanDuplicateIncomes } from "@/lib/incomes";
 import { getStoredPrinterConfig, PrinterConfig } from "@/lib/printer";
+import { getShiftFinancialSummary, resolveShiftInitialFund } from "@/lib/shiftCalculations";
 
 const INITIAL_EXPENSES: CashExpense[] = [];
 
@@ -2181,57 +2182,27 @@ export default function POSPage() {
     }
   }, [activeBranch?.id, shiftStartBoundary, shiftVersion]);
 
-  const totalCashSales = useMemo(() => {
-    let posCash = (currentShiftSales || [])
-      .filter((s) => s && s.paymentMethod === "efectivo" && !s.isCustomOrder && !String(s.id || "").startsWith("PED-") && !String(s.id || "").startsWith("LIQ-"))
-      .reduce((sum, s) => sum + (Number(s.total) || 0), 0);
-    const branchDeskCash = Number(activeBranch?.todayDeskSales ?? (activeBranch?.todaySales && (activeBranch?.todayOrdersDeposit ?? 0) === 0 ? activeBranch.todaySales : 0));
-    if (branchDeskCash > 0 && posCash === 0) {
-      posCash = branchDeskCash;
-    }
-    // Para el conteo de efectivo en cajón, sumar anticipos y liquidaciones cobrados en efectivo estrictamente en este turno y sucursal operativa
-    const ordersCashCalc = getStoredOrders().reduce((sum, o) => {
-      if (!o || o.status === "cancelado") return sum;
-      if (activeBranch && activeBranch.id !== "all") {
-        const bId = activeBranch.id.toLowerCase().trim();
-        const rawNotes = String(o.notes || "");
-        const originMatch = rawNotes.match(/\[Origen:\s*([^\|\]\r\n]+)(?:\|([^\]\r\n]+))?\]/);
-        const originBranchId = originMatch && originMatch[1] ? originMatch[1].trim() : undefined;
-        const opId = (o as any).operatingBranchId || (o as any).operating_branch_id;
-        const pId = o.branchId || (o as any).branch_id;
-        const cashierBranchId = o.cashier && !/don toño|admin|carlos/i.test(String(o.cashier))
-          ? resolveBranchId(undefined, o.cashier)
-          : undefined;
-        const cashBranchId = originBranchId
-          ? resolveBranchId(originBranchId, o.cashier)
-          : opId
-          ? resolveBranchId(opId, o.cashier)
-          : (cashierBranchId || resolveBranchId(pId, o.cashier));
-        if (cashBranchId !== bId) {
-          return sum;
-        }
-      }
-      const col = getOrderShiftCollection(o, shiftStartBoundary);
-      return sum + col.collectedCash;
-    }, 0);
-    const branchOrdersDeposit = Number(activeBranch?.todayOrdersDeposit ?? 0);
-    const ordersCash = ordersCashCalc > 0 ? ordersCashCalc : (branchOrdersDeposit > 0 ? branchOrdersDeposit : 0);
-    return posCash + ordersCash;
-  }, [currentShiftSales, shiftStartBoundary, shiftVersion, activeBranch?.id, activeBranch?.todayDeskSales, activeBranch?.todaySales, activeBranch?.todayOrdersDeposit]);
+  const posShiftSummary = useMemo(() => {
+    return getShiftFinancialSummary({
+      branchId: activeBranch?.id,
+      branch: activeBranch,
+      branches,
+      cashierName,
+      shiftStartBoundary,
+      sales: currentShiftSales,
+      orders: currentShiftOrders,
+      expenses: currentShiftExpenses,
+      incomes: currentShiftIncomes,
+      cashMovements,
+      initialFund: initialCashFund,
+      branchCashInDrawer: activeBranch?.cashInDrawer,
+    });
+  }, [activeBranch, branches, cashierName, shiftStartBoundary, currentShiftSales, currentShiftOrders, currentShiftExpenses, currentShiftIncomes, cashMovements, initialCashFund]);
 
-  const totalExpenses = (currentShiftExpenses || []).reduce((sum, e) => sum + (Number(e?.amount) || 0), 0);
-  const totalExtraInCash = (currentShiftIncomes || [])
-    .filter((i) => {
-      if (!i) return false;
-      if (i.paymentMethod && i.paymentMethod !== "efectivo") return false;
-      if (i.category === "abono_pedido" || i.category === "pedido" || (i as any).orderId) return false;
-      const cLower = (i.concept || "").toLowerCase();
-      if (cLower.includes("pedido") || cLower.includes("abono") || cLower.includes("anticipo") || cLower.includes("liquidaci") || (i.id && String(i.id).startsWith("order-"))) return false;
-      if (i.amount === 6000) return false;
-      return true;
-    })
-    .reduce((sum, i) => sum + (Number(i.amount) || 0), 0);
-  const calculatedNetCashInDrawer = Math.max(0, (Number(initialCashFund) || 0) + totalCashSales + totalExtraInCash - totalExpenses);
+  const totalCashSales = posShiftSummary.totalCashSales;
+  const totalExpenses = posShiftSummary.totalExpenses;
+  const totalExtraInCash = posShiftSummary.totalIncomesInCash;
+  const calculatedNetCashInDrawer = posShiftSummary.netCashInDrawer;
   const netCashInDrawer = calculatedNetCashInDrawer;
 
   useEffect(() => {
