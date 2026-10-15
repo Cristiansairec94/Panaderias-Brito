@@ -1109,7 +1109,7 @@ export default function EmployeeManagement({ onGoToUsersTab }: EmployeeManagemen
                         <span className="text-[10px] text-amber-800 bg-amber-100 px-1.5 py-0.5 rounded font-bold">Jornada</span>
                       </h4>
                       <p className="text-[11px] text-stone-500">
-                        Asigna el turno (mañana / tarde) y define la hora de entrada y salida del empleado.
+                        Asigna el turno de trabajo (mañana o tarde) para el empleado.
                       </p>
                     </div>
                   </div>
@@ -1231,40 +1231,6 @@ export default function EmployeeManagement({ onGoToUsersTab }: EmployeeManagemen
                   </div>
                 </div>
 
-                {/* Hora de Entrada y Hora de Salida Inputs */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 bg-white/90 p-3.5 rounded-xl border border-amber-200/70">
-                  <div className="space-y-1">
-                    <label className="font-bold text-stone-700 text-xs flex items-center justify-between">
-                      <span className="flex items-center gap-1.5">
-                        <Clock className="w-3.5 h-3.5 text-stone-400" /> Hora de Entrada *
-                      </span>
-                      <span className="text-[10px] text-stone-400 font-normal">24 horas</span>
-                    </label>
-                    <input
-                      type="time"
-                      required
-                      value={formShiftStartTime}
-                      onChange={(e) => setFormShiftStartTime(e.target.value)}
-                      className="w-full px-3.5 py-2.5 bg-stone-50 border border-stone-200 rounded-xl font-bold text-stone-900 focus:bg-white focus:ring-2 focus:ring-amber-500 focus:outline-none text-sm"
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="font-bold text-stone-700 text-xs flex items-center justify-between">
-                      <span className="flex items-center gap-1.5">
-                        <Clock className="w-3.5 h-3.5 text-stone-400" /> Hora de Salida *
-                      </span>
-                      <span className="text-[10px] text-stone-400 font-normal">24 horas</span>
-                    </label>
-                    <input
-                      type="time"
-                      required
-                      value={formShiftEndTime}
-                      onChange={(e) => setFormShiftEndTime(e.target.value)}
-                      className="w-full px-3.5 py-2.5 bg-stone-50 border border-stone-200 rounded-xl font-bold text-stone-900 focus:bg-white focus:ring-2 focus:ring-amber-500 focus:outline-none text-sm"
-                    />
-                  </div>
-                </div>
               </div>
 
               {/* SECTION 3: System Access & Credentials (NEW & REDESIGNED) */}
