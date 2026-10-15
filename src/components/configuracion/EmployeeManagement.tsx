@@ -339,14 +339,19 @@ export default function EmployeeManagement({ onGoToUsersTab }: EmployeeManagemen
       }
 
       // Check for duplicate username among other users
-      const duplicate = usersList.find((u) => 
-        u.id !== editingEmployeeId && 
-        u.username?.toLowerCase() === finalUsername.toLowerCase()
-      );
-      if (duplicate) {
-        alert(`El nombre de usuario "@${finalUsername}" ya está en uso por ${duplicate.name}. Por favor elige otro usuario.`);
-        return;
+      let candidate = finalUsername;
+      let counter = 2;
+      while (usersList.some((u) => u.id !== editingEmployeeId && u.username?.toLowerCase() === candidate.toLowerCase())) {
+        if (!formUsername.trim()) {
+          // Si fue autogenerado a partir del nombre, sufijamos con número automáticamente
+          candidate = `${finalUsername}${counter}`;
+          counter++;
+        } else {
+          alert(`El nombre de usuario "@${finalUsername}" ya está en uso por otro empleado. Por favor elige otro usuario.`);
+          return;
+        }
       }
+      finalUsername = candidate;
     }
 
     const matchedRole = SYSTEM_ROLES.find((r) => r.id === formRole);
@@ -846,8 +851,8 @@ export default function EmployeeManagement({ onGoToUsersTab }: EmployeeManagemen
       {/* MODAL: EDIT / CREATE EMPLOYEE RECORD & SYSTEM CREDENTIALS                 */}
       {/* ========================================================================= */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-5 overflow-y-auto animate-in fade-in">
-          <div className="bg-white rounded-3xl max-w-2xl w-full shadow-2xl border border-stone-200 overflow-hidden my-auto max-h-[94vh] flex flex-col animate-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 z-[250] bg-black/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-5 overflow-y-auto animate-in fade-in">
+          <div className="bg-white rounded-3xl max-w-2xl w-full shadow-2xl border border-stone-200 overflow-hidden my-auto max-h-[92vh] flex flex-col animate-in zoom-in-95 duration-200">
             {/* Modal Header Redesigned */}
             <div className="p-5 sm:p-6 bg-gradient-to-r from-blue-600/10 via-indigo-600/10 to-amber-500/10 border-b border-indigo-100 flex items-center justify-between shrink-0">
               <div className="flex items-center gap-3.5">
@@ -900,9 +905,10 @@ export default function EmployeeManagement({ onGoToUsersTab }: EmployeeManagemen
             </div>
 
             {/* Modal Form */}
-            <form onSubmit={handleSaveEmployee} className="p-5 sm:p-6 overflow-y-auto space-y-5 flex-1 text-xs">
-              {/* SECTION 1: Photo and Avatar */}
-              <div className="bg-stone-50/80 p-4 sm:p-4.5 rounded-2xl border border-stone-200/90 space-y-3">
+            <form onSubmit={handleSaveEmployee} className="flex flex-col flex-1 overflow-hidden min-h-0">
+              <div className="p-5 sm:p-6 overflow-y-auto space-y-5 flex-1 text-xs">
+                {/* SECTION 1: Photo and Avatar */}
+                <div className="bg-stone-50/80 p-4 sm:p-4.5 rounded-2xl border border-stone-200/90 space-y-3">
                 <label className="font-black text-stone-900 flex items-center gap-1.5 text-xs">
                   <Camera className="w-4 h-4 text-blue-600" /> Fotografía o Avatar del Trabajador
                 </label>
@@ -1229,6 +1235,32 @@ export default function EmployeeManagement({ onGoToUsersTab }: EmployeeManagemen
                       </div>
                     </button>
                   </div>
+
+                  {/* Horario de Entrada y Salida editable */}
+                  <div className="pt-3 border-t border-amber-200/60 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <label className="font-bold text-stone-800 text-xs flex items-center gap-1.5">
+                        <Clock className="w-3.5 h-3.5 text-amber-600" /> Hora de Entrada
+                      </label>
+                      <input
+                        type="time"
+                        value={formShiftStartTime}
+                        onChange={(e) => setFormShiftStartTime(e.target.value)}
+                        className="w-full px-3 py-2 bg-white border border-amber-300 rounded-xl font-mono font-bold text-xs text-stone-900 focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="font-bold text-stone-800 text-xs flex items-center gap-1.5">
+                        <Clock className="w-3.5 h-3.5 text-amber-600" /> Hora de Salida
+                      </label>
+                      <input
+                        type="time"
+                        value={formShiftEndTime}
+                        onChange={(e) => setFormShiftEndTime(e.target.value)}
+                        className="w-full px-3 py-2 bg-white border border-amber-300 rounded-xl font-mono font-bold text-xs text-stone-900 focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                      />
+                    </div>
+                  </div>
                 </div>
 
               </div>
@@ -1308,8 +1340,7 @@ export default function EmployeeManagement({ onGoToUsersTab }: EmployeeManagemen
                           </span>
                           <input
                             type="text"
-                            required={formHasAccess}
-                            placeholder="ej. lupita.brito"
+                            placeholder={formName ? generateSuggestedUsername(formName) : "ej. lupita.brito"}
                             value={formUsername}
                             onChange={(e) => setFormUsername(e.target.value.toLowerCase().replace(/[^a-z0-9._-]/g, ""))}
                             className="w-full pl-8 pr-3.5 py-2.5 bg-white border border-indigo-200 rounded-xl font-mono font-black text-xs text-stone-900 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
@@ -1357,8 +1388,7 @@ export default function EmployeeManagement({ onGoToUsersTab }: EmployeeManagemen
                         <div className="relative">
                           <input
                             type={showFormPassword ? "text" : "password"}
-                            required={formHasAccess}
-                            placeholder="Escribe la clave o PIN"
+                            placeholder="PIN numérico o contraseña (ej. 1234)"
                             value={formPassword}
                             onChange={(e) => setFormPassword(e.target.value)}
                             className="w-full pl-3.5 pr-10 py-2.5 bg-white border border-indigo-200 rounded-xl font-mono font-black text-xs text-stone-900 focus:ring-2 focus:ring-indigo-500 focus:outline-none tracking-wider"
@@ -1466,12 +1496,14 @@ export default function EmployeeManagement({ onGoToUsersTab }: EmployeeManagemen
                 )}
               </div>
 
-              {/* Modal Footer */}
-              <div className="pt-3 border-t border-stone-100 flex items-center justify-between shrink-0">
+              </div>
+
+              {/* Modal Footer (Pinned at bottom, always visible) */}
+              <div className="p-4 sm:p-5 bg-stone-50 border-t border-stone-200 flex items-center justify-between shrink-0">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2.5 text-stone-600 font-bold hover:bg-stone-100 rounded-xl transition-all cursor-pointer"
+                  className="px-4 py-2.5 text-stone-600 font-bold hover:bg-stone-200/80 rounded-xl transition-all cursor-pointer"
                 >
                   Cancelar
                 </button>

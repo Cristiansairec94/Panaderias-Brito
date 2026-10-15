@@ -14,9 +14,7 @@ let inMemoryUsersCache: AppUser[] | null = null;
 let lastFileMtime = 0;
 const RETIRED_USER_IDS = [
   "usr-3",
-  "roberto",
   "usr-4",
-  "juan",
 ];
 
 const deletedUserIdsSet = new Set<string>(RETIRED_USER_IDS);
@@ -294,13 +292,12 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Bloqueo: si fue eliminado en otra terminal, no revivirlo a menos que venga force=true
-    if (!body.force && (deletedSet.has(newUser.id) || (newUser.username && deletedSet.has(newUser.username)))) {
-      return NextResponse.json(
-        { success: false, message: "Este empleado fue dado de baja del sistema.", isDeleted: true },
-        { status: 409 }
-      );
+    // Si el usuario estaba marcado como eliminado previamente, rehabilitarlo
+    deletedSet.delete(newUser.id);
+    if (newUser.username) {
+      deletedSet.delete(newUser.username);
     }
+    writeDeletedUserIds();
 
     // Hashear contraseña si se proporciona una nueva
     if (newUser.password && newUser.password.length !== 64) {

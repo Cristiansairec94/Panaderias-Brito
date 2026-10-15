@@ -1454,10 +1454,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       removeDeletedUserId(newUser.username);
     }
 
-    let updated: User[] = [];
     setUsersList((prevUsers) => {
       const exists = prevUsers.some((u) => u.id === newUser.id);
-      updated = exists
+      const updated = exists
         ? prevUsers.map((u) => (u.id === newUser.id ? { ...u, ...newUser } : u))
         : [...prevUsers, newUser];
       try {
@@ -1467,10 +1466,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       return updated;
     });
-
-    if (typeof window !== "undefined") {
-      window.dispatchEvent(new Event("brito_users_updated"));
-    }
 
     // Transmitir en tiempo real a todos los perfiles conectados (Paulina <-> Don Toño)
     realtimeHub.broadcastUser("create", newUser);
@@ -1486,10 +1481,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const updateUser = useCallback((userId: string, updatedData: Partial<User>) => {
-    let updated: User[] = [];
     let updatedTargetUser: User | null = null;
     setUsersList((prevUsers) => {
-      updated = prevUsers.map((u) => {
+      const updated = prevUsers.map((u) => {
         if (u.id === userId) {
           updatedTargetUser = { ...u, ...updatedData };
           return updatedTargetUser;
@@ -1535,10 +1529,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       return updated;
     });
-
-    if (typeof window !== "undefined") {
-      window.dispatchEvent(new Event("brito_users_updated"));
-    }
 
     // Transmitir en tiempo real a todos los perfiles conectados (Paulina <-> Don Toño)
     if (updatedTargetUser) {
