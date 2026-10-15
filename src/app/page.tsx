@@ -132,9 +132,9 @@ export default function Home() {
 
   const avgTicket = Math.round(activeSales / Math.max(1, activeTickets));
 
-  // Filtered orders for active branch
+  // Filtered orders for active branch (only pending orders to be delivered)
   const filteredOrders = useMemo(() => {
-    let result = orders;
+    let result = orders.filter((o) => o && o.status !== "entregado" && o.status !== "cancelado");
     if (!isAllBranches && currentBranch) {
       result = result.filter((o) => !o.branchId || o.branchId === currentBranch.id);
     }
@@ -145,8 +145,9 @@ export default function Home() {
   }, [orders, isAllBranches, currentBranch, orderStatusFilter]);
 
   const allBranchOrders = useMemo(() => {
-    if (isAllBranches) return orders;
-    return orders.filter((o) => !o.branchId || o.branchId === currentBranch?.id);
+    const activeOnly = orders.filter((o) => o && o.status !== "entregado" && o.status !== "cancelado");
+    if (isAllBranches) return activeOnly;
+    return activeOnly.filter((o) => !o.branchId || o.branchId === currentBranch?.id);
   }, [orders, isAllBranches, currentBranch]);
 
   const pendingOrdersCount = allBranchOrders.filter((o) => o.status === "pendiente").length;

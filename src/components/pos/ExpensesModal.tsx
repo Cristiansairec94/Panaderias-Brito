@@ -1060,18 +1060,17 @@ export default function ExpensesModal({
   // Ventas exclusivas del turno actual (todas las ventas emitidas en la terminal en este turno)
   const effectiveSales = shiftSales;
 
-  // Pedidos especiales del turno (anticipos y liquidaciones cobrados estrictamente en el turno activo)
+  // Pedidos especiales del turno (únicamente pedidos pendientes que faltan por entregar)
   const relevantOrders = useMemo(() => {
     const boundary = shiftStartBoundary > 0 ? shiftStartBoundary : getStoredShiftStartBoundary(activeBranch?.id);
     const sourceOrders = mergeOrdersList(orders, internalOrders);
     return sourceOrders.filter((o) => {
-      if (!o) return false;
-      if (o.status === "cancelado") return false;
+      if (!isOrderPendingDelivery(o)) return false;
       if (!isOrderCashInBranch(o) && !isOrderInBranch(o)) return false;
       const col = getOrderShiftCollection(o, boundary);
       return col.isInShift;
     });
-  }, [orders, internalOrders, mergeOrdersList, isOrderCashInBranch, isOrderInBranch, shiftStartBoundary, shiftVersion, ordersVersion, activeBranch?.id]);
+  }, [orders, internalOrders, mergeOrdersList, isOrderPendingDelivery, isOrderCashInBranch, isOrderInBranch, shiftStartBoundary, shiftVersion, ordersVersion, activeBranch?.id]);
 
   const effectiveOrders = relevantOrders;
 
@@ -1096,11 +1095,10 @@ export default function ExpensesModal({
     });
   }, [allAvailableSales, cashierName, activeBranch]);
 
-  // 4. Todos los pedidos especiales históricos de la cajera/operador en turno (incluyendo pedidos entregados / dados de salida)
+  // 4. Pedidos especiales pendientes de la cajera/operador en turno (excluyendo entregados y dados de baja)
   const operatorAllOrders = useMemo(() => {
     return (internalOrders || []).filter((o) => {
-      if (!o) return false;
-      if (o.status === "cancelado") return false;
+      if (!isOrderPendingDelivery(o)) return false;
       if (!isOrderInBranch(o) && !isOrderCashInBranch(o)) return false;
       if (o.cashier && cashierName) {
         const isMatch =
@@ -1113,7 +1111,7 @@ export default function ExpensesModal({
       }
       return true;
     });
-  }, [internalOrders, isOrderInBranch, isOrderCashInBranch, cashierName]);
+  }, [internalOrders, isOrderPendingDelivery, isOrderInBranch, isOrderCashInBranch, cashierName]);
 
   // Selección del grupo de ventas según el alcance activo:
   // "turno": estrictamente las de este turno y cajera en vivo.
@@ -1125,10 +1123,13 @@ export default function ExpensesModal({
   }, [ticketScopeFilter, effectiveSales, operatorAllSales, allAvailableSales]);
 
   const ordersPool = useMemo(() => {
-    if (ticketScopeFilter === "turno") return effectiveOrders;
-    if (ticketScopeFilter === "por_dia") return operatorAllOrders.length > 0 ? operatorAllOrders : effectiveOrders;
-    return getStoredOrders().filter((o) => o && o.status !== "cancelado" && (isOrderInBranch(o) || isOrderCashInBranch(o)));
-  }, [ticketScopeFilter, effectiveOrders, operatorAllOrders, isOrderInBranch, isOrderCashInBranch]);
+    if (ticketScopeFilter === "turno") return effectiveOrders.filter((o) => isOrderPendingDelivery(o));
+    if (ticketScopeFilter === "por_dia") {
+      const base = operatorAllOrders.length > 0 ? operatorAllOrders : effectiveOrders;
+      return base.filter((o) => isOrderPendingDelivery(o));
+    }
+    return getStoredOrders().filter((o) => isOrderPendingDelivery(o) && (isOrderInBranch(o) || isOrderCashInBranch(o)));
+  }, [ticketScopeFilter, effectiveOrders, operatorAllOrders, isOrderPendingDelivery, isOrderInBranch, isOrderCashInBranch]);
 
   // Métricas superiores sincronizadas con el alcance activo (ventas de mostrador sin pedidos)
   const activeSalesForKpi = useMemo(() => {
@@ -1204,275 +1205,46 @@ export default function ExpensesModal({
 
   const averageTicket = totalRecordsCount > 0 ? totalCombinedRevenue / totalRecordsCount : 0;
 
-  // Listados específicos para los modales emergentes de detalle: ventas regulares en mostrador (todos los métodos)
+  // Listados específicos para los modales emergentes de detalle: ventas regulares en mostrador (sin pedidos)
   const allShiftPureSales = useMemo(() => {
-    return effectiveSales.filter((s) => !s.isCustomOrder);
+    return effectiveSales.filter((s) => !s.isCustomOrder && !String(s.id || "").startsWith("PED-") && !String(s.id || "").startsWith("LIQ-"));
   }, [effectiveSales]);
 
-  // Todos los pedidos especiales del turno activo (anticipos, liquidaciones y pedidos dados de salida/entregados, excluyendo solo cancelados)
+  // Pedidos especiales del turno activo: ÚNICAMENTE pedidos pendientes que faltan por entregar (excluyendo entregados y dados de baja/cancelados)
   const allShiftOrdersList = useMemo(() => {
     const ordersMap = new Map<string, CustomOrder>();
     const storedAll = mergeOrdersList(orders, internalOrders);
-    const boundary = shiftStartBoundary > 0 ? shiftStartBoundary : getStoredShiftStartBoundary(activeBranch?.id);
 
-    // 1. Pedidos desde effectiveOrders (incluyendo pedidos entregados / dados de salida)
+    // 1. Pedidos pendientes desde effectiveOrders
     effectiveOrders.forEach((o) => {
       if (!o) return;
       const latest = storedAll.find((sto) => sto.id === o.id || sto.orderNumber === o.orderNumber) || o;
-      if (latest.status === "cancelado") return;
+      if (!isOrderPendingDelivery(latest)) return;
       const hasDeposit = (Number(latest.deposit) || 0) > 0 || (Number(latest.total) || 0) > 0;
       if (hasDeposit) {
         ordersMap.set(latest.orderNumber || latest.id, latest);
       }
     });
 
-    // 2. Pedidos especiales registrados en effectiveSales (incluyendo entregados / dados de salida)
+    // 2. Pedidos especiales en effectiveSales que sigan pendientes por entregar en storedAll
     effectiveSales.forEach((s) => {
       if (s.isCustomOrder) {
-        const orderKey = s.orderNumber || s.id;
         const storedMatch = storedAll.find((ord) => ord.id === s.id || ord.orderNumber === s.orderNumber || ord.orderNumber === s.id);
-        if (storedMatch && storedMatch.status === "cancelado") {
-          return;
-        }
-        if (storedMatch) {
+        if (storedMatch && isOrderPendingDelivery(storedMatch)) {
           ordersMap.set(storedMatch.orderNumber || storedMatch.id, storedMatch);
-          return;
-        }
-        if (!ordersMap.has(orderKey)) {
-          const synthOrder: CustomOrder = {
-            id: s.id,
-            orderNumber: s.orderNumber || s.id,
-            customerName: s.customerName || "Cliente Pedido",
-            phone: "N/A",
-            branchId: (s as any).branchId || activeBranch?.id || "branch-matriz",
-            branchName: activeBranch?.name || "Sucursal",
-            description: s.items && s.items.length > 0 ? s.items.map((i) => `${i.quantity}x ${i.product.name.replace(/^🎂\s*\[Pedido[^\]]*\]\s*/i, "")}`).join(", ") : "Pedido Especial",
-            items: (s.items || []).map((i) => ({
-              productId: i.product.id,
-              name: i.product.name.replace(/^🎂\s*\[Pedido[^\]]*\]\s*/i, ""),
-              quantity: i.quantity,
-              unitPrice: i.product.price,
-              subtotal: i.quantity * i.product.price,
-            })),
-            deliveryDate: s.date || "Hoy",
-            deliveryTime: "12:00",
-            deliveryType: "sucursal",
-            status: "entregado",
-            total: s.total,
-            deposit: s.total,
-            remainingBalance: 0,
-            paymentStatus: "liquidado",
-            paymentMethod: (s.paymentMethod || "efectivo") as any,
-            createdAt: s.createdAt || (s.timestamp ? new Date(s.timestamp).toISOString() : new Date().toISOString()),
-            timestamp: parseDateTimeSafe(s.timestamp || s.createdAt || s.date) || Date.now(),
-            cashier: s.cashier || effectiveCashier,
-          };
-          ordersMap.set(orderKey, synthOrder);
         }
       }
     });
 
-    // 3. Reconciliar con movimientos de caja e ingresos de pedidos especiales (abono_pedido / pedido) del turno
-    const orderMovementsPool: Array<{
-      id: string;
-      amount: number;
-      reason: string;
-      cashier: string;
-      branchId?: string;
-      timestamp: number;
-      paymentMethod?: string;
-    }> = [];
-
-    if (cashMovements && cashMovements.length > 0) {
-      cashMovements.forEach((m) => {
-        if (!m || m.type !== "entrada") return;
-        const rLower = (m.reason || "").toLowerCase();
-        const isOrderMov =
-          m.category === "abono_pedido" ||
-          m.category === "pedido" ||
-          (m.id && (m.id.startsWith("order-") || m.id.includes("PED-"))) ||
-          rLower.includes("pedido") ||
-          rLower.includes("anticipo") ||
-          rLower.includes("liquidaci");
-        if (!isOrderMov) return;
-        const mBranch = resolveBranchId(m.branchId, m.authorizedBy || m.cashier);
-        if (activeBranch && activeBranch.id !== "all" && mBranch !== activeBranch.id) return;
-        const mTime = m.rawTimestamp || parseDateTimeSafe(m.timestamp || m.createdAt) || 0;
-        if (boundary > 0 && mTime > 0 && mTime < boundary) return;
-        orderMovementsPool.push({
-          id: m.id,
-          amount: Number(m.amount) || 0,
-          reason: m.reason || "Pedido Especial",
-          cashier: m.authorizedBy || m.cashier || effectiveCashier,
-          branchId: mBranch,
-          timestamp: mTime || Date.now(),
-          paymentMethod: "efectivo",
-        });
-      });
-    }
-
-    const storedIncs = [...(incomes || []), ...(typeof window !== "undefined" ? getStoredIncomes() : [])];
-    storedIncs.forEach((inc) => {
-      if (!inc) return;
-      const cLower = (inc.concept || "").toLowerCase();
-      const isOrderInc =
-        inc.category === "abono_pedido" ||
-        inc.category === "pedido" ||
-        Boolean((inc as any).orderId) ||
-        (inc.id && (inc.id.startsWith("order-") || inc.id.includes("PED-"))) ||
-        cLower.includes("pedido") ||
-        cLower.includes("anticipo") ||
-        cLower.includes("liquidaci");
-      if (!isOrderInc) return;
-      const incBranch = resolveBranchId((inc as any).branchId || (inc as any).branch_id, inc.cashier);
-      if (activeBranch && activeBranch.id !== "all" && incBranch !== activeBranch.id) return;
-      const incTime = parseDateTimeSafe(inc.timestamp || inc.date || (inc as any).createdAt) || 0;
-      if (boundary > 0 && incTime > 0 && incTime < boundary) return;
-      orderMovementsPool.push({
-        id: (inc as any).orderId || inc.id,
-        amount: Number(inc.amount) || 0,
-        reason: inc.concept || "Pedido Especial",
-        cashier: inc.cashier || effectiveCashier,
-        branchId: incBranch,
-        timestamp: incTime || Date.now(),
-        paymentMethod: inc.paymentMethod || "efectivo",
-      });
-    });
-
-    orderMovementsPool.forEach((mov) => {
-      if (mov.amount <= 0) return;
-      const folioMatch = `${mov.id} ${mov.reason}`.match(/PED[-_]?(\d+)/i);
-      const folio = folioMatch ? `PED-${folioMatch[1]}` : undefined;
-      const matchedOrder = storedAll.find((ord) => {
-        if (!ord || ord.status === "cancelado") return false;
-        if (folio && (ord.orderNumber?.toUpperCase() === folio.toUpperCase() || ord.id?.toUpperCase() === folio.toUpperCase())) {
-          return true;
-        }
-        if ((isOrderInBranch(ord) || isOrderCashInBranch(ord)) && Math.abs((Number(ord.deposit) || Number(ord.total) || 0) - mov.amount) < 0.05) {
-          return true;
-        }
-        return false;
-      });
-
-      if (matchedOrder) {
-        const key = matchedOrder.orderNumber || matchedOrder.id;
-        if (!ordersMap.has(key)) {
-          ordersMap.set(key, matchedOrder);
-        }
-      } else {
-        const synthKey = folio || mov.id;
-        if (!ordersMap.has(synthKey)) {
-          // Extraer cliente de "Liquidación final pedido PED-XXX - Nombre Cliente"
-          const dashParts = mov.reason.split(/\s+-\s+/);
-          const extractedCustomer = dashParts.length > 1 ? dashParts[dashParts.length - 1].trim() : "Cliente Mostrador";
-          ordersMap.set(synthKey, {
-            id: synthKey,
-            orderNumber: folio || synthKey,
-            customerName: extractedCustomer,
-            phone: "N/A",
-            branchId: activeBranch?.id || "branch-matriz",
-            branchName: effectiveBranchName,
-            description: mov.reason,
-            items: [
-              {
-                name: mov.reason,
-                quantity: 1,
-                unitPrice: mov.amount,
-                subtotal: mov.amount,
-              },
-            ],
-            deliveryDate: "Hoy",
-            deliveryTime: "12:00",
-            deliveryType: "sucursal",
-            status: "entregado",
-            total: mov.amount,
-            deposit: mov.amount,
-            remainingBalance: 0,
-            paymentStatus: "liquidado",
-            paymentMethod: (mov.paymentMethod || "efectivo") as any,
-            cashier: mov.cashier || effectiveCashier,
-            createdAt: new Date(mov.timestamp).toISOString(),
-            timestamp: mov.timestamp,
-          });
-        }
-      }
-    });
-
-    // 4. Fallback: Si la sucursal tiene monto de pedidos en el turno (ej. +$678.50) pero aún no están en ordersMap
-    const targetOrderAmount = Math.max(shiftOrdersTotal, Number(activeBranch?.todayOrdersTotal || 0), Number(activeBranch?.todayOrdersDeposit || 0));
-    if (ordersMap.size === 0 && targetOrderAmount > 0) {
-      // Buscar primero en storedAll pedidos de esta sucursal (incluyendo los que se dieron de salida / "entregado")
-      const branchCandidates = storedAll.filter((ord) => ord && ord.status !== "cancelado" && (isOrderCashInBranch(ord) || isOrderInBranch(ord)));
-      const exactAmountMatches = branchCandidates.filter(
-        (ord) => Math.abs((Number(ord.deposit) || 0) - targetOrderAmount) < 0.05 || Math.abs((Number(ord.total) || 0) - targetOrderAmount) < 0.05
-      );
-
-      if (exactAmountMatches.length > 0) {
-        exactAmountMatches.forEach((ord) => {
-          ordersMap.set(ord.orderNumber || ord.id, ord);
-        });
-      } else if (branchCandidates.length > 0) {
-        branchCandidates.forEach((ord) => {
-          ordersMap.set(ord.orderNumber || ord.id, ord);
-        });
-      }
-
-      // Si aún no hay registro en memoria local pero la sucursal reporta el monto de pedidos del turno, sintetizar el registro visible
-      if (ordersMap.size === 0) {
-        const fallbackFolio = activeBranch?.id === "branch-matriz" ? "PED-172" : `PED-${String(Math.round(targetOrderAmount)).slice(0, 3)}`;
-        ordersMap.set(fallbackFolio, {
-          id: fallbackFolio,
-          orderNumber: fallbackFolio,
-          customerName: activeBranch?.id === "branch-matriz" && targetOrderAmount === 8911 ? "julio cesar" : "Cliente de Sucursal (Salida de Pedido)",
-          phone: "N/A",
-          branchId: activeBranch?.id || "branch-matriz",
-          branchName: effectiveBranchName,
-          description: `Pedido especial entregado / liquidado en turno (${formatCurrency(targetOrderAmount)})`,
-          items: [
-            {
-              name: `Pedido Especial de Pastelería / Panadería (${fallbackFolio})`,
-              quantity: 1,
-              unitPrice: targetOrderAmount,
-              subtotal: targetOrderAmount,
-              notes: "Pedido liquidado y dado de salida en el turno actual",
-            },
-          ],
-          deliveryDate: "Hoy",
-          deliveryTime: "12:00",
-          deliveryType: "sucursal",
-          status: "entregado",
-          total: targetOrderAmount,
-          deposit: targetOrderAmount,
-          remainingBalance: 0,
-          paymentStatus: "liquidado",
-          paymentMethod: "efectivo",
-          cashier: effectiveCashier,
-          createdAt: new Date().toISOString(),
-          timestamp: Date.now(),
-        });
-      }
-    }
-
-    return Array.from(ordersMap.values());
+    return Array.from(ordersMap.values()).filter((o) => isOrderPendingDelivery(o));
   }, [
     effectiveOrders,
     effectiveSales,
     orders,
     internalOrders,
     mergeOrdersList,
+    isOrderPendingDelivery,
     ordersVersion,
-    shiftStartBoundary,
-    activeBranch?.id,
-    activeBranch?.name,
-    activeBranch?.todayOrdersDeposit,
-    activeBranch?.todayOrdersTotal,
-    shiftOrdersTotal,
-    cashMovements,
-    incomes,
-    effectiveCashier,
-    effectiveBranchName,
-    isOrderInBranch,
-    isOrderCashInBranch,
   ]);
 
   // Listados específicos en efectivo para compatibilidad
@@ -1706,6 +1478,15 @@ export default function ExpensesModal({
     }
   };
 
+  const handleMarkOrderReady = (order: CustomOrder) => {
+    updateOrderStatus(order.id, "listo");
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new Event("brito_orders_updated"));
+    }
+    setOrdersVersion((v) => v + 1);
+    setInternalOrders(getStoredOrders().filter((o) => isOrderPendingDelivery(o)));
+  };
+
   const handleDeliverOrder = (order: CustomOrder) => {
     const rem = order.remainingBalance !== undefined ? order.remainingBalance : Math.max(0, (order.total || 0) - (order.deposit || 0));
     if (rem > 0) {
@@ -1713,6 +1494,13 @@ export default function ExpensesModal({
         `⛔ No se puede entregar:\n\nEl pedido #${order.orderNumber} aún tiene un saldo pendiente de ${formatCurrency(rem)}.\n\nEl pedido debe estar pagado por completo antes de poder entregarse al cliente. Por favor, presiona "Cobrar Saldo" para registrar el pago.`
       );
       handlePayOrder(order);
+      return;
+    }
+
+    if (order.status !== "listo") {
+      alert(
+        `📦 Primero confirma que el pedido ya llegó a sucursal:\n\nSelecciona primero el botón azul "🎂 Marcar Listo" en el pedido #${order.orderNumber} para estar seguros de que ya está en mostrador antes de entregarlo.`
+      );
       return;
     }
 
@@ -1725,7 +1513,7 @@ export default function ExpensesModal({
       window.dispatchEvent(new Event("brito_orders_updated"));
     }
     setOrdersVersion((v) => v + 1);
-    setInternalOrders(getStoredOrders().filter((o) => o && o.status !== "cancelado"));
+    setInternalOrders(getStoredOrders().filter((o) => isOrderPendingDelivery(o)));
     setOrderToDeliver(null);
   };
 
@@ -1746,7 +1534,7 @@ export default function ExpensesModal({
       window.dispatchEvent(new Event("brito_orders_updated"));
     }
     setOrdersVersion((v) => v + 1);
-    setInternalOrders(getStoredOrders().filter((o) => o && o.status !== "cancelado"));
+    setInternalOrders(getStoredOrders().filter((o) => isOrderPendingDelivery(o)));
   };
 
   const handleSendOrderWhatsApp = (order: CustomOrder) => {
@@ -1820,7 +1608,7 @@ export default function ExpensesModal({
     if (ticketTypeFilter === "pedidos") return [];
     return salesPoolForTickets
       .filter((sale) => {
-        if (ticketTypeFilter === "ventas" && sale.isCustomOrder) return false;
+        if (sale.isCustomOrder || String(sale.id || "").startsWith("PED-") || String(sale.id || "").startsWith("LIQ-")) return false;
         if (ticketMethodFilter !== "all" && sale.paymentMethod !== ticketMethodFilter) return false;
         if (ticketSearch.trim()) {
           const q = ticketSearch.toLowerCase().trim();
@@ -1835,12 +1623,12 @@ export default function ExpensesModal({
       .sort((a, b) => compareMovementsDesc(a, b));
   }, [salesPoolForTickets, ticketTypeFilter, ticketMethodFilter, ticketSearch]);
 
-  // Filtrado de Pedidos Especiales ordenados cronológicamente (incluyendo pedidos entregados / dados de salida en el turno)
+  // Filtrado de Pedidos Especiales ordenados cronológicamente (únicamente pendientes por entregar)
   const filteredOrders = useMemo(() => {
     if (ticketTypeFilter === "ventas") return [];
     return ordersPool
       .filter((order) => {
-        if (order.status === "cancelado") return false;
+        if (!isOrderPendingDelivery(order)) return false;
         if (ticketMethodFilter !== "all" && order.paymentMethod !== ticketMethodFilter) return false;
         if (ticketSearch.trim()) {
           const q = ticketSearch.toLowerCase().trim();
@@ -1860,7 +1648,7 @@ export default function ExpensesModal({
           { id: b.id, date: b.createdAt || b.deliveryDate, timestamp: b.timestamp || b.createdAt, createdAt: b.createdAt }
         )
       );
-  }, [ordersPool, ticketTypeFilter, ticketMethodFilter, ticketSearch]);
+  }, [ordersPool, isOrderPendingDelivery, ticketTypeFilter, ticketMethodFilter, ticketSearch]);
 
   // Listado unificado cronológico de ventas y pedidos según el orden de emisión de los tickets
   const unifiedTickets = useMemo(() => {
@@ -2382,21 +2170,19 @@ export default function ExpensesModal({
   });
 
   const renderOrderCard = (order: CustomOrder) => {
+    if (!isOrderPendingDelivery(order)) return null;
     const isExpanded = expandedOrderId === order.id;
     const orderItemsCount = (order.items || []).reduce((sum, item) => sum + (Number(item.quantity) || 1), 0);
-    const isDelivered = order.status === "entregado";
+    const isReadyInBranch = order.status === "listo";
+    const isFullyPaid = (order.remainingBalance ?? Math.max(0, (order.total || 0) - (order.deposit || 0))) <= 0;
 
     return (
       <div
         key={order.id}
-        className={`bg-white hover:bg-stone-50/80 rounded-2xl border-2 shadow-2xs overflow-hidden transition-all ${
-          isDelivered ? "border-sky-300/90" : "border-amber-300/80"
-        }`}
+        className="bg-white hover:bg-stone-50/80 rounded-2xl border-2 border-amber-300/80 shadow-2xs overflow-hidden transition-all"
       >
         {/* Cabecera del Pedido */}
-        <div className={`p-3.5 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
-          isDelivered ? "bg-sky-50/25" : "bg-amber-50/20"
-        }`}>
+        <div className="p-3.5 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-amber-50/20">
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               <span className="text-[10px] bg-amber-500 text-stone-950 font-black px-2 py-0.5 rounded-md flex items-center gap-1 shadow-2xs">
@@ -2421,20 +2207,16 @@ export default function ExpensesModal({
                   : "⚠️ Sin Anticipo"}
               </span>
               <span className={`text-[10px] font-black px-2 py-0.5 rounded-md border ${
-                order.status === "entregado"
-                  ? "bg-sky-100 text-sky-900 border-sky-300"
-                  : order.status === "listo"
-                  ? "bg-emerald-100 text-emerald-900 border-emerald-300"
+                order.status === "listo"
+                  ? "bg-blue-100 text-blue-900 border-blue-300"
                   : order.status === "en_horno"
                   ? "bg-amber-100 text-amber-900 border-amber-300"
                   : "bg-stone-100 border-stone-200 text-stone-700"
               }`}>
                 {order.status === "listo"
-                  ? "🎂 Listo"
+                  ? "🎂 Listo en Sucursal"
                   : order.status === "en_horno"
                   ? "🔥 En Horno"
-                  : order.status === "entregado"
-                  ? "📦 Salida / Entregado"
                   : "⏳ Pendiente"}
               </span>
               {order.paymentMethod && (
@@ -2533,37 +2315,50 @@ export default function ExpensesModal({
                 <span>Detalles</span>
               </button>
 
-              {isDelivered ? (
-                <span
-                  className="px-2.5 py-1.5 rounded-xl bg-sky-100 text-sky-900 border border-sky-300 text-xs font-black flex items-center gap-1 shadow-2xs"
-                  title="Este pedido ya fue entregado al cliente (se dio salida)"
-                >
-                  <CheckCircle2 className="w-3.5 h-3.5 text-sky-700" />
-                  <span>Salida Registrada</span>
-                </span>
-              ) : order.remainingBalance > 0 ? (
-                onSelectOrderForPayment && (
-                  <button
-                    type="button"
-                    onClick={() => onSelectOrderForPayment(order)}
-                    className="px-2.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black transition-all shadow-xs cursor-pointer active:scale-95 flex items-center gap-1"
-                    title="Cobrar saldo restante de este pedido"
-                  >
-                    <DollarSign className="w-3.5 h-3.5" />
-                    <span>Cobrar</span>
-                  </button>
-                )
-              ) : (
+              {order.remainingBalance > 0 && onSelectOrderForPayment && (
                 <button
                   type="button"
-                  onClick={() => handleDeliverOrder(order)}
-                  className="px-2.5 py-1.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white text-xs font-black transition-all shadow-xs cursor-pointer active:scale-95 flex items-center gap-1"
-                  title="Marcar como entregado (se archivará en el historial directo de pedidos)"
+                  onClick={() => onSelectOrderForPayment(order)}
+                  className="px-2.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black transition-all shadow-xs cursor-pointer active:scale-95 flex items-center gap-1"
+                  title="Cobrar saldo restante de este pedido"
                 >
-                  <CheckCircle2 className="w-3.5 h-3.5" />
-                  <span>Entregar</span>
+                  <DollarSign className="w-3.5 h-3.5" />
+                  <span>Cobrar</span>
                 </button>
               )}
+
+              <button
+                type="button"
+                onClick={() => handleMarkOrderReady(order)}
+                className={`px-2.5 py-1.5 rounded-xl text-xs font-black transition-all flex items-center gap-1 cursor-pointer active:scale-95 ${
+                  isReadyInBranch
+                    ? "bg-blue-600 text-white border border-blue-700 shadow-sm shadow-blue-600/30 ring-2 ring-blue-400/40"
+                    : "bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-300"
+                }`}
+                title="Paso 1: Confirmar que el pedido ya llegó y está listo en la sucursal"
+              >
+                <span>🎂 {isReadyInBranch ? "Listo ✓" : "Marcar Listo"}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleDeliverOrder(order)}
+                className={`px-2.5 py-1.5 rounded-xl text-xs font-black transition-all flex items-center gap-1 cursor-pointer active:scale-95 ${
+                  isReadyInBranch && isFullyPaid
+                    ? "bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm shadow-emerald-600/30 ring-2 ring-emerald-400/40"
+                    : "bg-stone-100 text-stone-400 border border-stone-200"
+                }`}
+                title={
+                  !isReadyInBranch
+                    ? "Primero selecciona el botón azul 'Marcar Listo' para confirmar que el pedido llegó a sucursal"
+                    : !isFullyPaid
+                    ? "Primero liquida el saldo pendiente para entregar"
+                    : "Entregar pedido al cliente"
+                }
+              >
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                <span>Entregar</span>
+              </button>
 
               {(onSelectOrderForReceipt || true) && (
                 <button
@@ -4416,33 +4211,39 @@ export default function ExpensesModal({
                                         </button>
                                       )}
 
-                                      {/* Botón Entregar: Activo si 100% Pagado, con bloqueo informativo si tiene saldo pendiente */}
-                                      {remaining <= 0 ? (
-                                        <button
-                                          type="button"
-                                          onClick={() => handleDeliverOrder(order)}
-                                          className="px-4 py-1.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white text-xs font-black transition-all shadow-md shadow-blue-600/30 flex items-center gap-1.5 cursor-pointer active:scale-95 ring-2 ring-blue-400/40"
-                                          title="Marcar como entregado (se eliminará de esta sección de pedidos por entregar)"
-                                        >
-                                          <CheckCircle2 className="w-4 h-4" />
-                                          <span>Entregar</span>
-                                        </button>
-                                      ) : (
-                                        <button
-                                          type="button"
-                                          onClick={() => {
-                                            alert(
-                                              `⛔ No se puede entregar:\n\nEl pedido #${order.orderNumber} aún tiene un saldo pendiente de ${formatCurrency(remaining)}.\n\nEl pedido debe estar 100% pagado antes de poder entregarse al cliente. Presiona "Cobrar Saldo" primero.`
-                                            );
-                                            handlePayOrder(order);
-                                          }}
-                                          className="px-3 py-1.5 rounded-xl bg-stone-100 hover:bg-rose-50 text-stone-500 hover:text-rose-700 border border-stone-300 font-bold text-xs transition-colors flex items-center gap-1 cursor-pointer"
-                                          title="No se puede entregar: requiere estar 100% pagado"
-                                        >
-                                          <Lock className="w-3.5 h-3.5 text-stone-400" />
-                                          <span>Entregar (Requiere Pago 100%)</span>
-                                        </button>
-                                      )}
+                                      <button
+                                        type="button"
+                                        onClick={() => handleMarkOrderReady(order)}
+                                        className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all flex items-center gap-1 cursor-pointer active:scale-95 ${
+                                          order.status === "listo"
+                                            ? "bg-blue-600 text-white border border-blue-700 shadow-sm shadow-blue-600/30 ring-2 ring-blue-400/40"
+                                            : "bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-300"
+                                        }`}
+                                        title="Paso 1: Confirmar que el pedido ya llegó y está listo en la sucursal"
+                                      >
+                                        <span>🎂 {order.status === "listo" ? "Listo ✓" : "Marcar Listo"}</span>
+                                      </button>
+
+                                      {/* Botón Entregar: Iluminado en verde solo si primero se seleccionó el botón azul (Listo) y está 100% pagado */}
+                                      <button
+                                        type="button"
+                                        onClick={() => handleDeliverOrder(order)}
+                                        className={`px-4 py-1.5 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 ${
+                                          order.status === "listo" && remaining <= 0
+                                            ? "bg-emerald-600 hover:bg-emerald-700 text-white shadow-md shadow-emerald-600/30 ring-2 ring-emerald-400/40"
+                                            : "bg-stone-100 hover:bg-stone-200 text-stone-400 border border-stone-200"
+                                        }`}
+                                        title={
+                                          order.status !== "listo"
+                                            ? "Primero selecciona el botón azul 'Marcar Listo' para confirmar que el pedido llegó a sucursal"
+                                            : remaining > 0
+                                            ? "No se puede entregar: requiere estar 100% pagado"
+                                            : "Marcar como entregado (se eliminará de esta sección de pedidos por entregar)"
+                                        }
+                                      >
+                                        <CheckCircle2 className="w-4 h-4" />
+                                        <span>Entregar</span>
+                                      </button>
 
                                       <button
                                         type="button"
@@ -4665,8 +4466,10 @@ export default function ExpensesModal({
 
                             if (item.type === "pedido" && item.order) {
                               const order = item.order;
+                              if (!isOrderPendingDelivery(order)) return null;
                               const orderPieces = (order.items || []).reduce((sum, i) => sum + (Number(i.quantity) || 1), 0);
-                              const isDelivered = order.status === "entregado";
+                              const isReadyInBranch = order.status === "listo";
+                              const isFullyPaid = (order.remainingBalance ?? Math.max(0, (order.total || 0) - (order.deposit || 0))) <= 0;
                               const cleanOrderNotes = (order.notes || "")
                                 .replace(/\[Origen:[^\]]+\]/g, "")
                                 .replace(/\[TS:[^\]]+\]/g, "")
@@ -4675,11 +4478,7 @@ export default function ExpensesModal({
                                 <div
                                   key={order.id}
                                   onClick={() => setSelectedOrderDetail(order)}
-                                  className={`bg-white border-2 p-3.5 sm:p-4 rounded-2xl shadow-2xs flex flex-col sm:flex-row sm:items-start justify-between gap-3 transition-all cursor-pointer group ${
-                                    isDelivered
-                                      ? "border-sky-300 hover:border-sky-500 bg-sky-50/15"
-                                      : "border-amber-200 hover:border-amber-400"
-                                  }`}
+                                  className="bg-white border-2 border-amber-200 hover:border-amber-400 p-3.5 sm:p-4 rounded-2xl shadow-2xs flex flex-col sm:flex-row sm:items-start justify-between gap-3 transition-all cursor-pointer group"
                                 >
                                   <div className="flex-1 min-w-0 space-y-1.5">
                                     <div className="flex items-center gap-2 flex-wrap">
@@ -4691,18 +4490,14 @@ export default function ExpensesModal({
                                       </span>
                                       <span
                                         className={`text-[10px] font-black px-2 py-0.5 rounded-md border ${
-                                          isDelivered
-                                            ? "bg-sky-100 text-sky-900 border-sky-300"
-                                            : order.status === "listo"
-                                            ? "bg-emerald-100 text-emerald-900 border-emerald-300"
+                                          order.status === "listo"
+                                            ? "bg-blue-100 text-blue-900 border-blue-300"
                                             : order.status === "en_horno"
                                             ? "bg-amber-100 text-amber-900 border-amber-300"
                                             : "bg-stone-100 text-stone-700 border-stone-300"
                                         }`}
                                       >
-                                        {isDelivered
-                                          ? "📦 Salida / Pedido Entregado"
-                                          : order.status === "listo"
+                                        {order.status === "listo"
                                           ? "🎂 Listo en Sucursal"
                                           : order.status === "en_horno"
                                           ? "🔥 En Horno"
@@ -4776,11 +4571,6 @@ export default function ExpensesModal({
                                         <span className="text-[10px] font-black uppercase tracking-wider text-amber-900">
                                           📋 Pedido Solicitado / Productos:
                                         </span>
-                                        {isDelivered && (
-                                          <span className="text-[10px] font-black text-sky-800 bg-sky-100 border border-sky-200 px-2 py-0.2 rounded-md">
-                                            ✓ Se dio salida en sucursal
-                                          </span>
-                                        )}
                                       </div>
                                       <p className="text-xs text-stone-900 font-bold">
                                         {order.description || (order.items || []).map((i) => `${i.quantity}x ${i.name}`).join(", ") || "Encargo especial de pastelería"}
@@ -4832,39 +4622,52 @@ export default function ExpensesModal({
                                       </span>
                                     </div>
                                     <div className="flex items-center gap-1.5 flex-wrap justify-end" onClick={(e) => e.stopPropagation()}>
-                                      {isDelivered ? (
-                                        <span
-                                          className="px-2.5 py-1.5 bg-sky-100 text-sky-900 border border-sky-300 font-black text-xs rounded-xl flex items-center gap-1 shadow-2xs"
-                                          title="Este pedido ya fue entregado al cliente (se dio salida)"
-                                        >
-                                          <CheckCircle2 className="w-3.5 h-3.5 text-sky-700" />
-                                          <span>Salida Registrada</span>
-                                        </span>
-                                      ) : order.remainingBalance > 0 ? (
-                                        onSelectOrderForPayment && (
-                                          <button
-                                            type="button"
-                                            onClick={() => {
-                                              handlePayOrder(order);
-                                            }}
-                                            className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition-all shadow-xs cursor-pointer active:scale-95 flex items-center gap-1"
-                                            title="Cobrar saldo restante"
-                                          >
-                                            <DollarSign className="w-3.5 h-3.5" />
-                                            <span>Cobrar</span>
-                                          </button>
-                                        )
-                                      ) : (
+                                      {order.remainingBalance > 0 && onSelectOrderForPayment && (
                                         <button
                                           type="button"
-                                          onClick={() => handleDeliverOrder(order)}
-                                          className="px-3 py-1.5 bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white font-black text-xs rounded-xl transition-all shadow-md shadow-blue-600/30 flex items-center gap-1.5 cursor-pointer active:scale-95 ring-2 ring-blue-400/40"
-                                          title="Marcar como entregado (se archivará en el historial de pedidos)"
+                                          onClick={() => {
+                                            handlePayOrder(order);
+                                          }}
+                                          className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition-all shadow-xs cursor-pointer active:scale-95 flex items-center gap-1"
+                                          title="Cobrar saldo restante"
                                         >
-                                          <CheckCircle2 className="w-3.5 h-3.5 text-blue-200" />
-                                          <span>Entregar</span>
+                                          <DollarSign className="w-3.5 h-3.5" />
+                                          <span>Cobrar</span>
                                         </button>
                                       )}
+
+                                      <button
+                                        type="button"
+                                        onClick={() => handleMarkOrderReady(order)}
+                                        className={`px-2.5 py-1.5 font-black text-xs rounded-xl transition-all flex items-center gap-1 cursor-pointer active:scale-95 ${
+                                          isReadyInBranch
+                                            ? "bg-blue-600 text-white border border-blue-700 shadow-sm shadow-blue-600/30 ring-2 ring-blue-400/40"
+                                            : "bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-300"
+                                        }`}
+                                        title="Paso 1: Confirmar que el pedido ya llegó y está listo en la sucursal"
+                                      >
+                                        <span>🎂 {isReadyInBranch ? "Listo ✓" : "Marcar Listo"}</span>
+                                      </button>
+
+                                      <button
+                                        type="button"
+                                        onClick={() => handleDeliverOrder(order)}
+                                        className={`px-3 py-1.5 font-black text-xs rounded-xl transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 ${
+                                          isReadyInBranch && isFullyPaid
+                                            ? "bg-emerald-600 hover:bg-emerald-700 text-white shadow-md shadow-emerald-600/30 ring-2 ring-emerald-400/40"
+                                            : "bg-stone-100 hover:bg-stone-200 text-stone-400 border border-stone-200"
+                                        }`}
+                                        title={
+                                          !isReadyInBranch
+                                            ? "Primero selecciona el botón azul 'Marcar Listo' para confirmar que el pedido llegó a sucursal"
+                                            : !isFullyPaid
+                                            ? "Primero liquida el saldo pendiente para entregar"
+                                            : "Marcar como entregado (se archivará en el historial de pedidos)"
+                                        }
+                                      >
+                                        <CheckCircle2 className="w-3.5 h-3.5" />
+                                        <span>Entregar</span>
+                                      </button>
                                       {/* 1. Botón Detalles Completos */}
                                       <button
                                         type="button"
