@@ -3,6 +3,7 @@ import { CustomOrder, OrderItem, OrderPayment, CashIncome, Sale } from "@/types"
 import { formatCurrency, formatDateTimeSafe, parseDateTimeSafe, getStoredShiftStartBoundary, resolveBranchId, formatTime24 } from "@/lib/utils";
 import { realtimeHub } from "@/lib/realtime/realtimeHub";
 import { createClient } from "@/lib/supabase/client";
+import { enqueueSyncItem, markRecordIdsAsSynced } from "@/lib/sync/syncService";
 
 export const STORAGE_ORDERS_KEY = "brito_custom_orders";
 
@@ -161,10 +162,65 @@ export function extractOrderOriginAndNotes(order?: Partial<CustomOrder> | { note
   };
 }
 
-export async function persistOrderToSupabase(order: CustomOrder): Promise<void> {
+export function enqueueOrderOffline(order: CustomOrder) {
   if (typeof window === "undefined" || !order) return;
+  try {
+    enqueueSyncItem({
+      type: "order",
+      title: `Pedido ${order.orderNumber} - ${order.customerName}`,
+      amount: order.deposit || order.total,
+      branchId: order.branchId,
+      data: order,
+    });
+  } catch (e) {
+    console.warn("[Orders] Error encolando pedido offline:", e);
+  }
+}
+
+export function broadcastOrderCreatedNotification(newOrder: CustomOrder) {
+  if (typeof window === "undefined" || !realtimeHub?.broadcastNotification) return;
+  const remaining = newOrder.remainingBalance || 0;
+  const isCross = Boolean(
+    newOrder.operatingBranchName &&
+    newOrder.branchName &&
+    newOrder.operatingBranchName.toLowerCase().trim() !== newOrder.branchName.toLowerCase().trim()
+  );
+  const branchSender = isCross
+    ? `🎂 ${newOrder.operatingBranchName} ➔ ${newOrder.branchName}`
+    : `🎂 Pedido Registrado (${newOrder.branchName || "Sucursal"})`;
+
+  const notifPayload = {
+    id: `notif-order-${newOrder.id}`,
+    senderName: branchSender,
+    senderAvatar: "🎂",
+    badgeIcon: "pastel" as const,
+    title: `Nuevo Pedido ${newOrder.orderNumber}: Total ${formatCurrency(newOrder.total)}`,
+    highlightText: `${newOrder.customerName} • Anticipo: ${formatCurrency(newOrder.deposit)}${remaining > 0 ? ` (Resta: ${formatCurrency(remaining)})` : " (Liquidado)"}`,
+    description: `${newOrder.description ? `${newOrder.description}. ` : ""}${isCross ? `[Levantado en: ${newOrder.operatingBranchName} • Entrega en: ${newOrder.branchName}] ` : `Recoge en: ${newOrder.branchName}. `}Entrega: ${newOrder.deliveryDate} a las ${newOrder.deliveryTime} hrs. Saldo restante: ${formatCurrency(remaining)}.`,
+    timeAgo: formatNotificationHour(newOrder.timestamp),
+    timestamp: newOrder.timestamp || Date.now(),
+    group: "recientes" as const,
+    read: false,
+    category: "pedidos" as const,
+    orderId: newOrder.id,
+    branchId: newOrder.branchId,
+    branchName: newOrder.branchName,
+    operatingBranchId: newOrder.operatingBranchId,
+    operatingBranchName: newOrder.operatingBranchName,
+    actionLabel: remaining > 0 ? `Cobrar ${formatCurrency(remaining)}` : "Ver Detalle",
+    actionLink: "/pedidos",
+    secondaryActionLabel: remaining > 0 ? "Ver Detalle" : undefined,
+    secondaryActionLink: remaining > 0 ? "/pedidos" : undefined,
+    orderData: newOrder,
+  };
+
+  realtimeHub.broadcastNotification(notifPayload);
+}
+
+export async function persistOrderToSupabase(order: CustomOrder): Promise<boolean> {
+  if (typeof window === "undefined" || !order) return false;
   const orderTs = order.timestamp ? Number(order.timestamp) : parseDateTimeSafe(order.createdAt);
-  if (orderTs < CLEAN_SLATE_EPOCH) return;
+  if (orderTs < CLEAN_SLATE_EPOCH) return false;
   try {
     const supabase = createClient();
     const payload = orderToSupabasePayload(order);
@@ -179,12 +235,18 @@ export async function persistOrderToSupabase(order: CustomOrder): Promise<void> 
       error = retry.error;
     }
     if (error) {
-      console.warn("[OrdersSupabase] Error al guardar pedido en Supabase:", error);
+      console.warn("[OrdersSupabase] Error al guardar pedido en Supabase, encolando offline:", error);
+      enqueueOrderOffline(order);
+      return false;
     } else {
       console.log("[OrdersSupabase] Pedido guardado exitosamente en Supabase:", payload.order_number);
+      if (order.id) markRecordIdsAsSynced([order.id]);
+      return true;
     }
   } catch (err) {
-    console.warn("[OrdersSupabase] Excepción guardando pedido en Supabase:", err);
+    console.warn("[OrdersSupabase] Excepción guardando pedido en Supabase (Modo Offline activo):", err);
+    enqueueOrderOffline(order);
+    return false;
   }
 }
 
@@ -196,11 +258,12 @@ export async function persistOrderPaymentMovementToSupabase(params: {
   cashier: string;
   branchId?: string;
   isLiquidation?: boolean;
-}): Promise<void> {
-  if (typeof window === "undefined" || params.amount <= 0) return;
+}): Promise<boolean> {
+  if (typeof window === "undefined" || params.amount <= 0) return false;
+  const movId = `ING-${Date.now().toString().slice(-6)}-${Math.floor(1000 + Math.random() * 9000)}`;
+  const effBranch = resolveBranchId(params.branchId, params.cashier);
   try {
     const supabase = createClient();
-    const movId = `ING-${Date.now().toString().slice(-6)}-${Math.floor(1000 + Math.random() * 9000)}`;
     const { error } = await supabase.from("cash_movements").insert({
       id: movId,
       type: "entrada",
@@ -209,13 +272,58 @@ export async function persistOrderPaymentMovementToSupabase(params: {
       amount: params.amount,
       reason: `${params.isLiquidation ? "Liquidación final" : "Anticipo"} pedido ${params.orderNumber} - ${params.customerName}`,
       authorized_by: params.cashier || "Cajero",
-      branch_id: resolveBranchId(params.branchId, params.cashier),
+      branch_id: effBranch,
     });
     if (error) {
-      console.warn("[OrdersSupabase] Error registrando movimiento de dinero en Supabase:", error);
+      console.warn("[OrdersSupabase] Error registrando movimiento de dinero en Supabase, encolando offline:", error);
+      enqueueSyncItem({
+        type: "income",
+        title: `${params.isLiquidation ? "Liquidación" : "Anticipo"} pedido ${params.orderNumber} (${params.customerName})`,
+        amount: params.amount,
+        branchId: effBranch,
+        data: {
+          id: movId,
+          type: "entrada",
+          category: "abono_pedido",
+          category_label: params.isLiquidation ? "Liquidación de Pedido Especial" : "Anticipo de Pedido Especial",
+          amount: params.amount,
+          concept: `${params.isLiquidation ? "Liquidación final" : "Anticipo"} pedido ${params.orderNumber} - ${params.customerName}`,
+          authorized_by: params.cashier || "Cajero",
+          cashier: params.cashier || "Cajero",
+          branchId: effBranch,
+          orderId: params.orderId,
+          orderNumber: params.orderNumber,
+        },
+      });
+      return false;
+    } else {
+      markRecordIdsAsSynced([movId]);
+      return true;
     }
   } catch (err) {
-    console.warn("[OrdersSupabase] Excepción registrando movimiento en Supabase:", err);
+    console.warn("[OrdersSupabase] Excepción registrando movimiento en Supabase (Modo Offline):", err);
+    try {
+      enqueueSyncItem({
+        type: "income",
+        title: `${params.isLiquidation ? "Liquidación" : "Anticipo"} pedido ${params.orderNumber} (${params.customerName})`,
+        amount: params.amount,
+        branchId: effBranch,
+        data: {
+          id: movId,
+          type: "entrada",
+          category: "abono_pedido",
+          category_label: params.isLiquidation ? "Liquidación de Pedido Especial" : "Anticipo de Pedido Especial",
+          amount: params.amount,
+          concept: `${params.isLiquidation ? "Liquidación final" : "Anticipo"} pedido ${params.orderNumber} - ${params.customerName}`,
+          authorized_by: params.cashier || "Cajero",
+          cashier: params.cashier || "Cajero",
+          branchId: effBranch,
+          orderId: params.orderId,
+          orderNumber: params.orderNumber,
+        },
+      });
+    } catch {}
+    return false;
   }
 }
 
@@ -824,13 +932,13 @@ export async function syncOrdersWithServer(): Promise<CustomOrder[]> {
       const isLocallyMutated = hasRecentOrderLocalMutation(ord);
 
       if (!existing) {
-        // Solo subir si acaba de ser creado localmente o si Supabase no respondió
-        if (!fetchedFromSupabase || isLocallyMutated || Date.now() - localTs <= 60000) {
-          if (ord.id) ordersMap.set(ord.id, ord);
-          if (ord.orderNumber) ordersMap.set(ord.orderNumber, ord);
-          hasLocalChangesToPush = true;
-          pendingPushList.push(ord);
-        }
+        // Pedido local que aún no existe en el servidor:
+        // JAMÁS debe descartarse ni borrarse del almacenamiento local.
+        // Se preserva en el mapa y se añade a la lista pendiente de subir a Supabase y al servidor.
+        if (ord.id) ordersMap.set(ord.id, ord);
+        if (ord.orderNumber) ordersMap.set(ord.orderNumber, ord);
+        hasLocalChangesToPush = true;
+        pendingPushList.push(ord);
       } else {
         const { winner, shouldPushLocal } = reconcileOrderPair(existing, ord, isLocallyMutated);
         if (winner.id) ordersMap.set(winner.id, winner);
@@ -872,8 +980,30 @@ export async function syncOrdersWithServer(): Promise<CustomOrder[]> {
         try {
           const supabase = createClient();
           const payloads = validPending.map(orderToSupabasePayload);
-          supabase.from("custom_orders").upsert(payloads, { onConflict: "id" }).then(() => {});
+          supabase.from("custom_orders").upsert(payloads, { onConflict: "id" }).then(({ error }) => {
+            if (!error) {
+              markRecordIdsAsSynced(validPending.map((p) => p.id));
+            }
+          });
         } catch {}
+
+        for (const p of validPending) {
+          if (p.deposit > 0) {
+            persistOrderPaymentMovementToSupabase({
+              amount: p.deposit,
+              orderNumber: p.orderNumber,
+              orderId: p.id,
+              customerName: p.customerName,
+              cashier: p.cashier,
+              branchId: p.operatingBranchId || p.branchId,
+              isLiquidation: p.remainingBalance === 0,
+            });
+          }
+          if (realtimeHub?.broadcastOrder) {
+            realtimeHub.broadcastOrder("create", p);
+          }
+          broadcastOrderCreatedNotification(p);
+        }
 
         fetch("/api/orders", {
           method: "POST",
@@ -1268,44 +1398,7 @@ export function addCustomOrder(data: {
     if (realtimeHub?.broadcastOrder) {
       realtimeHub.broadcastOrder("create", newOrder);
     }
-    if (realtimeHub?.broadcastNotification) {
-      const remaining = newOrder.remainingBalance || 0;
-      const isCross = Boolean(
-        newOrder.operatingBranchName &&
-        newOrder.branchName &&
-        newOrder.operatingBranchName.toLowerCase().trim() !== newOrder.branchName.toLowerCase().trim()
-      );
-      const branchSender = isCross
-        ? `🎂 ${newOrder.operatingBranchName} ➔ ${newOrder.branchName}`
-        : `🎂 Pedido Registrado (${newOrder.branchName || "Sucursal"})`;
-
-      const notifPayload = {
-        id: `notif-order-${newOrder.id}`,
-        senderName: branchSender,
-        senderAvatar: "🎂",
-        badgeIcon: "pastel" as const,
-        title: `Nuevo Pedido ${newOrder.orderNumber}: Total ${formatCurrency(newOrder.total)}`,
-        highlightText: `${newOrder.customerName} • Anticipo: ${formatCurrency(newOrder.deposit)}${remaining > 0 ? ` (Resta: ${formatCurrency(remaining)})` : " (Liquidado)"}`,
-        description: `${newOrder.description ? `${newOrder.description}. ` : ""}${isCross ? `[Levantado en: ${newOrder.operatingBranchName} • Entrega en: ${newOrder.branchName}] ` : `Recoge en: ${newOrder.branchName}. `}Entrega: ${newOrder.deliveryDate} a las ${newOrder.deliveryTime} hrs. Saldo restante: ${formatCurrency(remaining)}.`,
-        timeAgo: formatNotificationHour(newOrder.timestamp),
-        timestamp: newOrder.timestamp || Date.now(),
-        group: "recientes" as const,
-        read: false,
-        category: "pedidos" as const,
-        orderId: newOrder.id,
-        branchId: newOrder.branchId,
-        branchName: newOrder.branchName,
-        operatingBranchId: newOrder.operatingBranchId,
-        operatingBranchName: newOrder.operatingBranchName,
-        actionLabel: remaining > 0 ? `Cobrar ${formatCurrency(remaining)}` : "Ver Detalle",
-        actionLink: "/pedidos",
-        secondaryActionLabel: remaining > 0 ? "Ver Detalle" : undefined,
-        secondaryActionLink: remaining > 0 ? "/pedidos" : undefined,
-        orderData: newOrder,
-      };
-
-      realtimeHub.broadcastNotification(notifPayload);
-    }
+    broadcastOrderCreatedNotification(newOrder);
   }
 
   return newOrder;

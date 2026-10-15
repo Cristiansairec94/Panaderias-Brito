@@ -32,8 +32,9 @@ import {
   FileText
 } from "lucide-react";
 import { Product, Sale, CashExpense, CashIncome, ShiftCutRecord, CustomOrder } from "@/types";
-import { formatCurrency, onlyNumbersKeyDown, cleanDecimalNumbers, formatDateTimeSafe, parseDateTimeSafe, matchesCashier, getStoredShiftStartBoundary, resolveBranchId } from "@/lib/utils";
+import { formatCurrency, onlyNumbersKeyDown, cleanDecimalNumbers, formatDateTimeSafe, parseDateTimeSafe, matchesCashier, getStoredShiftStartBoundary, resolveBranchId, isOrderSale } from "@/lib/utils";
 import { getStoredOrders, syncOrdersWithServer, normalizeOrder, getOrderShiftCollection } from "@/lib/orders";
+import { getShiftFinancialSummary, resolveShiftInitialFund } from "@/lib/shiftCalculations";
 import { useNotifications, FBNotification } from "@/context/NotificationContext";
 import { useBranch } from "@/context/BranchContext";
 import { useAuth } from "@/context/AuthContext";
@@ -97,37 +98,16 @@ export default function CashDrawerShiftModal({
   branchCashInDrawer,
 }: CashDrawerShiftModalProps) {
   const { addNotification } = useNotifications();
-  const { currentBranch, branches, updateBranch } = useBranch();
+  const { currentBranch, branches, updateBranch, cashMovements } = useBranch();
   const { user, usersList } = useAuth();
 
   // Fondo Inicial Sincronizado en tiempo real
-  const targetBranchId = resolveBranchId(branchId || currentBranch?.id, cashierName);
+  const targetBranch = (branchId ? branches.find((b) => b.id === branchId) : null) || currentBranch || branches[0];
+  const targetBranchId = resolveBranchId(targetBranch?.id || branchId, cashierName);
   const standardBranchFund = targetBranchId === "branch-benito" ? 800 : targetBranchId === "branch-flores" ? 1200 : 1000;
 
   const [syncedFund, setSyncedFund] = useState<number>(() => {
-    if (currentBranch?.lastCut?.nextFund !== undefined && currentBranch?.lastCut?.nextFund !== null) {
-      const f = Number(currentBranch.lastCut.nextFund);
-      if (f > 0 && !(targetBranchId === "branch-matriz" && f === 800)) return f;
-    }
-    if (currentBranch?.currentShift?.initialFund !== undefined && currentBranch?.currentShift?.initialFund !== null) {
-      const f = Number(currentBranch.currentShift.initialFund);
-      if (f > 0 && !(targetBranchId === "branch-matriz" && f === 800)) return f;
-    }
-    if (typeof window !== "undefined") {
-      const branchSaved = localStorage.getItem(`brito_pos_initial_fund_${targetBranchId}`);
-      if (branchSaved !== null && !isNaN(Number(branchSaved)) && Number(branchSaved) > 0) {
-        const num = Number(branchSaved);
-        if (!(targetBranchId === "branch-matriz" && num === 800)) return num;
-      }
-      if (targetBranchId === "branch-matriz") {
-        const saved = localStorage.getItem("brito_pos_initial_fund");
-        if (saved !== null && !isNaN(Number(saved)) && Number(saved) > 0 && Number(saved) !== 800) return Number(saved);
-      }
-    }
-    if (typeof initialFund === "number" && initialFund > 0 && !(targetBranchId === "branch-matriz" && initialFund === 800)) {
-      return initialFund;
-    }
-    return standardBranchFund;
+    return resolveShiftInitialFund(targetBranchId, targetBranch, initialFund);
   });
 
   // Limpieza defensiva en localStorage para asegurar que ningún abono de pedido o 6000 fantasma contamine las entradas
@@ -417,155 +397,60 @@ export default function CashDrawerShiftModal({
 
   if (!isOpen) return null;
 
-  // Límite temporal estricto del turno actual (timestamp en ms con soporte por sucursal)
+  // Límite temporal estricto del turno actual (timestamp en ms con soporte por sucursal, mínimo 00:00:00 de hoy)
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+  const todayStartTs = todayStart.getTime();
   const activeCutTs = parseDateTimeSafe(currentBranch?.lastCut?.timestamp || currentBranch?.lastCut?.date);
-  const validLastCut = (lastCutTimestamp && lastCutTimestamp >= CLEAN_SLATE_EPOCH && lastCutTimestamp <= Date.now()) 
+  const validLastCut = (lastCutTimestamp && lastCutTimestamp >= todayStartTs && lastCutTimestamp <= Date.now()) 
     ? lastCutTimestamp 
-    : (activeCutTs >= CLEAN_SLATE_EPOCH && activeCutTs <= Date.now() ? activeCutTs : 0);
-  const shiftStartBoundary = Math.max(CLEAN_SLATE_EPOCH, validLastCut, getStoredShiftStartBoundary(effectiveBranchId || currentBranch?.id));
-  const targetBranchForOrders = effectiveBranchId && effectiveBranchId !== "all" ? effectiveBranchId : undefined;
+    : (activeCutTs >= todayStartTs && activeCutTs <= Date.now() ? activeCutTs : 0);
+  const shiftStartBoundary = Math.max(todayStartTs, validLastCut, getStoredShiftStartBoundary(effectiveBranchId || currentBranch?.id));
 
-  // 1. Cálculos de Ventas del Turno (todas las ventas de mostrador del turno en esta sucursal)
-  const shiftSales = (sales || []).filter((s) => {
-    if (!s) return false;
-    const sId = String(s.id || "");
-    if (/^pos-\d{10,}$/i.test(sId) || sId.startsWith("LIQ-") || sId.startsWith("PED-") || s.isCustomOrder) return false;
-    const sBranch = resolveBranchId((s as any).branchId || (s as any).branch_id, s.cashier);
-    if (effectiveBranchId && effectiveBranchId !== "all") {
-      if (sBranch !== effectiveBranchId) return false;
-    } else {
-      const belongsToBranchStaff = branchUsers.some((u) => s.cashier && matchesCashier(s.cashier, u.name));
-      if (outgoingCashier && s.cashier && !matchesCashier(s.cashier, outgoingCashier) && !belongsToBranchStaff) {
-        return false;
-      }
-    }
-    const sTime = parseDateTimeSafe(s.timestamp || s.createdAt || s.date);
-    if (!sTime || sTime < CLEAN_SLATE_EPOCH) return false;
-    if (shiftStartBoundary > 0) {
-      if (!sTime || sTime <= shiftStartBoundary) return false;
-    }
-    if (sTime > Date.now() + 60000) return false;
-    return true;
-  });
-  const effectiveSales = shiftSales;
 
-  // Unificar pedidos pasados por props con los sincronizados de localStorage y Supabase
-  const allOrdersPool = (() => {
-    const map = new Map<string, CustomOrder>();
-    (syncedOrders || []).forEach((o) => {
-      if (!o) return;
-      const norm = normalizeOrder(o);
-      const key = norm.orderNumber || norm.id;
-      if (key) map.set(key, norm);
+
+  // ─── Balance Financiero Canónico de Turno (Gemelo de Movimientos de Caja) ───────
+  const shiftFinancialSummary = useMemo(() => {
+    return getShiftFinancialSummary({
+      branchId: targetBranchId,
+      branch: targetBranch,
+      branches,
+      cashierName: outgoingCashier || cashierName,
+      shiftStartBoundary,
+      sales,
+      orders: syncedOrders && syncedOrders.length > 0 ? syncedOrders : orders,
+      expenses,
+      incomes,
+      cashMovements,
+      initialFund,
+      branchCashInDrawer,
     });
-    (orders || []).forEach((o) => {
-      if (!o) return;
-      const norm = normalizeOrder(o);
-      const key = norm.orderNumber || norm.id;
-      if (key && !map.has(key)) map.set(key, norm);
-    });
-    return Array.from(map.values());
-  })();
+  }, [targetBranchId, targetBranch, branches, outgoingCashier, cashierName, shiftStartBoundary, sales, syncedOrders, orders, expenses, incomes, cashMovements, initialFund, branchCashInDrawer]);
 
-  // Pedidos especiales del turno (anticipos y liquidaciones de pedidos cobrados estrictamente en este turno y sucursal)
-  const shiftOrders = allOrdersPool.filter((o) => {
-    if (!o || o.status === "cancelado") return false;
-    const col = getOrderShiftCollection(o, shiftStartBoundary, targetBranchForOrders);
-    return col.isInShift;
-  });
-
-  const ordersCash = shiftOrders.reduce(
-    (sum, o) => sum + getOrderShiftCollection(o, shiftStartBoundary, targetBranchForOrders).collectedCash,
-    0
-  );
-
-  // Ventas de mostrador y pedidos basadas prioritariamente en la sucursal activa (barra café)
-  const targetBranch = (branchId ? branches.find((b) => b.id === branchId) : null) || currentBranch || branches[0];
-  const branchDeskSales = Number(targetBranch?.todayDeskSales ?? (targetBranch?.todaySales && (targetBranch?.todayOrdersDeposit ?? 0) === 0 ? targetBranch.todaySales : 0));
-  const branchOrdersDeposit = Number(targetBranch?.todayOrdersDeposit ?? 0);
-
-  const calculatedPurePosCash = effectiveSales
-    .filter((s) => s.paymentMethod === "efectivo" && !s.isCustomOrder && !String(s.id || "").startsWith("PED-") && !String(s.id || "").startsWith("LIQ-") && !/^pos-\d{10,}$/i.test(String(s.id || "")))
-    .reduce((sum, s) => sum + s.total, 0);
-  const rawPurePosCash = branchDeskSales > 0 && calculatedPurePosCash === 0 ? branchDeskSales : calculatedPurePosCash > 0 ? calculatedPurePosCash : branchDeskSales;
-
-  const totalOrdersCash = ordersCash > 0 ? ordersCash : (branchOrdersDeposit > 0 ? branchOrdersDeposit : 0);
-  const rawPosCash = rawPurePosCash + totalOrdersCash;
-
-  const standardFund = targetBranch?.id === "branch-benito" ? 800 : targetBranch?.id === "branch-flores" ? 1200 : 1000;
-  const effectiveInitialFund = targetBranch?.currentShift?.initialFund !== undefined && targetBranch?.currentShift?.initialFund !== null
-    ? Number(targetBranch.currentShift.initialFund)
-    : (targetBranch?.lastCut?.nextFund !== undefined && targetBranch?.lastCut?.nextFund !== null
-        ? Number(targetBranch.lastCut.nextFund)
-        : (syncedFund || standardFund));
-
-  // 2. Cálculos de Gastos y Entradas del Turno (incluyendo retiros de dueño tomados del cajón)
-  const shiftExpenses = (expenses || []).filter((e) => {
-    if (!e) return false;
-    if (e.id && (e.id.includes("354644") || e.id.includes("299599") || e.id.includes("334972") || e.amount > 500000)) return false;
-    if (targetBranch && targetBranch.id && targetBranch.id !== "all") {
-      const eBranch = resolveBranchId((e as any).branchId || (e as any).branch_id, e.cashier);
-      if (eBranch !== targetBranch.id) return false;
-    } else {
-      const isOwnerOrAdmin = e.isOwner || e.category === "retiro_dueno" || outgoingCashier.toLowerCase().includes("don toño") || outgoingCashier.toLowerCase().includes("admin") || (e.cashier && (e.cashier.toLowerCase().includes("don toño") || e.cashier.toLowerCase().includes("admin")));
-      if (!isOwnerOrAdmin && (!e.cashier || !matchesCashier(e.cashier, outgoingCashier))) return false;
-    }
-    const expTime = parseDateTimeSafe(e.timestamp || e.createdAt || e.date);
-    if (!expTime || expTime < CLEAN_SLATE_EPOCH) return false;
-    if (shiftStartBoundary > 0 && expTime && expTime <= shiftStartBoundary) return false;
-    return true;
-  });
-  const totalExpenses = shiftExpenses.reduce((sum, e) => sum + e.amount, 0);
-
-  const shiftIncomes = (incomes || []).filter((inc) => {
-    if (!inc) return false;
-    if (inc.id && (inc.id.includes("012599") || inc.id.includes("331037") || inc.amount > 500000)) return false;
-    if (inc.category === "abono_pedido" || inc.category === "pedido" || (inc as any).orderId) return false;
-    const cLower = (inc.concept || "").toLowerCase();
-    if (cLower.includes("pedido") || cLower.includes("abono") || cLower.includes("anticipo") || cLower.includes("liquidaci") || (inc.id && String(inc.id).startsWith("order-"))) return false;
-    if (Number(inc.amount) === 6000) return false; // Duplicado fantasma de pedido de 6000
-
-    if (targetBranch && targetBranch.id && targetBranch.id !== "all") {
-      const incBranch = resolveBranchId((inc as any).branchId || (inc as any).branch_id, inc.cashier);
-      if (incBranch !== targetBranch.id) return false;
-    } else {
-      const isOwnerOrAdmin = outgoingCashier.toLowerCase().includes("don toño") || outgoingCashier.toLowerCase().includes("admin") || (inc.cashier && (inc.cashier.toLowerCase().includes("don toño") || inc.cashier.toLowerCase().includes("admin")));
-      if (!isOwnerOrAdmin && (!inc.cashier || !matchesCashier(inc.cashier, outgoingCashier))) return false;
-    }
-    const incTime = parseDateTimeSafe(inc.timestamp || inc.date || (inc as any).createdAt);
-    if (!incTime || incTime < CLEAN_SLATE_EPOCH) return false;
-    if (shiftStartBoundary > 0 && incTime && incTime <= shiftStartBoundary) return false;
-    return true;
-  });
-  const totalIncomesInCash = shiftIncomes
-    .filter((i) => {
-      if (!i) return false;
-      if (i.paymentMethod && i.paymentMethod !== "efectivo") return false;
-      if (i.category === "abono_pedido" || i.category === "pedido" || (i as any).orderId) return false;
-      const cLower = (i.concept || "").toLowerCase();
-      if (cLower.includes("pedido") || cLower.includes("abono") || cLower.includes("anticipo") || cLower.includes("liquidaci") || (i.id && String(i.id).startsWith("order-"))) return false;
-      if (Number(i.amount) === 6000) return false;
-      return typeof i.amount === "number" && i.amount > 0 && i.amount !== 902095.5;
-    })
-    .reduce((sum, i) => sum + i.amount, 0);
-
-  // 3. Dinero esperado en caja (Cajón: Fondo Inicial + Ventas Efectivo + Pedidos Efectivo + Entradas Efectivo - Gastos Efectivo)
-  const rawCalculatedExpectedCash = Math.max(0, effectiveInitialFund + rawPosCash + totalIncomesInCash - totalExpenses);
-  const expectedCashInDrawer = rawCalculatedExpectedCash;
+  const effectiveInitialFund = shiftFinancialSummary.initialFund;
+  const purePosCash = shiftFinancialSummary.purePosSalesCash;
+  const totalOrdersCash = shiftFinancialSummary.ordersCash;
+  const rawPosCash = shiftFinancialSummary.totalCashSales;
   const posCash = rawPosCash;
-  const purePosCash = rawPurePosCash;
-
   const cashSales = posCash;
+  const totalExpenses = shiftFinancialSummary.totalExpenses;
+  const totalIncomesInCash = shiftFinancialSummary.totalIncomesInCash;
+  const expectedCashInDrawer = shiftFinancialSummary.netCashInDrawer;
+  const effectiveSales = shiftFinancialSummary.effectiveSales;
+  const shiftOrders = shiftFinancialSummary.effectiveOrders;
+  const shiftExpenses = shiftFinancialSummary.effectiveExpenses;
+  const shiftIncomes = shiftFinancialSummary.effectiveIncomes;
+
   const cardSales =
     effectiveSales
-      .filter((s) => s.paymentMethod === "tarjeta" && !s.isCustomOrder && !String(s.id || "").startsWith("PED-") && !String(s.id || "").startsWith("LIQ-") && !/^pos-\d{10,}$/i.test(String(s.id || "")))
+      .filter((s) => s.paymentMethod === "tarjeta" && !isOrderSale(s))
       .reduce((sum, s) => sum + s.total, 0) +
-    shiftOrders.reduce((sum, o) => sum + getOrderShiftCollection(o, shiftStartBoundary, targetBranchForOrders).collectedCard, 0);
+    shiftOrders.reduce((sum, o) => sum + getOrderShiftCollection(o, shiftStartBoundary, targetBranchId).collectedCard, 0);
   const transferSales =
     effectiveSales
-      .filter((s) => s.paymentMethod === "transferencia" && !s.isCustomOrder && !String(s.id || "").startsWith("PED-") && !String(s.id || "").startsWith("LIQ-") && !/^pos-\d{10,}$/i.test(String(s.id || "")))
+      .filter((s) => s.paymentMethod === "transferencia" && !isOrderSale(s))
       .reduce((sum, s) => sum + s.total, 0) +
-    shiftOrders.reduce((sum, o) => sum + getOrderShiftCollection(o, shiftStartBoundary, targetBranchForOrders).collectedTransfer, 0);
+    shiftOrders.reduce((sum, o) => sum + getOrderShiftCollection(o, shiftStartBoundary, targetBranchId).collectedTransfer, 0);
   const totalSalesAll = cashSales + cardSales + transferSales;
 
   // 4. Conteo y Diferencia (Arqueo)
@@ -1210,12 +1095,12 @@ export default function CashDrawerShiftModal({
                 /* Formulario Directo de Arqueo y Relevo */
                 <div className="space-y-3.5">
                   {/* 1. Resumen Financiero del Turno (coincide con Movimientos de Caja) */}
-                  <div className={`grid grid-cols-2 ${totalIncomesInCash > 0 ? "sm:grid-cols-6" : "sm:grid-cols-5"} gap-2.5 p-3.5 bg-gradient-to-br from-stone-50 to-amber-50/40 rounded-3xl border-2 border-stone-200/90 shadow-xs`}>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 p-3.5 bg-gradient-to-br from-stone-50 to-amber-50/40 rounded-3xl border-2 border-stone-200/90 shadow-xs">
                     <div
                       className="bg-white p-3 sm:p-4 rounded-2xl border border-stone-200/80 shadow-xs flex flex-col items-center justify-center text-center"
                     >
                       <span className="text-[11px] sm:text-xs text-stone-500 font-black block uppercase tracking-wider">Fondo Inicial</span>
-                      <span className="text-xl sm:text-2xl font-black text-stone-900 mt-0.5 block">{formatCurrency(syncedFund)}</span>
+                      <span className="text-xl sm:text-2xl font-black text-stone-900 mt-0.5 block">{formatCurrency(effectiveInitialFund)}</span>
                     </div>
                     <button
                       type="button"
@@ -1241,20 +1126,18 @@ export default function CashDrawerShiftModal({
                         👁️ Ver pedidos
                       </span>
                     </button>
-                    {totalIncomesInCash > 0 && (
-                      <button
-                        type="button"
-                        onClick={() => setModalView("history")}
-                        className="bg-white p-3 sm:p-4 rounded-2xl border border-teal-200/80 shadow-xs transition-transform hover:scale-105 duration-200 flex flex-col items-center justify-center text-center cursor-pointer"
-                        title="Ver historial de entradas de cambio"
-                      >
-                        <span className="text-[11px] sm:text-xs text-teal-700 font-black block uppercase tracking-wider">(+) Entradas</span>
-                        <span className="text-xl sm:text-2xl font-black text-teal-700 mt-0.5 block">+{formatCurrency(totalIncomesInCash)}</span>
-                        <span className="text-[11px] sm:text-xs font-black text-teal-800 bg-teal-100/90 border border-teal-200/80 px-2 py-0.5 rounded-full mt-1.5 inline-flex items-center gap-1 shadow-2xs">
-                          👁️ Ver historial
-                        </span>
-                      </button>
-                    )}
+                    <button
+                      type="button"
+                      onClick={() => setModalView("history")}
+                      className="bg-white p-3 sm:p-4 rounded-2xl border border-teal-200/80 shadow-xs transition-transform hover:scale-105 duration-200 flex flex-col items-center justify-center text-center cursor-pointer"
+                      title="Ver historial de entradas de cambio"
+                    >
+                      <span className="text-[11px] sm:text-xs text-teal-700 font-black block uppercase tracking-wider">(+) Entradas</span>
+                      <span className="text-xl sm:text-2xl font-black text-teal-700 mt-0.5 block">+{formatCurrency(totalIncomesInCash)}</span>
+                      <span className="text-[11px] sm:text-xs font-black text-teal-800 bg-teal-100/90 border border-teal-200/80 px-2 py-0.5 rounded-full mt-1.5 inline-flex items-center gap-1 shadow-2xs">
+                        👁️ Ver historial
+                      </span>
+                    </button>
                     <button
                       type="button"
                       onClick={() => setModalView("history")}
@@ -1274,7 +1157,7 @@ export default function CashDrawerShiftModal({
                       title="Ver historial de balance en caja"
                     >
                       <span className="text-[11px] sm:text-xs text-amber-950 font-black block uppercase tracking-wider">
-                        {cashSales === 0 && totalExpenses === 0 && totalIncomesInCash === 0 ? "En Caja (Fondo)" : "En Caja"}
+                        En Caja
                       </span>
                       <span className="text-2xl sm:text-3xl font-black text-amber-950 mt-0.5 block leading-none">{formatCurrency(expectedCashInDrawer)}</span>
                       <span className="text-[11px] sm:text-xs font-black text-amber-900 bg-amber-200/90 border border-amber-300 px-2 py-0.5 rounded-full mt-1.5 inline-flex items-center gap-1 shadow-2xs">
@@ -1365,7 +1248,7 @@ export default function CashDrawerShiftModal({
                           <span className="text-xl">💵</span> Dinero que debe haber en caja:
                         </span>
                         <span className="text-xs sm:text-sm text-stone-600 font-bold mt-0.5 block">
-                          Fondo: {formatCurrency(syncedFund)} • Ventas y Pedidos: {formatCurrency(cashSales)}{totalIncomesInCash > 0 ? ` • Entradas: +${formatCurrency(totalIncomesInCash)}` : ""} • Gastos: -{formatCurrency(totalExpenses)}
+                          Fondo: {formatCurrency(effectiveInitialFund)} • Ventas y Pedidos: {formatCurrency(cashSales)}{totalIncomesInCash > 0 ? ` • Entradas: +${formatCurrency(totalIncomesInCash)}` : ""} • Gastos: -{formatCurrency(totalExpenses)}
                         </span>
                       </div>
                       <span className="text-3xl sm:text-4xl font-black text-amber-950 bg-gradient-to-r from-amber-200 to-amber-300 px-5 py-2 rounded-2xl shadow-md border-2 border-amber-400">

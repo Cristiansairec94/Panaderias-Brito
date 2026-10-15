@@ -5,6 +5,7 @@ import { DEFAULT_GENERAL_CUSTOMER, getStoredCustomers, saveStoredCustomers } fro
 import { playSyncSuccessSound } from "@/lib/sound";
 import { CLEAN_SLATE_EPOCH } from "@/lib/wipeOperationalData";
 import { parseDateTimeSafe, isOrderSale } from "@/lib/utils";
+import { orderToSupabasePayload, persistOrderPaymentMovementToSupabase, broadcastOrderCreatedNotification } from "@/lib/orders";
 
 export const STORAGE_SYNC_QUEUE_KEY = "brito_offline_sync_queue";
 export const STORAGE_LAST_SYNC_KEY = "brito_last_sync_time";
@@ -336,6 +337,58 @@ export async function processSyncQueue(): Promise<{
       } else if (item.type === "cut") {
         archiveOfflineItem(item, "Corte de turno archivado en disco local");
         syncedCount++;
+      } else if (item.type === "order") {
+        const orderData = item.data;
+        if (orderData) {
+          const payload = orderToSupabasePayload(orderData);
+          let { error: ordErr } = await supabase.from("custom_orders").upsert(payload, { onConflict: "id" });
+          if (ordErr) {
+            const safePayload = { ...payload, customer_id: null };
+            if (payload.order_number) {
+              await supabase.from("custom_orders").delete().eq("order_number", payload.order_number).neq("id", payload.id);
+            }
+            const retry = await supabase.from("custom_orders").upsert(safePayload, { onConflict: "id" });
+            ordErr = retry.error;
+          }
+
+          if (ordErr && (ordErr.code === "PGRST205" || ordErr.message?.includes("schema cache"))) {
+            archiveOfflineItem(item, "Pedido archivado en disco local (Esquema Supabase en preparación)");
+            syncedCount++;
+            continue;
+          }
+
+          if (ordErr) throw new Error(ordErr.message);
+
+          if (orderData.deposit > 0) {
+            await persistOrderPaymentMovementToSupabase({
+              amount: Number(orderData.deposit),
+              orderNumber: orderData.orderNumber || payload.order_number,
+              orderId: orderData.id || payload.id,
+              customerName: orderData.customerName || payload.customer_name,
+              cashier: orderData.cashier || payload.cashier,
+              branchId: orderData.operatingBranchId || payload.branch_id,
+              isLiquidation: orderData.remainingBalance === 0,
+            });
+          }
+
+          markRecordIdsAsSynced([orderData.id || payload.id]);
+
+          if (typeof window !== "undefined") {
+            try {
+              const { realtimeHub } = await import("@/lib/realtime/realtimeHub");
+              if (realtimeHub?.broadcastOrder) {
+                realtimeHub.broadcastOrder("create", orderData);
+              }
+            } catch {}
+            broadcastOrderCreatedNotification(orderData);
+            fetch("/api/orders", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ order: orderData }),
+            }).catch(() => {});
+          }
+        }
+        syncedCount++;
       } else {
         syncedCount++;
       }
@@ -641,7 +694,7 @@ export async function syncAllLocalDataToSupabase(): Promise<{
 
     const unsyncedIncomes = Array.from(incomesMap.values()).filter((i) => {
       if (!i.id || i.id.includes("ING-ING") || syncedIds.has(i.id)) return false;
-      if (i.category === "venta_mostrador" || i.category === "abono_pedido" || i.category === "pedido" || i.orderId || i.saleId) return false;
+      if (i.category === "venta_mostrador") return false;
       const iTs = parseDateTimeSafe(i.timestamp || i.createdAt || i.date);
       return iTs >= CLEAN_SLATE_EPOCH;
     });
@@ -670,7 +723,7 @@ export async function syncAllLocalDataToSupabase(): Promise<{
     errors.push("Ingresos: " + e.message);
   }
 
-  // 5. Sincronizar Pedidos Especiales (en lote)
+  // 5. Sincronizar Pedidos Especiales (en lote y con payload enriquecido completo)
   try {
     const ordersMap = new Map<string, any>();
     const rawOrd1 = localStorage.getItem("brito_custom_orders");
@@ -689,28 +742,61 @@ export async function syncAllLocalDataToSupabase(): Promise<{
       const oTs = o.timestamp || (o.createdAt ? parseDateTimeSafe(o.createdAt) : 0);
       return oTs >= CLEAN_SLATE_EPOCH;
     });
+
     if (unsyncedOrders.length > 0) {
-      const ordPayload = unsyncedOrders.map((ord) => ({
-        id: ord.id,
-        order_number: ord.orderNumber || ord.id,
-        customer_name: ord.customerName || "Cliente",
-        phone: ord.phone || "N/A",
-        branch_id: ord.branchId || "branch-matriz",
-        branch_name: ord.branchName || "Sucursal Matriz",
-        description: ord.description || "Pedido de pastelería",
-        items: Array.isArray(ord.items) ? ord.items : [],
-        delivery_date: ord.deliveryDate || new Date().toISOString().split("T")[0],
-        delivery_time: ord.deliveryTime || "16:00",
-        status: ord.status || "pendiente",
-        total: Number(ord.total) || 0,
-        deposit: Number(ord.deposit) || 0,
-        remaining_balance: Number(ord.remainingBalance) || 0,
-        payment_status: ord.paymentStatus || "anticipo",
-        cashier: ord.cashier || "Don Toño Brito",
-      }));
-      await supabase.from("custom_orders").upsert(ordPayload, { onConflict: "id" });
-      ordersSynced = unsyncedOrders.length;
-      markRecordIdsAsSynced(unsyncedOrders.map((o) => o.id));
+      for (const ord of unsyncedOrders) {
+        try {
+          const payload = orderToSupabasePayload(ord);
+          let { error: ordErr } = await supabase.from("custom_orders").upsert(payload, { onConflict: "id" });
+          if (ordErr) {
+            const safePayload = { ...payload, customer_id: null };
+            if (payload.order_number) {
+              await supabase.from("custom_orders").delete().eq("order_number", payload.order_number).neq("id", payload.id);
+            }
+            const retry = await supabase.from("custom_orders").upsert(safePayload, { onConflict: "id" });
+            ordErr = retry.error;
+          }
+
+          if (!ordErr) {
+            ordersSynced++;
+            markRecordIdsAsSynced([ord.id]);
+
+            if (ord.deposit > 0) {
+              await persistOrderPaymentMovementToSupabase({
+                amount: Number(ord.deposit),
+                orderNumber: ord.orderNumber || payload.order_number,
+                orderId: ord.id || payload.id,
+                customerName: ord.customerName || payload.customer_name,
+                cashier: ord.cashier || payload.cashier,
+                branchId: ord.operatingBranchId || payload.branch_id,
+                isLiquidation: ord.remainingBalance === 0,
+              });
+            }
+
+            if (typeof window !== "undefined") {
+              try {
+                const { realtimeHub } = await import("@/lib/realtime/realtimeHub");
+                if (realtimeHub?.broadcastOrder) {
+                  realtimeHub.broadcastOrder("create", ord);
+                }
+              } catch {}
+              broadcastOrderCreatedNotification(ord);
+            }
+          } else {
+            errors.push("Pedido " + ord.orderNumber + ": " + ordErr.message);
+          }
+        } catch (singleErr: any) {
+          errors.push("Pedido " + ord.orderNumber + ": " + singleErr.message);
+        }
+      }
+
+      if (ordersSynced > 0 && typeof window !== "undefined") {
+        fetch("/api/orders", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ orders: unsyncedOrders }),
+        }).catch(() => {});
+      }
     }
   } catch (e: any) {
     errors.push("Pedidos: " + e.message);

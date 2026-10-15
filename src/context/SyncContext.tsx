@@ -25,6 +25,7 @@ import {
   printEmergencyContingencySheet,
 } from "@/lib/sync/syncService";
 import { playCashRegisterSound } from "@/lib/sound";
+import { syncOrdersWithServer } from "@/lib/orders";
 
 interface SyncContextType {
   isOnline: boolean;
@@ -109,10 +110,12 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
     setIsSyncing(true);
     try {
       const syncPromise = syncAllLocalDataToSupabase();
+      const ordersPromise = syncOrdersWithServer().catch(() => []);
       const timeoutPromise = new Promise<{ total: number; synced: number; failed: number; errors: string[] }>((resolve) =>
-        setTimeout(() => resolve({ total: 0, synced: 0, failed: 0, errors: ["Timeout de seguridad"] }), 5000)
+        setTimeout(() => resolve({ total: 0, synced: 0, failed: 0, errors: ["Timeout de seguridad"] }), 6000)
       );
       const res: any = await Promise.race([syncPromise, timeoutPromise]);
+      await ordersPromise;
       refreshQueueAndStats();
       const con = await checkRealOnlineStatus();
       setIsOnline(con.isOnline);
@@ -269,6 +272,16 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
       setConnectionDetail("Conexión a internet restablecida");
       await refreshConnection();
       await syncNow();
+      try {
+        await syncOrdersWithServer();
+      } catch (err) {
+        console.warn("[SyncContext] Error en syncOrdersWithServer al reconectar:", err);
+      }
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event("brito_orders_updated"));
+        window.dispatchEvent(new Event("brito_sales_updated"));
+        window.dispatchEvent(new Event("brito_caja_updated"));
+      }
     };
 
     const handleOfflineEvent = () => {
@@ -281,6 +294,7 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
       await refreshConnection();
       if (!checkSimulatedOffline()) {
         await syncNow();
+        syncOrdersWithServer().catch(() => {});
       }
     };
 
@@ -292,8 +306,12 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
     // Heartbeat cada 25 segundos para mantener estado en vivo
     const interval = setInterval(async () => {
       await refreshConnection();
-      if (getPendingSyncCount() > 0 && !checkSimulatedOffline()) {
-        await syncNow();
+      if (!checkSimulatedOffline()) {
+        if (getPendingSyncCount() > 0) {
+          await syncNow();
+        } else {
+          syncOrdersWithServer().catch(() => {});
+        }
       }
     }, 25000);
 
