@@ -5059,7 +5059,16 @@ export default function ExpensesModal({
           const message = `🥖 *PANADERÍA BRITO*\nHola *${order.customerName}*, te saludamos respecto a tu pedido *${order.orderNumber}*.`;
           window.open(`https://wa.me/${formattedPhone}?text=${encodeURIComponent(message)}`, "_blank");
         }}
-        onDarDeBaja={(order) => {
+        onDarDeBaja={(order, reason) => {
+          if (reason) {
+            setSelectedOrderDetail(null);
+            setOrdersVersion((v) => v + 1);
+            setInternalOrders(getStoredOrders().filter((o) => o && o.status !== "cancelado"));
+            if (typeof window !== "undefined") {
+              window.dispatchEvent(new Event("brito_orders_updated"));
+            }
+            return;
+          }
           const isCancelled = order.status === "cancelado";
           const confirmMsg = isCancelled
             ? `¿Estás seguro de ELIMINAR PERMANENTEMENTE el pedido ${order.orderNumber} de "${order.customerName}"?\n\nEsta acción borrará el pedido por completo del registro histórico y no se podrá recuperar.`

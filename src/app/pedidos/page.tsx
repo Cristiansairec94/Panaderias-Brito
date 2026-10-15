@@ -1263,15 +1263,46 @@ export default function PedidosPage() {
     }
   };
 
-  const handleDarDeBaja = (order: CustomOrder) => {
+  const handleDarDeBaja = (order: CustomOrder, confirmedReason?: string) => {
+    const totalNum = Number(order.total) || 0;
+    const baseItemsDesc = order.description ? `${order.description}. ` : "";
+
+    if (confirmedReason) {
+      loadOrders();
+      setSelectedOrderForDetail(null);
+      setClassificationFilter("historial");
+      setHistorialSubFilter("cancelados");
+      setTimeout(() => {
+        scrollToCatalog();
+      }, 120);
+
+      addNotification({
+        id: `notif-order-${order.id}`,
+        title: `Pedido Dado de Baja: ${order.orderNumber}${totalNum ? ` • Total $${totalNum.toFixed(2)}` : ""}`,
+        description: `${baseItemsDesc}El pedido ${order.orderNumber} de "${order.customerName}" se dio de baja (${confirmedReason}).`,
+        senderName: `🗑️ Pedido Dado de Baja (${order.branchName || "Sucursal"})`,
+        senderAvatar: "🗑️",
+        highlightText: `${order.customerName} • Dado de Baja (${confirmedReason})`,
+        category: "pedidos",
+        badgeIcon: "pastel",
+        orderId: order.id,
+        orderData: { ...order, status: "cancelado" },
+        branchId: order.branchId,
+        branchName: order.branchName,
+        operatingBranchId: order.operatingBranchId,
+        operatingBranchName: order.operatingBranchName,
+        actionLabel: "Ver Pedido Dado de Baja",
+        actionLink: "/pedidos",
+      });
+      return;
+    }
+
     const isPermanent = order.status === "cancelado";
     const confirmMsg = isPermanent
       ? `¿Estás seguro de ELIMINAR PERMANENTEMENTE el pedido ${order.orderNumber} de "${order.customerName}"?\n\nEsta acción borrará el pedido por completo del registro histórico y no se podrá recuperar.`
       : `¿Estás seguro de DAR DE BAJA el pedido ${order.orderNumber} de "${order.customerName}"?\n\nEl pedido se marcará como dado de baja y te mandaremos directo al historial de "Productos que se dieron de baja".`;
 
     if (confirm(confirmMsg)) {
-      const totalNum = Number(order.total) || 0;
-      const baseItemsDesc = order.description ? `${order.description}. ` : "";
       if (isPermanent) {
         deleteCustomOrder(order.id);
         loadOrders();
@@ -3677,8 +3708,13 @@ export default function PedidosPage() {
                             </div>
                           )}
                           {order.status === "cancelado" && (
-                            <div className="text-[10px] text-rose-700 font-bold flex items-center gap-1 mt-1 bg-rose-50 px-2 py-0.5 rounded-md border border-rose-200">
+                            <div className="text-[10px] text-rose-700 font-bold flex flex-col gap-0.5 mt-1 bg-rose-50 px-2 py-1 rounded-md border border-rose-200">
                               <span>✕ Dado de baja</span>
+                              {extractOrderOriginAndNotes(order).cancelReason && (
+                                <span className="text-[9px] text-rose-900 font-semibold leading-tight">
+                                  {extractOrderOriginAndNotes(order).cancelReason}
+                                </span>
+                              )}
                             </div>
                           )}
                         </td>
@@ -4140,8 +4176,8 @@ export default function PedidosPage() {
         onSendWhatsApp={(o) => {
           handleSendWhatsApp(o);
         }}
-        onDarDeBaja={isAdmin && selectedOrderForDetail?.status !== "entregado" ? (o) => {
-          handleDarDeBaja(o);
+        onDarDeBaja={selectedOrderForDetail?.status !== "entregado" ? (o, reason) => {
+          handleDarDeBaja(o, reason);
         } : undefined}
       />
 

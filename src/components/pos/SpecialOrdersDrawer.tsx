@@ -531,7 +531,12 @@ export default function SpecialOrdersDrawer({
             const updated = getStoredOrders().find((item) => item.id === o.id);
             if (updated) setSelectedOrderForDetail(updated);
           }}
-          onDarDeBaja={(o) => {
+          onDarDeBaja={(o, reason) => {
+            if (reason) {
+              setSelectedOrderForDetail(null);
+              loadOrders();
+              return;
+            }
             const isCancelled = o.status === "cancelado";
             const confirmMsg = isCancelled
               ? `¿Estás seguro de ELIMINAR PERMANENTEMENTE el pedido ${o.orderNumber} de "${o.customerName}"?\n\nEsta acción borrará el pedido por completo del registro histórico y no se podrá recuperar.`

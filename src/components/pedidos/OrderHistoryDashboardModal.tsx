@@ -32,6 +32,7 @@ import {
 } from "lucide-react";
 import { CustomOrder, Branch } from "@/types";
 import { formatCurrency, formatOrderCreation } from "@/lib/utils";
+import { extractOrderOriginAndNotes } from "@/lib/orders";
 
 interface OrderHistoryDashboardModalProps {
   isOpen: boolean;
@@ -430,10 +431,17 @@ export default function OrderHistoryDashboardModal({
                         ) : (
                           <span className="inline-flex items-center gap-1 text-[11px] font-black px-2.5 py-1 rounded-xl bg-red-600 text-white border border-red-700 shadow-xs">
                             <Trash2 className="w-3.5 h-3.5 text-red-100" />
-                            CANCELADO / DADO DE BAJA
+                            DADO DE BAJA
                           </span>
                         )}
                       </div>
+
+                      {isCancelled && extractOrderOriginAndNotes(order).cancelReason && (
+                        <div className="mb-2.5 bg-red-100/90 border border-red-300 rounded-xl px-2.5 py-1.5 text-[11px] font-bold text-red-950 flex items-center gap-1.5">
+                          <span>🚫</span>
+                          <span>Motivo: {extractOrderOriginAndNotes(order).cancelReason}</span>
+                        </div>
+                      )}
 
                       {/* Datos del Cliente y Teléfono */}
                       <div className="space-y-1 mb-3">
@@ -595,10 +603,17 @@ export default function OrderHistoryDashboardModal({
                                 Entregado
                               </span>
                             ) : (
-                              <span className="inline-flex items-center gap-1 text-[10px] font-black px-2 py-0.5 rounded-lg bg-rose-100 text-rose-800">
-                                <Trash2 className="w-3 h-3 text-rose-600" />
-                                Baja
-                              </span>
+                              <div className="flex flex-col gap-0.5">
+                                <span className="inline-flex items-center gap-1 text-[10px] font-black px-2 py-0.5 rounded-lg bg-rose-100 text-rose-800 w-fit">
+                                  <Trash2 className="w-3 h-3 text-rose-600" />
+                                  Dado de baja
+                                </span>
+                                {extractOrderOriginAndNotes(order).cancelReason && (
+                                  <span className="text-[9px] text-rose-700 font-bold">
+                                    {extractOrderOriginAndNotes(order).cancelReason}
+                                  </span>
+                                )}
+                              </div>
                             )}
                           </td>
                           <td className="py-2.5 px-3.5 whitespace-nowrap">
