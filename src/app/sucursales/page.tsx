@@ -64,7 +64,6 @@ export default function SucursalesPage() {
     updateBranch,
     deleteBranch,
     simulateSale, 
-    advanceShift,
     consolidatedMetrics
   } = useBranch();
 
@@ -1042,13 +1041,6 @@ export default function SucursalesPage() {
                             >
                               Modificar Horario
                             </button>
-                            <button
-                              type="button"
-                              onClick={() => advanceShift(b.id)}
-                              className="px-3 py-1.5 rounded-xl bg-stone-200 hover:bg-stone-300 text-stone-800 font-bold text-xs transition-colors"
-                            >
-                              Corte de Turno
-                            </button>
                           </div>
                         </div>
                       </div>
@@ -1508,12 +1500,6 @@ export default function SucursalesPage() {
                                     >
                                       <Clock className="w-3.5 h-3.5" />
                                       <span>Modificar Horario</span>
-                                    </button>
-                                    <button
-                                      onClick={() => advanceShift(b.id)}
-                                      className="px-3 py-1.5 rounded-xl bg-white hover:bg-stone-100 text-stone-700 font-bold border border-stone-200 transition-colors"
-                                    >
-                                      Corte de Turno
                                     </button>
                                   </div>
                                 </div>
