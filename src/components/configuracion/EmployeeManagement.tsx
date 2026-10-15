@@ -1264,15 +1264,6 @@ export default function EmployeeManagement({ onGoToUsersTab }: EmployeeManagemen
                       className="w-full px-3.5 py-2.5 bg-stone-50 border border-stone-200 rounded-xl font-bold text-stone-900 focus:bg-white focus:ring-2 focus:ring-amber-500 focus:outline-none text-sm"
                     />
                   </div>
-
-                  <div className="sm:col-span-2 flex items-center gap-2 text-[11px] text-stone-600 bg-amber-50/70 px-3 py-2 rounded-lg border border-amber-200/60">
-                    <span className="text-amber-600 text-sm shrink-0">💡</span>
-                    <span>
-                      {formShift === "vespertino"
-                        ? "Turno de la Tarde: Los cajeros de la tarde inician con $0.00 en caja esperando el dinero y relevo de turno del cajero de la mañana."
-                        : "Turno de la Mañana: Los cajeros de la mañana inician automáticamente su turno con $1,000.00 como fondo de caja inicial."}
-                    </span>
-                  </div>
                 </div>
               </div>
 
