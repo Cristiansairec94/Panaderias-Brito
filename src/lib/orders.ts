@@ -128,14 +128,18 @@ export function extractOrderOriginAndNotes(order?: Partial<CustomOrder> | { note
       originName: "Sucursal Matriz (Centro)",
       cleanNotes: "",
       isCrossBranch: false,
+      cancelReason: undefined as string | undefined,
     };
   }
 
   const rawNotes = order.notes || "";
   const match = rawNotes.match(/\[Origen:\s*([^\|\]]+)(?:\|([^\]]+))?\]/);
+  const bajaMatch = rawNotes.match(/\[Baja:\s*([^\]]+)\]/);
+  const cancelReason = bajaMatch ? bajaMatch[1].trim() : undefined;
   const cleanNotes = rawNotes
     .replace(/\[Origen:[^\]]+\]/g, "")
     .replace(/\[TS:[^\]]+\]/g, "")
+    .replace(/\[Baja:[^\]]+\]/g, "")
     .trim();
 
   const originId = order.operatingBranchId || (match ? match[1].trim() : undefined) || order.branchId;
@@ -153,6 +157,7 @@ export function extractOrderOriginAndNotes(order?: Partial<CustomOrder> | { note
     originName,
     cleanNotes,
     isCrossBranch,
+    cancelReason,
   };
 }
 
@@ -1516,7 +1521,7 @@ export function addOrderPayment(
 /**
  * Actualiza el estado operativo de un pedido (pendiente -> en_horno -> listo -> entregado -> cancelado)
  */
-export function updateOrderStatus(orderId: string, status: CustomOrder["status"]): CustomOrder | null {
+export function updateOrderStatus(orderId: string, status: CustomOrder["status"], cancelReason?: string): CustomOrder | null {
   const current = getStoredOrders();
   const idx = current.findIndex(o => o.id === orderId || o.orderNumber === orderId);
   if (idx === -1) return null;
@@ -1528,9 +1533,16 @@ export function updateOrderStatus(orderId: string, status: CustomOrder["status"]
   }
 
   const nowTs = Date.now();
+  let updatedNotes = (current[idx].notes || "").replace(/\[Baja:[^\]]+\]/g, "").trim();
+  if (status === "cancelado" && cancelReason && cancelReason.trim()) {
+    const cleanReason = cancelReason.trim().replace(/[\[\]]/g, "");
+    updatedNotes = `${updatedNotes} [Baja: ${cleanReason}]`.trim();
+  }
+
   current[idx] = {
     ...current[idx],
     status,
+    notes: updatedNotes || current[idx].notes,
     timestamp: nowTs,
   };
 
@@ -1545,7 +1557,7 @@ export function updateOrderStatus(orderId: string, status: CustomOrder["status"]
     fetch("/api/orders", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ orderId, updates: { status, timestamp: current[idx].timestamp } }),
+      body: JSON.stringify({ orderId, updates: { status, notes: current[idx].notes, timestamp: current[idx].timestamp } }),
     }).catch(() => {});
   }
 
@@ -1570,13 +1582,15 @@ export function updateOrderStatus(orderId: string, status: CustomOrder["status"]
     const remNum = Number(ord.remainingBalance) || 0;
     const isCross = ord.operatingBranchName && ord.branchName && ord.operatingBranchName !== ord.branchName;
     const baseItemsDesc = ord.description ? `${ord.description}. ` : "";
+    const { cancelReason: extractedReason } = extractOrderOriginAndNotes(ord);
+    const effectiveReason = cancelReason?.trim() || extractedReason;
 
     realtimeHub.broadcastNotification({
       id: `notif-order-${ord.id}`,
       senderName: isDelivered
         ? `📦 Pedido Entregado (${ord.branchName})`
         : isCancelled
-        ? `🗑️ Pedido Cancelado (${ord.branchName})`
+        ? `🗑️ Pedido Dado de Baja (${ord.branchName})`
         : isReady
         ? `🎂 Listo en Sucursal (${ord.branchName})`
         : `👨‍🍳 ${ord.branchName}`,
@@ -1585,19 +1599,19 @@ export function updateOrderStatus(orderId: string, status: CustomOrder["status"]
       title: isDelivered
         ? `Pedido Entregado con Éxito: ${ord.orderNumber}${totalNum ? ` • Total $${totalNum.toFixed(2)}` : ""}`
         : isCancelled
-        ? `Pedido Cancelado / Dado de Baja: ${ord.orderNumber}${totalNum ? ` • Total $${totalNum.toFixed(2)}` : ""}`
+        ? `Pedido Dado de Baja: ${ord.orderNumber}${totalNum ? ` • Total $${totalNum.toFixed(2)}` : ""}`
         : isReady
         ? `El producto ya está en sucursal: ${ord.orderNumber}${totalNum ? ` • Total $${totalNum.toFixed(2)}` : ""}`
         : `Pedido ${ord.orderNumber}: Total $${totalNum.toFixed(2)}`,
       highlightText: isDelivered
         ? `${ord.customerName} • Entregado al Cliente`
         : isCancelled
-        ? `${ord.customerName} • Dado de Baja`
+        ? `${ord.customerName} • Dado de Baja${effectiveReason ? ` (${effectiveReason})` : ""}`
         : `${ord.customerName} • ${statusMap[status] || status}${remNum > 0 ? ` (Resta: $${remNum.toFixed(2)})` : " (Liquidado)"}`,
       description: isDelivered
         ? `${baseItemsDesc}El pedido ${ord.orderNumber} de "${ord.customerName}" fue entregado satisfactoriamente en ${ord.branchName}.${isCross ? ` (Originado en: ${ord.operatingBranchName}).` : ""}`
         : isCancelled
-        ? `${baseItemsDesc}El pedido ${ord.orderNumber} de "${ord.customerName}" fue dado de baja.`
+        ? `${baseItemsDesc}El pedido ${ord.orderNumber} de "${ord.customerName}" fue dado de baja${effectiveReason ? `. Motivo: ${effectiveReason}` : ""}.`
         : isReady
         ? `${baseItemsDesc}El pedido ${ord.orderNumber} de "${ord.customerName}" ya está LISTO en ${ord.branchName} para entrega.`
         : `${baseItemsDesc}Cliente: ${ord.customerName} • Entrega: ${ord.deliveryDate} ${ord.deliveryTime}${isCross ? ` • Origen: ${ord.operatingBranchName}` : ""}`,
@@ -1614,7 +1628,7 @@ export function updateOrderStatus(orderId: string, status: CustomOrder["status"]
       actionLabel: isDelivered
         ? "Ver Pedido Entregado"
         : isCancelled
-        ? "Ver Pedido Cancelado"
+        ? "Ver Pedido Dado de Baja"
         : remNum > 0
         ? `Cobrar $${remNum.toFixed(2)}`
         : "Ver Detalle",

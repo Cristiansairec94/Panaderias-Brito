@@ -1383,8 +1383,8 @@ export default function PedidosPage() {
         );
       case "cancelado":
         return (
-          <span className="bg-stone-100 text-stone-600 border border-stone-200 px-2.5 py-0.5 rounded-full font-bold text-[11px] inline-flex items-center gap-1 shadow-2xs">
-            <XCircle className="w-3 h-3 text-stone-500" /> Cancelado
+          <span className="bg-red-600 text-white border border-red-700 px-2.5 py-0.5 rounded-full font-black text-[11px] inline-flex items-center gap-1 shadow-xs ring-1 ring-red-400/50">
+            <XCircle className="w-3 h-3 text-red-100" /> CANCELADO
           </span>
         );
     }
@@ -2610,7 +2610,7 @@ export default function PedidosPage() {
                     onClick={() => setSelectedOrderForDetail(order)}
                     className={`rounded-2xl border p-3 sm:p-3.5 transition-all duration-150 shadow-2xs hover:shadow-md cursor-pointer group border-l-4 ${
                       order.status === "cancelado"
-                        ? "border-l-stone-400 bg-stone-50/80 hover:bg-stone-50/95 border-stone-200 ring-1 ring-stone-200/50 opacity-75"
+                        ? "border-l-red-600 bg-red-50/75 hover:bg-red-100/75 border-red-400 ring-2 ring-red-500/20"
                         : order.status === "entregado"
                         ? "border-l-sky-500 bg-sky-50/40 hover:bg-sky-50/70 border-sky-200 ring-1 ring-sky-200/50"
                         : isOverdue
@@ -2655,8 +2655,8 @@ export default function PedidosPage() {
                             </div>
                           )}
                           {order.status === "cancelado" && (
-                            <div className="my-1.5 py-1 px-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-900 flex items-center justify-center gap-1.5 shadow-2xs">
-                              <XCircle className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+                            <div className="my-1.5 py-1.5 px-3 rounded-xl bg-gradient-to-r from-red-600 via-rose-600 to-red-700 border border-red-800 text-white flex items-center justify-center gap-1.5 shadow-sm ring-2 ring-red-500/30">
+                              <XCircle className="w-4 h-4 text-red-100 shrink-0" />
                               <span className="font-black text-xs tracking-wider uppercase">CANCELADO</span>
                             </div>
                           )}
@@ -2715,7 +2715,11 @@ export default function PedidosPage() {
                           const itemsToShow = isExpanded ? orderItems : orderItems.slice(0, 2);
 
                           return (
-                            <div className="bg-stone-50/70 border border-stone-200/80 rounded-xl p-2.5 flex flex-col justify-between h-full transition-all shadow-2xs">
+                            <div className={`border rounded-xl p-2.5 flex flex-col justify-between h-full transition-all shadow-2xs ${
+                              order.status === "cancelado"
+                                ? "bg-red-50/50 border-red-300/90"
+                                : "bg-stone-50/70 border-stone-200/80"
+                            }`}>
                               <div>
                                 {/* Cabecera de Comanda */}
                                 <div className="flex items-center justify-between gap-1 mb-1.5 pb-1 border-b border-stone-200/60">
@@ -2807,7 +2811,11 @@ export default function PedidosPage() {
 
                       {/* COLUMNA 3: Entrega, Cliente y Saldo Cuadrados (xl:col-span-3) */}
                       <div className="md:col-span-1 xl:col-span-3 min-w-0 h-full">
-                        <div className="bg-stone-50/70 border border-stone-200/80 rounded-xl p-2.5 flex flex-col justify-between h-full shadow-2xs">
+                        <div className={`border rounded-xl p-2.5 flex flex-col justify-between h-full shadow-2xs ${
+                          order.status === "cancelado"
+                            ? "bg-red-50/50 border-red-300/90"
+                            : "bg-stone-50/70 border-stone-200/80"
+                        }`}>
                           {/* 1. Fecha y Hora de Entrega Destacada */}
                           <div>
                             <span className="text-[10px] font-bold uppercase tracking-wider text-stone-500 flex items-center gap-1 mb-1">
@@ -2970,8 +2978,24 @@ export default function PedidosPage() {
                           )
                         ) : (
                           /* Si ya está en historial */
-                          <div className="w-full py-2 px-3 bg-stone-100 text-stone-600 border border-stone-200 text-center font-bold text-xs rounded-xl">
-                            {order.status === "entregado" ? "✓ Pedido Entregado (Historial)" : "✕ Pedido Cancelado (Historial)"}
+                          <div
+                            className={`w-full py-2 px-3 text-center font-black text-xs rounded-xl border shadow-xs flex items-center justify-center gap-1.5 ${
+                              order.status === "entregado"
+                                ? "bg-sky-600 text-white border-sky-700"
+                                : "bg-red-600 text-white border-red-700 ring-2 ring-red-500/25"
+                            }`}
+                          >
+                            {order.status === "entregado" ? (
+                              <>
+                                <PackageCheck className="w-4 h-4 text-sky-100 shrink-0" />
+                                <span>Pedido Entregado (Historial)</span>
+                              </>
+                            ) : (
+                              <>
+                                <XCircle className="w-4 h-4 text-red-100 shrink-0" />
+                                <span>Pedido Cancelado (Historial)</span>
+                              </>
+                            )}
                           </div>
                         )}
 
@@ -3022,10 +3046,10 @@ export default function PedidosPage() {
                               <button
                                 type="button"
                                 onClick={() => handleDeletePermanent(order.id, order.orderNumber, order.customerName)}
-                                className="py-1.5 px-1 bg-white hover:bg-rose-50/50 active:scale-95 text-stone-700 hover:text-rose-700 border border-stone-200 hover:border-rose-300 font-semibold text-xs rounded-xl transition-all flex items-center justify-center gap-1 cursor-pointer shadow-2xs"
+                                className="py-1.5 px-1 bg-red-50 hover:bg-red-600 active:scale-95 text-red-700 hover:text-white border border-red-300 hover:border-red-600 font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-1 cursor-pointer shadow-2xs"
                                 title="Eliminar permanentemente del historial"
                               >
-                                <Trash2 className="w-3.5 h-3.5 text-rose-500 shrink-0" />
+                                <Trash2 className="w-3.5 h-3.5 shrink-0" />
                                 <span>Borrar</span>
                               </button>
                             )
@@ -3058,7 +3082,7 @@ export default function PedidosPage() {
                     onClick={() => setSelectedOrderForDetail(order)}
                     className={`rounded-3xl border transition-all duration-200 shadow-xs hover:shadow-xl cursor-pointer flex flex-col justify-between group overflow-hidden ${
                       order.status === "cancelado"
-                        ? "border-2 border-rose-300 bg-rose-50/80 ring-2 ring-rose-200/60 hover:border-rose-400 shadow-sm"
+                        ? "border-2 border-red-500 bg-red-50/85 ring-2 ring-red-400/35 hover:border-red-600 shadow-sm"
                         : order.status === "entregado"
                         ? "border-2 border-sky-300 bg-sky-50/80 ring-2 ring-sky-200/60 hover:border-sky-400 shadow-sm"
                         : isOverdue
@@ -3473,7 +3497,7 @@ export default function PedidosPage() {
                       <tr
                         className={`transition-all duration-150 group cursor-pointer hover:shadow-xs border-l-4 ${
                           order.status === "cancelado"
-                            ? "bg-rose-50/80 border-l-rose-500 hover:bg-rose-100/80"
+                            ? "bg-red-50/85 border-l-red-600 hover:bg-red-100/85"
                             : order.status === "entregado"
                             ? "bg-sky-50/80 border-l-sky-500 hover:bg-sky-100/80"
                             : isOverdue

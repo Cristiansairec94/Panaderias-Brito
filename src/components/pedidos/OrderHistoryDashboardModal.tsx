@@ -400,10 +400,10 @@ export default function OrderHistoryDashboardModal({
                 return (
                   <div
                     key={order.id}
-                    className={`bg-white rounded-2xl border p-4 shadow-xs hover:shadow-md transition-all flex flex-col justify-between ${
+                    className={`rounded-2xl border p-4 shadow-xs hover:shadow-md transition-all flex flex-col justify-between ${
                       isDelivered
-                        ? "border-teal-200/80 hover:border-teal-400"
-                        : "border-rose-200/80 hover:border-rose-400"
+                        ? "bg-white border-teal-200/80 hover:border-teal-400"
+                        : "bg-red-50/75 border-2 border-red-400 hover:border-red-600 ring-1 ring-red-400/30"
                     }`}
                   >
                     <div>
@@ -428,9 +428,9 @@ export default function OrderHistoryDashboardModal({
                             Entregado con Éxito
                           </span>
                         ) : (
-                          <span className="inline-flex items-center gap-1 text-[11px] font-black px-2.5 py-1 rounded-xl bg-rose-100 text-rose-800 border border-rose-200/80">
-                            <Trash2 className="w-3.5 h-3.5 text-rose-600" />
-                            Dado de Baja
+                          <span className="inline-flex items-center gap-1 text-[11px] font-black px-2.5 py-1 rounded-xl bg-red-600 text-white border border-red-700 shadow-xs">
+                            <Trash2 className="w-3.5 h-3.5 text-red-100" />
+                            CANCELADO / DADO DE BAJA
                           </span>
                         )}
                       </div>

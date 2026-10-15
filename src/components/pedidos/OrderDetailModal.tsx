@@ -29,7 +29,9 @@ import {
   AlertTriangle,
   Trash2,
   PackageCheck,
-  Lock
+  Lock,
+  Ban,
+  XCircle
 } from "lucide-react";
 import { CustomOrder } from "@/types";
 import { formatCurrency, formatOrderCreation } from "@/lib/utils";
@@ -47,7 +49,7 @@ interface OrderDetailModalProps {
   onAdvanceStatus?: (order: CustomOrder) => void;
   onDeliverOrder?: (order: CustomOrder) => void;
   onSendWhatsApp?: (order: CustomOrder) => void;
-  onDarDeBaja?: (order: CustomOrder) => void;
+  onDarDeBaja?: (order: CustomOrder, reason?: string) => void;
 }
 
 export default function OrderDetailModal({
@@ -132,8 +134,8 @@ export default function OrderDetailModal({
         );
       case "cancelado":
         return (
-          <span className="bg-rose-400/20 text-rose-300 border border-rose-400/40 px-2.5 py-0.5 rounded-full font-bold text-xs inline-flex items-center gap-1.5 shadow-2xs">
-            ✕ Cancelado
+          <span className="bg-red-600 text-white border border-red-400 px-3 py-0.5 rounded-full font-black text-xs inline-flex items-center gap-1.5 shadow-sm ring-2 ring-red-500/40">
+            ✕ CANCELADO / DADO DE BAJA
           </span>
         );
     }
@@ -146,14 +148,20 @@ export default function OrderDetailModal({
     order.status === "cancelado"
   );
   const deliveryFormatted = formatDeliveryDate(order.deliveryDate);
-  const { originName, cleanNotes, isCrossBranch } = extractOrderOriginAndNotes(order);
+  const { originName, cleanNotes, isCrossBranch, cancelReason } = extractOrderOriginAndNotes(order);
   const pickupBranch = order.branchName || "Sucursal Matriz (Centro)";
   const orderCreation = formatOrderCreation(order);
   const [showDeliverConfirm, setShowDeliverConfirm] = useState(false);
+  const [showBajaConfirm, setShowBajaConfirm] = useState(false);
+  const [bajaReasonType, setBajaReasonType] = useState<"cancelo" | "no_pasaron">("cancelo");
+  const [bajaExtraNote, setBajaExtraNote] = useState("");
 
   useEffect(() => {
     if (!isOpen) {
       setShowDeliverConfirm(false);
+      setShowBajaConfirm(false);
+      setBajaReasonType("cancelo");
+      setBajaExtraNote("");
     }
   }, [isOpen]);
 
@@ -189,6 +197,33 @@ export default function OrderDetailModal({
       if (typeof window !== "undefined") {
         window.dispatchEvent(new Event("brito_orders_updated"));
       }
+    }
+  };
+
+  const handleConfirmDarDeBaja = () => {
+    if (!order) return;
+    const baseReason =
+      bajaReasonType === "cancelo"
+        ? "El cliente canceló el pedido"
+        : "Ya no pasaron a recogerlo";
+    const fullReason = bajaExtraNote.trim()
+      ? `${baseReason} (${bajaExtraNote.trim()})`
+      : baseReason;
+
+    setShowBajaConfirm(false);
+    const updatedOrd = updateOrderStatus(order.id, "cancelado", fullReason) || {
+      ...order,
+      status: "cancelado" as const,
+    };
+
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new Event("brito_orders_updated"));
+    }
+
+    if (onDarDeBaja) {
+      onDarDeBaja(updatedOrd, fullReason);
+    } else {
+      onClose();
     }
   };
 
@@ -266,7 +301,30 @@ export default function OrderDetailModal({
 
         {/* ── Cuerpo del Modal ── */}
         <div className="p-3.5 sm:p-4 overflow-y-auto space-y-3 text-stone-800 flex-1">
-          
+          {order.status === "cancelado" && (
+            <div className="bg-rose-50 border-2 border-rose-300 rounded-xl p-3 flex items-start gap-2.5 shadow-2xs">
+              <div className="w-8 h-8 rounded-lg bg-rose-600 text-white flex items-center justify-center font-black text-sm shrink-0">
+                🚫
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-xs font-black text-rose-950 uppercase tracking-wide">
+                    Pedido Dado de Baja
+                  </span>
+                  <span className="text-[10px] font-bold bg-rose-200/80 text-rose-900 px-2 py-0.5 rounded-full">
+                    No entregado
+                  </span>
+                </div>
+                <p className="text-xs font-bold text-rose-800 mt-0.5">
+                  Motivo:{" "}
+                  <strong className="text-rose-950">
+                    {cancelReason || "El cliente canceló el pedido o simplemente ya no pasaron"}
+                  </strong>
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* Tarjetas de Información Rápida (Registro de Pedido, Entrega, Cliente, Sucursal) */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
             
@@ -719,6 +777,19 @@ export default function OrderDetailModal({
               )
             )}
 
+            {/* Botón Dado de baja (El cliente canceló o simplemente ya no pasaron) */}
+            {!isHistoryOrder && order.status !== "entregado" && order.status !== "cancelado" && (
+              <button
+                type="button"
+                onClick={() => setShowBajaConfirm(true)}
+                className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 active:scale-95 text-white font-bold text-xs rounded-lg shadow-xs transition-all flex items-center gap-1.5 cursor-pointer"
+                title="Marcar pedido como Dado de baja (el cliente canceló o simplemente ya no pasaron)"
+              >
+                <Ban className="w-3.5 h-3.5" />
+                <span>Dado de baja</span>
+              </button>
+            )}
+
             {/* Botón Editar */}
             {isAdmin && !isHistoryOrder && onOpenEdit && order.status !== "cancelado" && (
               <button
@@ -733,16 +804,16 @@ export default function OrderDetailModal({
               </button>
             )}
 
-            {/* Botón Eliminar / Dar de Baja (no disponible si el pedido ya fue entregado) */}
-            {isAdmin && onDarDeBaja && order.status !== "entregado" && (
+            {/* Botón Eliminar Definitivamente (solo para administrador cuando el pedido ya está en historial como cancelado) */}
+            {isAdmin && onDarDeBaja && order.status === "cancelado" && (
               <button
                 type="button"
                 onClick={() => onDarDeBaja(order)}
-                className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 active:scale-95 text-white font-bold text-xs rounded-lg shadow-xs transition-all flex items-center gap-1.5 cursor-pointer"
-                title={order.status === "cancelado" ? "Eliminar definitivamente" : "Dar de baja el pedido"}
+                className="px-3 py-1.5 bg-rose-700 hover:bg-rose-800 active:scale-95 text-white font-bold text-xs rounded-lg shadow-xs transition-all flex items-center gap-1.5 cursor-pointer"
+                title="Eliminar definitivamente del registro histórico"
               >
                 <Trash2 className="w-3 h-3" />
-                <span>{order.status === "cancelado" ? "Eliminar" : "Dar de baja"}</span>
+                <span>Eliminar</span>
               </button>
             )}
           </div>
@@ -763,6 +834,154 @@ export default function OrderDetailModal({
         onClose={() => setShowDeliverConfirm(false)}
         onConfirm={handleConfirmDeliver}
       />
+
+      {/* Modal Centrado de Confirmación "Dado de Baja" (El cliente canceló o simplemente ya no pasaron) */}
+      {showBajaConfirm && (
+        <div className="fixed inset-0 z-[450] flex items-center justify-center p-3 sm:p-4 bg-stone-950/85 backdrop-blur-md animate-in fade-in duration-200">
+          <div
+            className="fixed inset-0"
+            onClick={() => setShowBajaConfirm(false)}
+          />
+          <div className="relative w-full max-w-md bg-gradient-to-b from-[#24130b] via-[#1c0e08] to-[#140a05] text-white rounded-3xl border-2 border-rose-500/40 shadow-2xl shadow-rose-950/80 overflow-hidden z-10 animate-in zoom-in-95 duration-200">
+            <div className="absolute -top-20 left-1/2 -translate-x-1/2 w-48 h-48 bg-gradient-to-b from-rose-500/25 to-transparent rounded-full blur-2xl pointer-events-none" />
+
+            <button
+              type="button"
+              onClick={() => setShowBajaConfirm(false)}
+              className="absolute top-4 right-4 p-2 text-stone-400 hover:text-white hover:bg-white/10 rounded-xl transition-colors cursor-pointer z-20"
+              title="Cerrar"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="p-5 sm:p-6 space-y-4 relative z-10">
+              {/* Icono y Encabezado */}
+              <div className="text-center space-y-2">
+                <div className="relative mx-auto w-16 h-16 rounded-2xl p-[2px] bg-gradient-to-tr from-rose-600 via-rose-500 to-amber-500 shadow-lg shadow-rose-600/30 flex items-center justify-center">
+                  <div className="w-full h-full bg-[#1c0e08] rounded-[14px] flex items-center justify-center text-3xl select-none">
+                    🚫
+                  </div>
+                </div>
+
+                <div className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-rose-500/15 border border-rose-500/30 text-rose-300 text-[11px] font-black uppercase tracking-wider">
+                  <Ban className="w-3 h-3 text-rose-400" />
+                  <span>Panadería Brito • Dado de Baja</span>
+                </div>
+
+                <h3 className="text-lg sm:text-xl font-black text-white tracking-tight leading-snug">
+                  ¿Dar de baja este pedido?
+                </h3>
+                <p className="text-xs text-stone-300 font-medium leading-relaxed">
+                  Señala el motivo por el cual el pedido <strong className="text-amber-400 font-mono">{order.orderNumber}</strong> de <strong className="text-white">&quot;{order.customerName}&quot;</strong> se marca como <strong className="text-rose-400">Dado de baja</strong>:
+                </p>
+              </div>
+
+              {/* Opciones de Motivo: Canceló vs Ya no pasaron */}
+              <div className="space-y-2">
+                <button
+                  type="button"
+                  onClick={() => setBajaReasonType("cancelo")}
+                  className={`w-full text-left p-3 rounded-2xl border-2 transition-all cursor-pointer flex items-start gap-3 ${
+                    bajaReasonType === "cancelo"
+                      ? "bg-rose-950/70 border-rose-500 text-white shadow-md shadow-rose-950/50"
+                      : "bg-[#2a160d]/70 border-white/10 text-stone-300 hover:border-white/25"
+                  }`}
+                >
+                  <div
+                    className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 mt-0.5 font-black text-base ${
+                      bajaReasonType === "cancelo"
+                        ? "bg-rose-600 text-white"
+                        : "bg-stone-800 text-stone-400"
+                    }`}
+                  >
+                    🚫
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-black text-xs sm:text-sm text-white">
+                        El cliente canceló el pedido
+                      </span>
+                      {bajaReasonType === "cancelo" && (
+                        <CheckCircle2 className="w-4 h-4 text-rose-400 shrink-0" />
+                      )}
+                    </div>
+                    <p className="text-[11px] text-stone-300 mt-0.5 leading-snug">
+                      El cliente se comunicó o avisó en sucursal que cancela su pedido.
+                    </p>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setBajaReasonType("no_pasaron")}
+                  className={`w-full text-left p-3 rounded-2xl border-2 transition-all cursor-pointer flex items-start gap-3 ${
+                    bajaReasonType === "no_pasaron"
+                      ? "bg-amber-950/70 border-amber-500 text-white shadow-md shadow-amber-950/50"
+                      : "bg-[#2a160d]/70 border-white/10 text-stone-300 hover:border-white/25"
+                  }`}
+                >
+                  <div
+                    className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 mt-0.5 font-black text-base ${
+                      bajaReasonType === "no_pasaron"
+                        ? "bg-amber-500 text-stone-950"
+                        : "bg-stone-800 text-stone-400"
+                    }`}
+                  >
+                    🕒
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-black text-xs sm:text-sm text-white">
+                        Simplemente ya no pasaron
+                      </span>
+                      {bajaReasonType === "no_pasaron" && (
+                        <CheckCircle2 className="w-4 h-4 text-amber-400 shrink-0" />
+                      )}
+                    </div>
+                    <p className="text-[11px] text-stone-300 mt-0.5 leading-snug">
+                      Se cumplió la fecha/hora de entrega y el cliente ya no pasó a recogerlo.
+                    </p>
+                  </div>
+                </button>
+              </div>
+
+              {/* Nota adicional opcional */}
+              <div>
+                <label className="text-[10px] font-bold text-stone-400 uppercase tracking-wider block mb-1">
+                  Nota adicional (Opcional):
+                </label>
+                <input
+                  type="text"
+                  value={bajaExtraNote}
+                  onChange={(e) => setBajaExtraNote(e.target.value)}
+                  placeholder="Ej. Avisó por teléfono, no contestó llamadas..."
+                  className="w-full px-3 py-2 rounded-xl bg-[#2a160d] border border-white/15 text-xs text-white placeholder:text-stone-500 focus:outline-none focus:border-rose-400"
+                />
+              </div>
+
+              {/* Botones de Acción */}
+              <div className="grid grid-cols-2 gap-2.5 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setShowBajaConfirm(false)}
+                  className="w-full py-2.5 px-3 rounded-2xl font-bold text-xs sm:text-sm text-stone-300 hover:text-white bg-stone-800/90 hover:bg-stone-800 border border-stone-700 transition-all cursor-pointer active:scale-95"
+                >
+                  Volver
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleConfirmDarDeBaja}
+                  className="w-full py-2.5 px-3 rounded-2xl font-black text-xs sm:text-sm text-white bg-gradient-to-r from-rose-600 via-rose-500 to-rose-600 hover:from-rose-500 hover:to-rose-500 shadow-lg shadow-rose-600/30 transition-all flex items-center justify-center gap-1.5 cursor-pointer hover:scale-[1.02] active:scale-95"
+                >
+                  <Ban className="w-4 h-4 shrink-0" />
+                  <span>Confirmar Baja</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
