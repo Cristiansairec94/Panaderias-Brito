@@ -32,11 +32,14 @@ import {
   Crown,
   ShoppingBag,
   Shield,
-  Layers
+  Layers,
+  Sun,
+  Moon,
+  Clock
 } from "lucide-react";
 import { useAuth, User } from "@/context/AuthContext";
 import { useBranch } from "@/context/BranchContext";
-import { onlyNumbersKeyDown, cleanOnlyNumbers, compressImageFile } from "@/lib/utils";
+import { onlyNumbersKeyDown, cleanOnlyNumbers, compressImageFile, isAfternoonShift } from "@/lib/utils";
 import { UserRole } from "@/types";
 
 const PUESTOS_PANADERIA = [
@@ -134,6 +137,7 @@ export default function EmployeeManagement({ onGoToUsersTab }: EmployeeManagemen
   const [searchTerm, setSearchTerm] = useState("");
   const [puestoFilter, setPuestoFilter] = useState<string>("all");
   const [branchFilter, setBranchFilter] = useState<string>("all");
+  const [shiftFilter, setShiftFilter] = useState<string>("all");
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -149,6 +153,11 @@ export default function EmployeeManagement({ onGoToUsersTab }: EmployeeManagemen
   const [formAvatar, setFormAvatar] = useState("👩‍💼");
   const [formPhotoUrl, setFormPhotoUrl] = useState<string>("");
   const [formCreatedAt, setFormCreatedAt] = useState("");
+
+  // Turno & Horario Form State
+  const [formShift, setFormShift] = useState<"matutino" | "vespertino" | "personalizado">("matutino");
+  const [formShiftStartTime, setFormShiftStartTime] = useState<string>("06:00");
+  const [formShiftEndTime, setFormShiftEndTime] = useState<string>("14:00");
 
   // System Access & Credentials State
   const [formHasAccess, setFormHasAccess] = useState(true);
@@ -193,6 +202,11 @@ export default function EmployeeManagement({ onGoToUsersTab }: EmployeeManagemen
     setFormAvatar("👩‍💼");
     setFormPhotoUrl("");
     setFormCreatedAt(new Date().toLocaleDateString("es-MX", { year: "numeric", month: "short", day: "numeric" }));
+
+    // Turno & Horario
+    setFormShift("matutino");
+    setFormShiftStartTime("06:00");
+    setFormShiftEndTime("14:00");
     
     // Credentials
     setFormHasAccess(true);
@@ -226,6 +240,27 @@ export default function EmployeeManagement({ onGoToUsersTab }: EmployeeManagemen
     setFormPhotoUrl(emp.photoUrl || (isImageAvatar ? emp.avatar : ""));
     setFormAvatar(!isImageAvatar ? (emp.avatar || "👤") : "👨‍🍳");
     setFormCreatedAt(emp.createdAt || "Registrado");
+
+    // Turno & Horario initialization
+    let initialShift: "matutino" | "vespertino" | "personalizado" = "matutino";
+    if (
+      emp.shift === "vespertino" ||
+      (!emp.shift && isAfternoonShift(emp.shiftName, emp.name, emp))
+    ) {
+      initialShift = "vespertino";
+    } else if (emp.shift === "personalizado") {
+      initialShift = "personalizado";
+    } else {
+      initialShift = "matutino";
+    }
+
+    setFormShift(initialShift);
+    setFormShiftStartTime(
+      emp.shiftStartTime || (initialShift === "vespertino" ? "14:00" : "06:00")
+    );
+    setFormShiftEndTime(
+      emp.shiftEndTime || (initialShift === "vespertino" ? "22:00" : "14:00")
+    );
 
     // Credentials
     const hasCreds = emp.hasSystemAccess !== undefined ? emp.hasSystemAccess : Boolean(emp.username);
@@ -315,7 +350,24 @@ export default function EmployeeManagement({ onGoToUsersTab }: EmployeeManagemen
     }
 
     const matchedRole = SYSTEM_ROLES.find((r) => r.id === formRole);
-    const roleLabelToSave = matchedRole ? matchedRole.label : finalJobTitle;
+    let roleLabelToSave = matchedRole ? matchedRole.label : finalJobTitle;
+
+    // Shift processing
+    const computedShiftName =
+      formShift === "vespertino"
+        ? "Turno Vespertino (Tarde)"
+        : formShift === "personalizado"
+        ? "Turno Personalizado"
+        : "Turno Matutino (Mañana)";
+
+    // Harmonize cashier shift label
+    if (formRole === "cajero" || finalJobTitle.toLowerCase().includes("cajer")) {
+      if (formShift === "vespertino") {
+        roleLabelToSave = "Cajero(a) Turno Tarde";
+      } else if (formShift === "matutino") {
+        roleLabelToSave = "Cajero(a) Turno Mañana";
+      }
+    }
 
     if (editingEmployeeId) {
       updateUser(editingEmployeeId, {
@@ -327,6 +379,11 @@ export default function EmployeeManagement({ onGoToUsersTab }: EmployeeManagemen
         status: formStatus,
         assignedBranchId: formBranchId || undefined,
         assignedBranchName: assignedBranch ? assignedBranch.shortName : undefined,
+        // Turno & Horario
+        shift: formShift,
+        shiftName: computedShiftName,
+        shiftStartTime: formShiftStartTime,
+        shiftEndTime: formShiftEndTime,
         // System access & credentials
         hasSystemAccess: formHasAccess,
         username: formHasAccess ? finalUsername : undefined,
@@ -354,6 +411,11 @@ export default function EmployeeManagement({ onGoToUsersTab }: EmployeeManagemen
         hasSystemAccess: formHasAccess,
         assignedBranchId: formBranchId || undefined,
         assignedBranchName: assignedBranch ? assignedBranch.shortName : undefined,
+        // Turno & Horario
+        shift: formShift,
+        shiftName: computedShiftName,
+        shiftStartTime: formShiftStartTime,
+        shiftEndTime: formShiftEndTime,
         createdAt: formCreatedAt || new Date().toLocaleDateString("es-MX", { year: "numeric", month: "short", day: "numeric" }),
       };
       addUser(newUser);
@@ -399,6 +461,11 @@ export default function EmployeeManagement({ onGoToUsersTab }: EmployeeManagemen
   const filteredEmployees = useMemo(() => {
     return usersList.filter((u) => {
       if (branchFilter !== "all" && u.assignedBranchId !== branchFilter) return false;
+      if (shiftFilter !== "all") {
+        const isAft = isAfternoonShift(u.shiftName, u.name, u);
+        const userShift = u.shift || (isAft ? "vespertino" : "matutino");
+        if (shiftFilter !== userShift) return false;
+      }
       if (puestoFilter !== "all") {
         const title = (u.jobTitle || u.roleLabel || "").toLowerCase();
         if (puestoFilter === "produccion" && !title.includes("panader") && !title.includes("horn") && !title.includes("past")) return false;
@@ -414,7 +481,7 @@ export default function EmployeeManagement({ onGoToUsersTab }: EmployeeManagemen
       }
       return true;
     });
-  }, [usersList, branchFilter, puestoFilter, searchTerm]);
+  }, [usersList, branchFilter, shiftFilter, puestoFilter, searchTerm]);
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
@@ -546,6 +613,17 @@ export default function EmployeeManagement({ onGoToUsersTab }: EmployeeManagemen
               </option>
             ))}
           </select>
+
+          <select
+            value={shiftFilter}
+            onChange={(e) => setShiftFilter(e.target.value)}
+            className="px-3 py-2 bg-stone-50 border border-stone-200 rounded-xl font-bold text-stone-700 text-xs focus:outline-none"
+          >
+            <option value="all">Todos los turnos</option>
+            <option value="matutino">☀️ Turno Mañana</option>
+            <option value="vespertino">🌙 Turno Tarde</option>
+            <option value="personalizado">⏱️ Turno Especial</option>
+          </select>
         </div>
       </div>
 
@@ -559,6 +637,12 @@ export default function EmployeeManagement({ onGoToUsersTab }: EmployeeManagemen
           const managedBranches = branches.filter((b) => b.assignedUserId === emp.id);
           const puesto = emp.jobTitle || emp.roleLabel || "Personal de Panadería";
           const hasSoftwareAccount = Boolean(emp.username);
+
+          // Shift & working hours
+          const isAfternoon = isAfternoonShift(emp.shiftName, emp.name, emp);
+          const empShift = emp.shift || (isAfternoon ? "vespertino" : "matutino");
+          const empShiftStartTime = emp.shiftStartTime || (empShift === "vespertino" ? "14:00" : "06:00");
+          const empShiftEndTime = emp.shiftEndTime || (empShift === "vespertino" ? "22:00" : "14:00");
 
           return (
             <div
@@ -621,6 +705,36 @@ export default function EmployeeManagement({ onGoToUsersTab }: EmployeeManagemen
                     </span>
                     <span className="font-bold text-stone-800">
                       {branchDisplayName}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between text-[11px]">
+                    <span className="flex items-center gap-1.5 text-stone-500">
+                      <Clock className="w-3.5 h-3.5 text-amber-500" /> Turno & Horario:
+                    </span>
+                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md font-bold text-[10px] border ${
+                      empShift === "vespertino"
+                        ? "bg-indigo-50 text-indigo-800 border-indigo-200"
+                        : empShift === "personalizado"
+                        ? "bg-blue-50 text-blue-800 border-blue-200"
+                        : "bg-amber-50 text-amber-900 border-amber-200"
+                    }`}>
+                      {empShift === "vespertino" ? (
+                        <>
+                          <Moon className="w-3 h-3 text-indigo-600" />
+                          <span>Tarde ({empShiftStartTime} - {empShiftEndTime})</span>
+                        </>
+                      ) : empShift === "personalizado" ? (
+                        <>
+                          <Clock className="w-3 h-3 text-blue-600" />
+                          <span>Personalizado ({empShiftStartTime} - {empShiftEndTime})</span>
+                        </>
+                      ) : (
+                        <>
+                          <Sun className="w-3 h-3 text-amber-600" />
+                          <span>Mañana ({empShiftStartTime} - {empShiftEndTime})</span>
+                        </>
+                      )}
                     </span>
                   </div>
 
@@ -978,6 +1092,186 @@ export default function EmployeeManagement({ onGoToUsersTab }: EmployeeManagemen
                       <option value="activo">Activo (En nómina / turno)</option>
                       <option value="inactivo">Inactivo (Baja temporal / definitiva)</option>
                     </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* SECTION: Asignación de Turno y Horario de Trabajo */}
+              <div className="bg-gradient-to-br from-amber-50/70 via-orange-50/40 to-yellow-50/50 p-4 sm:p-5 rounded-2xl border-2 border-amber-200/80 shadow-xs space-y-4 animate-in fade-in duration-200">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-amber-200/60 pb-3">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-xl bg-amber-500 text-white flex items-center justify-center font-black shadow-xs">
+                      <Clock className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h4 className="font-black text-stone-900 text-xs sm:text-sm flex items-center gap-1.5">
+                        <span>Turno y Horario Laboral</span>
+                        <span className="text-[10px] text-amber-800 bg-amber-100 px-1.5 py-0.5 rounded font-bold">Jornada</span>
+                      </h4>
+                      <p className="text-[11px] text-stone-500">
+                        Asigna el turno (mañana / tarde) y define la hora de entrada y salida del empleado.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Current Shift Summary Pill */}
+                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-black bg-white border border-amber-200 text-amber-900 shadow-2xs self-start sm:self-auto">
+                    {formShift === "vespertino" ? (
+                      <>
+                        <Moon className="w-3.5 h-3.5 text-indigo-600" />
+                        <span>Turno Tarde ({formShiftStartTime} - {formShiftEndTime})</span>
+                      </>
+                    ) : formShift === "personalizado" ? (
+                      <>
+                        <Clock className="w-3.5 h-3.5 text-blue-600" />
+                        <span>Personalizado ({formShiftStartTime} - {formShiftEndTime})</span>
+                      </>
+                    ) : (
+                      <>
+                        <Sun className="w-3.5 h-3.5 text-amber-600" />
+                        <span>Turno Mañana ({formShiftStartTime} - {formShiftEndTime})</span>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                {/* Shift Selector Buttons */}
+                <div className="space-y-1.5">
+                  <label className="font-bold text-stone-700 text-xs flex items-center gap-1.5">
+                    <Clock className="w-3.5 h-3.5 text-amber-600" /> Asignar Turno de Trabajo *
+                  </label>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                    {/* Turno Mañana */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFormShift("matutino");
+                        setFormShiftStartTime("06:00");
+                        setFormShiftEndTime("14:00");
+                      }}
+                      className={`p-3 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
+                        formShift === "matutino"
+                          ? "bg-white border-amber-500 ring-2 ring-amber-400/40 shadow-xs"
+                          : "bg-white/80 border-stone-200 hover:border-amber-300"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="flex items-center gap-1.5 font-black text-xs text-stone-900">
+                          <Sun className="w-4 h-4 text-amber-500" /> Turno Mañana
+                        </span>
+                        {formShift === "matutino" && (
+                          <CheckCircle2 className="w-4 h-4 text-amber-600" />
+                        )}
+                      </div>
+                      <p className="text-[11px] text-stone-500 mt-1 font-medium">
+                        Turno matutino habitual
+                      </p>
+                      <div className="mt-2 inline-flex items-center text-[10px] font-black text-amber-800 bg-amber-100/80 px-2 py-0.5 rounded-md w-fit">
+                        06:00 - 14:00
+                      </div>
+                    </button>
+
+                    {/* Turno Tarde */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFormShift("vespertino");
+                        setFormShiftStartTime("14:00");
+                        setFormShiftEndTime("22:00");
+                      }}
+                      className={`p-3 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
+                        formShift === "vespertino"
+                          ? "bg-white border-indigo-500 ring-2 ring-indigo-400/40 shadow-xs"
+                          : "bg-white/80 border-stone-200 hover:border-indigo-300"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="flex items-center gap-1.5 font-black text-xs text-stone-900">
+                          <Moon className="w-4 h-4 text-indigo-500" /> Turno Tarde
+                        </span>
+                        {formShift === "vespertino" && (
+                          <CheckCircle2 className="w-4 h-4 text-indigo-600" />
+                        )}
+                      </div>
+                      <p className="text-[11px] text-stone-500 mt-1 font-medium">
+                        Turno vespertino habitual
+                      </p>
+                      <div className="mt-2 inline-flex items-center text-[10px] font-black text-indigo-800 bg-indigo-100/80 px-2 py-0.5 rounded-md w-fit">
+                        14:00 - 22:00
+                      </div>
+                    </button>
+
+                    {/* Turno Personalizado */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFormShift("personalizado");
+                      }}
+                      className={`p-3 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
+                        formShift === "personalizado"
+                          ? "bg-white border-blue-500 ring-2 ring-blue-400/40 shadow-xs"
+                          : "bg-white/80 border-stone-200 hover:border-blue-300"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="flex items-center gap-1.5 font-black text-xs text-stone-900">
+                          <Clock className="w-4 h-4 text-blue-500" /> Personalizado
+                        </span>
+                        {formShift === "personalizado" && (
+                          <CheckCircle2 className="w-4 h-4 text-blue-600" />
+                        )}
+                      </div>
+                      <p className="text-[11px] text-stone-500 mt-1 font-medium">
+                        Horario flexible a definir
+                      </p>
+                      <div className="mt-2 inline-flex items-center text-[10px] font-black text-blue-800 bg-blue-100/80 px-2 py-0.5 rounded-md w-fit">
+                        Horario libre
+                      </div>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Hora de Entrada y Hora de Salida Inputs */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 bg-white/90 p-3.5 rounded-xl border border-amber-200/70">
+                  <div className="space-y-1">
+                    <label className="font-bold text-stone-700 text-xs flex items-center justify-between">
+                      <span className="flex items-center gap-1.5">
+                        <Clock className="w-3.5 h-3.5 text-stone-400" /> Hora de Entrada *
+                      </span>
+                      <span className="text-[10px] text-stone-400 font-normal">24 horas</span>
+                    </label>
+                    <input
+                      type="time"
+                      required
+                      value={formShiftStartTime}
+                      onChange={(e) => setFormShiftStartTime(e.target.value)}
+                      className="w-full px-3.5 py-2.5 bg-stone-50 border border-stone-200 rounded-xl font-bold text-stone-900 focus:bg-white focus:ring-2 focus:ring-amber-500 focus:outline-none text-sm"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="font-bold text-stone-700 text-xs flex items-center justify-between">
+                      <span className="flex items-center gap-1.5">
+                        <Clock className="w-3.5 h-3.5 text-stone-400" /> Hora de Salida *
+                      </span>
+                      <span className="text-[10px] text-stone-400 font-normal">24 horas</span>
+                    </label>
+                    <input
+                      type="time"
+                      required
+                      value={formShiftEndTime}
+                      onChange={(e) => setFormShiftEndTime(e.target.value)}
+                      className="w-full px-3.5 py-2.5 bg-stone-50 border border-stone-200 rounded-xl font-bold text-stone-900 focus:bg-white focus:ring-2 focus:ring-amber-500 focus:outline-none text-sm"
+                    />
+                  </div>
+
+                  <div className="sm:col-span-2 flex items-center gap-2 text-[11px] text-stone-600 bg-amber-50/70 px-3 py-2 rounded-lg border border-amber-200/60">
+                    <span className="text-amber-600 text-sm shrink-0">💡</span>
+                    <span>
+                      {formShift === "vespertino"
+                        ? "Turno de la Tarde: Los cajeros de la tarde inician con $0.00 en caja esperando el dinero y relevo de turno del cajero de la mañana."
+                        : "Turno de la Mañana: Los cajeros de la mañana inician automáticamente su turno con $1,000.00 como fondo de caja inicial."}
+                    </span>
                   </div>
                 </div>
               </div>

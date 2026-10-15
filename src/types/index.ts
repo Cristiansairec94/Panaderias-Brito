@@ -343,6 +343,10 @@ export interface AppUser {
   status?: "activo" | "inactivo";
   hasSystemAccess?: boolean;
   createdAt?: string;
+  shift?: "matutino" | "vespertino" | "personalizado" | string;
+  shiftName?: string;
+  shiftStartTime?: string;
+  shiftEndTime?: string;
 }
 
 export interface UserActiveSession {

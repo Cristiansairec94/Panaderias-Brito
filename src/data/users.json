@@ -14,7 +14,11 @@
     "hasSystemAccess": true,
     "assignedBranchId": "branch-matriz",
     "assignedBranchName": "Matriz",
-    "createdAt": "01 ene 2024"
+    "createdAt": "01 ene 2024",
+    "shift": "matutino",
+    "shiftName": "Turno Mañana",
+    "shiftStartTime": "06:00",
+    "shiftEndTime": "14:00"
   },
   {
     "id": "usr-2",
@@ -31,7 +35,11 @@
     "hasSystemAccess": true,
     "assignedBranchId": "branch-matriz",
     "assignedBranchName": "Matriz",
-    "createdAt": "01 ene 2024"
+    "createdAt": "01 ene 2024",
+    "shift": "matutino",
+    "shiftName": "Turno Mañana",
+    "shiftStartTime": "06:00",
+    "shiftEndTime": "14:00"
   },
   {
     "id": "usr-lupita",
@@ -48,7 +56,11 @@
     "hasSystemAccess": true,
     "assignedBranchId": "branch-matriz",
     "assignedBranchName": "Sucursal Matriz (Centro)",
-    "createdAt": "01 ene 2024"
+    "createdAt": "01 ene 2024",
+    "shift": "matutino",
+    "shiftName": "Turno Mañana",
+    "shiftStartTime": "06:00",
+    "shiftEndTime": "14:00"
   },
   {
     "id": "usr-carlos-b",
@@ -65,7 +77,11 @@
     "hasSystemAccess": true,
     "assignedBranchId": "branch-matriz",
     "assignedBranchName": "Sucursal Matriz (Centro)",
-    "createdAt": "2 oct 2026"
+    "createdAt": "2 oct 2026",
+    "shift": "vespertino",
+    "shiftName": "Turno Tarde",
+    "shiftStartTime": "14:00",
+    "shiftEndTime": "22:00"
   },
   {
     "id": "usr-5",
@@ -82,7 +98,11 @@
     "hasSystemAccess": true,
     "assignedBranchId": "branch-benito",
     "assignedBranchName": "Sucursal San Benito (Mercado)",
-    "createdAt": "10 feb 2024"
+    "createdAt": "10 feb 2024",
+    "shift": "matutino",
+    "shiftName": "Turno Mañana",
+    "shiftStartTime": "06:00",
+    "shiftEndTime": "14:00"
   },
   {
     "id": "usr-benito-tarde",
@@ -99,7 +119,11 @@
     "hasSystemAccess": true,
     "assignedBranchId": "branch-benito",
     "assignedBranchName": "Sucursal San Benito (Mercado)",
-    "createdAt": "05 oct 2026"
+    "createdAt": "05 oct 2026",
+    "shift": "vespertino",
+    "shiftName": "Turno Tarde",
+    "shiftStartTime": "14:00",
+    "shiftEndTime": "22:00"
   },
   {
     "id": "usr-noe",
@@ -116,7 +140,11 @@
     "hasSystemAccess": true,
     "assignedBranchId": "branch-sanjuan",
     "assignedBranchName": "Sucursal San Juan",
-    "createdAt": "2 oct 2026"
+    "createdAt": "2 oct 2026",
+    "shift": "matutino",
+    "shiftName": "Turno Mañana",
+    "shiftStartTime": "06:00",
+    "shiftEndTime": "14:00"
   },
   {
     "id": "usr-sanjuan",
@@ -133,7 +161,11 @@
     "hasSystemAccess": true,
     "assignedBranchId": "branch-sanjuan",
     "assignedBranchName": "Sucursal San Juan",
-    "createdAt": "05 oct 2026"
+    "createdAt": "05 oct 2026",
+    "shift": "vespertino",
+    "shiftName": "Turno Tarde",
+    "shiftStartTime": "14:00",
+    "shiftEndTime": "22:00"
   },
   {
     "id": "usr-sofia",
@@ -150,7 +182,11 @@
     "hasSystemAccess": true,
     "assignedBranchId": "branch-flores",
     "assignedBranchName": "Sucursal Las Flores (Plaza)",
-    "createdAt": "01 feb 2024"
+    "createdAt": "01 feb 2024",
+    "shift": "matutino",
+    "shiftName": "Turno Mañana",
+    "shiftStartTime": "06:00",
+    "shiftEndTime": "14:00"
   },
   {
     "id": "usr-elena",
@@ -167,7 +203,11 @@
     "hasSystemAccess": true,
     "assignedBranchId": "branch-flores",
     "assignedBranchName": "Sucursal Las Flores (Plaza)",
-    "createdAt": "01 feb 2024"
+    "createdAt": "01 feb 2024",
+    "shift": "vespertino",
+    "shiftName": "Turno Tarde",
+    "shiftStartTime": "14:00",
+    "shiftEndTime": "22:00"
   },
   {
     "id": "usr-silvia",
@@ -184,7 +224,11 @@
     "hasSystemAccess": true,
     "assignedBranchId": "branch-1790889237862",
     "assignedBranchName": "Sucursal San Ildefonso",
-    "createdAt": "2 oct 2026"
+    "createdAt": "2 oct 2026",
+    "shift": "matutino",
+    "shiftName": "Turno Mañana",
+    "shiftStartTime": "06:00",
+    "shiftEndTime": "14:00"
   },
   {
     "id": "usr-ildefonso-tarde",
@@ -201,7 +245,11 @@
     "hasSystemAccess": true,
     "assignedBranchId": "branch-1790889237862",
     "assignedBranchName": "Sucursal San Ildefonso",
-    "createdAt": "05 oct 2026"
+    "createdAt": "05 oct 2026",
+    "shift": "vespertino",
+    "shiftName": "Turno Tarde",
+    "shiftStartTime": "14:00",
+    "shiftEndTime": "22:00"
   },
   {
     "id": "usr-andres",
@@ -218,7 +266,11 @@
     "hasSystemAccess": true,
     "assignedBranchId": "branch-angeles",
     "assignedBranchName": "Sucursal Los Ángeles",
-    "createdAt": "1 oct 2026"
+    "createdAt": "1 oct 2026",
+    "shift": "matutino",
+    "shiftName": "Turno Mañana",
+    "shiftStartTime": "06:00",
+    "shiftEndTime": "14:00"
   },
   {
     "id": "usr-angeles",
@@ -235,6 +287,10 @@
     "hasSystemAccess": true,
     "assignedBranchId": "branch-angeles",
     "assignedBranchName": "Sucursal Los Ángeles",
-    "createdAt": "05 oct 2026"
+    "createdAt": "05 oct 2026",
+    "shift": "vespertino",
+    "shiftName": "Turno Tarde",
+    "shiftStartTime": "14:00",
+    "shiftEndTime": "22:00"
   }
 ]
