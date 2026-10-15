@@ -221,9 +221,12 @@ export async function POST(req: NextRequest) {
         if (ordersMap.has(key)) {
           // Si ya existe, preservar siempre el estado más avanzado (ej. entregado > listo > pendiente) y mayor abono
           const existing = ordersMap.get(key)!;
-          ordersMap.set(key, pickMoreAdvancedOrder(existing, ord));
+          const best = pickMoreAdvancedOrder(existing, ord);
+          ordersMap.set(key, best);
+          await upsertOrderToSupabaseRest(best);
         } else {
           ordersMap.set(key, ord);
+          await upsertOrderToSupabaseRest(ord);
 
           // Si es un pedido nuevo en el servidor, notificar a todas las sucursales conectadas
           try {
