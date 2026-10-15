@@ -15,16 +15,6 @@ let lastFileMtime = 0;
 const RETIRED_USER_IDS = [
   "usr-3",
   "roberto",
-  "usr-carlos-b",
-  "carlos.bueno",
-  "usr-benito-tarde",
-  "cajero.benito",
-  "usr-sanjuan",
-  "usr-sofia",
-  "sofia",
-  "usr-ildefonso-tarde",
-  "cajero.ildefonso",
-  "usr-angeles",
   "usr-4",
   "juan",
 ];

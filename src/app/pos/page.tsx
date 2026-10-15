@@ -52,7 +52,7 @@ import {
   ArrowUpRight
 } from "lucide-react";
 import { Product, CartItem, Sale, CashExpense, Customer, BreadDeliveryRecord, TransferAccount, CardTerminalAccount, CashIncome, CustomOrder, OrderItem, ShiftCutRecord } from "@/types";
-import { formatCurrency, onlyNumbersKeyDown, cleanOnlyNumbers, cleanDecimalNumbers, playScanBeep, formatDateTimeSafe, parseDateTimeSafe, compareMovementsDesc, matchesCashier, getStoredShiftStartBoundary, deduplicateExpenses, deduplicateIncomes, resolveBranchId, formatTime24 } from "@/lib/utils";
+import { formatCurrency, onlyNumbersKeyDown, cleanOnlyNumbers, cleanDecimalNumbers, playScanBeep, formatDateTimeSafe, parseDateTimeSafe, compareMovementsDesc, matchesCashier, getStoredShiftStartBoundary, deduplicateExpenses, deduplicateIncomes, resolveBranchId, formatTime24, isAfternoonShift } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import { CLEAN_SLATE_EPOCH } from "@/lib/wipeOperationalData";
 import { getStoredProducts, saveStoredProducts, DEFAULT_PRODUCTS, PRODUCT_CATEGORIES, findProductByBarcodeOrCode, fetchProductsFromDb, getDeletedProductIds } from "@/lib/products";
@@ -480,10 +480,10 @@ export default function POSPage() {
   
   // Shift & Cashier state
   const [cashierName, setCashierName] = useState(() => {
+    if (user?.name && user.role !== "admin") return user.name;
     if (activeBranch?.currentShift?.cashier && !activeBranch.currentShift.cashier.includes("Cajera 2")) {
       return activeBranch.currentShift.cashier;
     }
-    if (user?.name && user.role !== "admin") return user.name;
     if (typeof window !== "undefined") {
       const stored = localStorage.getItem("brito_current_shift_cashier");
       if (stored && !stored.includes("Cajera 2")) return stored;
@@ -491,6 +491,10 @@ export default function POSPage() {
     return activeBranch ? activeBranch.currentShift.cashier : "Cajera 1 - Turno Matutino";
   });
   const [shiftName, setShiftName] = useState(() => {
+    if (user?.name && user.role !== "admin") {
+      const isAft = isAfternoonShift("", user.name, user);
+      return isAft ? "Turno Vespertino (14:00 - 22:00)" : "Turno Matutino (06:00 - 14:00)";
+    }
     if (activeBranch?.currentShift?.name) return activeBranch.currentShift.name;
     if (typeof window !== "undefined") {
       const stored = localStorage.getItem("brito_current_shift_name");
@@ -500,63 +504,15 @@ export default function POSPage() {
   });
   const getStoredShiftFund = (targetBranchId?: string, fallback?: number): number => {
     const bId = targetBranchId || activeBranch?.id || "branch-matriz";
-    const standardFund = bId === "branch-benito" ? 800 : bId === "branch-flores" ? 1200 : 1000;
-    const finalFallback = fallback !== undefined && fallback > 0 ? fallback : standardFund;
-
-    // Auto-sanitizar clave local si Matriz tiene 800 por contaminación
-    if (typeof window !== "undefined" && bId === "branch-matriz") {
-      try {
-        if (localStorage.getItem("brito_pos_initial_fund") === "800") {
-          localStorage.setItem("brito_pos_initial_fund", "1000");
-        }
-        if (localStorage.getItem("brito_pos_initial_fund_branch-matriz") === "800") {
-          localStorage.setItem("brito_pos_initial_fund_branch-matriz", "1000");
-        }
-      } catch {}
-    }
-
-    if (activeBranch?.id === bId && activeBranch?.lastCut?.nextFund !== undefined && activeBranch?.lastCut?.nextFund !== null) {
-      const cutFund = Number(activeBranch.lastCut.nextFund);
-      if (cutFund > 0 && !(bId === "branch-matriz" && cutFund === 800)) {
-        return cutFund;
-      }
-    }
-    if (activeBranch?.id === bId && activeBranch?.currentShift?.initialFund !== undefined && activeBranch?.currentShift?.initialFund !== null) {
-      const shiftFund = Number(activeBranch.currentShift.initialFund);
-      if (shiftFund > 0 && !(bId === "branch-matriz" && shiftFund === 800)) {
-        return shiftFund;
-      }
-    }
-    if (typeof window === "undefined") return finalFallback;
-    try {
-      const branchSaved = localStorage.getItem(`brito_pos_initial_fund_${bId}`);
-      if (branchSaved !== null && branchSaved !== "" && !isNaN(Number(branchSaved))) {
-        const num = Number(branchSaved);
-        if (num > 0 && !(bId === "branch-matriz" && num === 800)) return num;
-      }
-
-      if (bId === "branch-matriz") {
-        const saved = localStorage.getItem("brito_pos_initial_fund");
-        if (saved !== null && saved !== "" && !isNaN(Number(saved))) {
-          const num = Number(saved);
-          if (num > 0 && num !== 800) return num;
-        }
-      }
-
-      const raw = localStorage.getItem("brito_shift_cuts_history");
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          const branchCut = parsed.find((c: any) => c && (c.branchId === bId || (!c.branchId && bId === "branch-matriz")));
-          if (branchCut && typeof branchCut.nextFund === "number" && branchCut.nextFund > 0) {
-            if (!(bId === "branch-matriz" && branchCut.nextFund === 800)) {
-              return branchCut.nextFund;
-            }
-          }
-        }
-      }
-    } catch (e) {}
-    return finalFallback;
+    const curCashier = cashierName || activeBranch?.currentShift?.cashier || (user?.role !== "admin" ? user?.name : "");
+    const curShift = shiftName || activeBranch?.currentShift?.name || "";
+    return resolveShiftInitialFund(
+      bId,
+      activeBranch,
+      fallback,
+      curShift || curCashier,
+      user && user.role === "cajero" ? user : undefined
+    );
   };
 
   const [initialCashFund, setInitialCashFund] = useState<number>(() => {

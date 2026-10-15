@@ -3,7 +3,7 @@
 import { createClient } from "@/lib/supabase/client";
 
 // Epoch timestamp for clean slate: all operational data (notifications, orders, sales, expenses) before this epoch is discarded
-export const CLEAN_SLATE_EPOCH = 1792088450000; // 2026-10-15T18:20:50.000Z
+export const CLEAN_SLATE_EPOCH = 1792088600000; // 2026-10-15T18:23:20.000Z
 export const WIPE_VERSION_KEY = `brito_clean_slate_epoch_${CLEAN_SLATE_EPOCH}`;
 
 // Ejecución sincrónica en el cliente en cuanto el módulo se carga en el navegador

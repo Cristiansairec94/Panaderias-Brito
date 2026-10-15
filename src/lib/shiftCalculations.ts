@@ -1,5 +1,5 @@
 import { Sale, CustomOrder, CashExpense, CashIncome } from "@/types";
-import { resolveBranchId, parseDateTimeSafe, matchesCashier, getStoredShiftStartBoundary, isOrderSale } from "@/lib/utils";
+import { resolveBranchId, parseDateTimeSafe, matchesCashier, getStoredShiftStartBoundary, isOrderSale, isAfternoonShift } from "@/lib/utils";
 import { getStoredOrders, normalizeOrder, getOrderShiftCollection } from "@/lib/orders";
 import { CLEAN_SLATE_EPOCH } from "@/lib/wipeOperationalData";
 
@@ -41,28 +41,68 @@ export interface ShiftFinancialSummary {
 /**
  * Resuelve de forma canónica el Fondo Inicial de Caja para cualquier sucursal y turno.
  * Garantiza total sincronía entre Movimientos de Caja y Cerrar Turno.
+ * - Turno de la Mañana: Inicia siempre con $1,000 en caja.
+ * - Turno de la Tarde: Inicia con $0 hasta recibir el corte y remanente de la mañana.
  */
 export function resolveShiftInitialFund(
   branchId?: string,
   branchObj?: any,
-  propInitialFund?: number
+  propInitialFund?: number,
+  shiftNameOrCashier?: string,
+  userObj?: any
 ): number {
   const bId = resolveBranchId(branchId || branchObj?.id);
-  const standardFund = bId === "branch-benito" ? 800 : bId === "branch-flores" ? 1200 : 1000;
+  const isAfternoon = isAfternoonShift(
+    shiftNameOrCashier || branchObj?.currentShift?.name,
+    shiftNameOrCashier || branchObj?.currentShift?.cashier,
+    userObj
+  );
 
-  // Auto-sanitizar clave local si Matriz tiene 800 por contaminación previa
-  if (typeof window !== "undefined" && bId === "branch-matriz") {
+  // 1. Si es Turno de la Tarde (Vespertino)
+  if (isAfternoon) {
+    // Si hubo corte previo de entrega matutina, usar lo dejado por la mañana
+    if (branchObj?.lastCut?.nextFund !== undefined && branchObj?.lastCut?.nextFund !== null) {
+      return Number(branchObj.lastCut.nextFund) || 0;
+    }
+    if (typeof window !== "undefined") {
+      try {
+        const raw = localStorage.getItem("brito_shift_cuts_history");
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            const branchCut = parsed.find((c: any) => c && (c.branchId === bId || (!c.branchId && bId === "branch-matriz")));
+            if (branchCut && typeof branchCut.nextFund === "number") {
+              return branchCut.nextFund;
+            }
+          }
+        }
+        const branchSaved = localStorage.getItem(`brito_pos_initial_fund_${bId}`);
+        if (branchSaved !== null && !isNaN(Number(branchSaved))) {
+          return Number(branchSaved);
+        }
+      } catch {}
+    }
+    // Si no ha habido corte matutino que entregue el turno, la tarde inicia estrictamente en $0
+    return 0;
+  }
+
+  // 2. Turno Matutino: Fondo inicial unificado de $1,000 para todas las sucursales
+  const standardFund = 1000;
+
+  // Auto-sanitizar claves viejas si tienen 800 o 1200
+  if (typeof window !== "undefined") {
     try {
-      if (localStorage.getItem("brito_pos_initial_fund") === "800") {
-        localStorage.setItem("brito_pos_initial_fund", "1000");
+      const curSaved = localStorage.getItem(`brito_pos_initial_fund_${bId}`);
+      if (curSaved === "800" || curSaved === "1200") {
+        localStorage.setItem(`brito_pos_initial_fund_${bId}`, "1000");
       }
-      if (localStorage.getItem("brito_pos_initial_fund_branch-matriz") === "800") {
-        localStorage.setItem("brito_pos_initial_fund_branch-matriz", "1000");
+      if (bId === "branch-matriz" && localStorage.getItem("brito_pos_initial_fund") === "800") {
+        localStorage.setItem("brito_pos_initial_fund", "1000");
       }
     } catch {}
   }
 
-  // 1. Priorizar si el corte anterior o el turno activo fijaron un fondo para esta sucursal
+  // Priorizar si el corte anterior o el turno activo fijaron un fondo para esta sucursal
   if (branchObj?.lastCut?.nextFund !== undefined && branchObj?.lastCut?.nextFund !== null) {
     const cutFund = Number(branchObj.lastCut.nextFund);
     if (cutFund > 0 && !(bId === "branch-matriz" && cutFund === 800)) {
@@ -77,18 +117,18 @@ export function resolveShiftInitialFund(
     }
   }
 
-  // 2. Si se pasó como prop explícito válido
+  // Si se pasó como prop explícito válido
   if (typeof propInitialFund === "number" && propInitialFund > 0 && !(bId === "branch-matriz" && propInitialFund === 800)) {
     return propInitialFund;
   }
 
-  // 3. Revisar almacenamiento local persistido por sucursal
+  // Revisar almacenamiento local persistido por sucursal
   if (typeof window !== "undefined") {
     try {
       const branchSaved = localStorage.getItem(`brito_pos_initial_fund_${bId}`);
       if (branchSaved !== null && !isNaN(Number(branchSaved)) && Number(branchSaved) > 0) {
         const num = Number(branchSaved);
-        if (!(bId === "branch-matriz" && num === 800)) return num;
+        if (!(bId === "branch-matriz" && num === 800) && num !== 800 && num !== 1200) return num;
       }
       if (bId === "branch-matriz") {
         const matSaved = localStorage.getItem("brito_pos_initial_fund");
@@ -119,7 +159,13 @@ export function getShiftFinancialSummary(params: ShiftCalculationParams): ShiftF
   );
 
   // 2. Fondo inicial unificado
-  const initialFund = resolveShiftInitialFund(effectiveBranchId, targetBranch, params.initialFund);
+  const initialFund = resolveShiftInitialFund(
+    effectiveBranchId,
+    targetBranch,
+    params.initialFund,
+    params.cashierName || targetBranch?.currentShift?.cashier,
+    params.cashierName ? { name: params.cashierName } : undefined
+  );
 
   // 3. Recopilar y filtrar ventas de mostrador del turno
   let salesPool: Sale[] = Array.isArray(params.sales) && params.sales.length > 0 ? [...params.sales] : [];

@@ -42,7 +42,7 @@ import {
   Radio
 } from "lucide-react";
 import { CashMovement, ShiftCutRecord } from "@/types";
-import { formatCurrency, onlyNumbersKeyDown, cleanDecimalNumbers, formatDateTimeSafe, parseDateTimeSafe, getStoredShiftStartBoundary, matchesCashier, formatTime24, resolveBranchId, isOrderSale } from "@/lib/utils";
+import { formatCurrency, onlyNumbersKeyDown, cleanDecimalNumbers, formatDateTimeSafe, parseDateTimeSafe, getStoredShiftStartBoundary, matchesCashier, formatTime24, resolveBranchId, isOrderSale, isAfternoonShift } from "@/lib/utils";
 import { getOrderShiftCollection } from "@/lib/orders";
 import { CLEAN_SLATE_EPOCH } from "@/lib/wipeOperationalData";
 import { useAuth } from "@/context/AuthContext";
@@ -224,7 +224,30 @@ export default function CajaPage() {
 
   const getStoredCajaInitialFund = (fallback: number = 0): number => {
     const bId = currentBranch?.id || "branch-matriz";
-    const standardFund = bId === "branch-benito" ? 800 : bId === "branch-flores" ? 1200 : 1000;
+    const curCashier = currentShiftResponsible || currentBranch?.currentShift?.cashier || (user?.role !== "admin" ? user?.name : "");
+    const curShift = currentBranch?.currentShift?.name || "";
+    const isAfternoon = isAfternoonShift(curShift, curCashier, user);
+
+    if (isAfternoon) {
+      if (currentBranch?.lastCut?.nextFund !== undefined && currentBranch?.lastCut?.nextFund !== null) {
+        return Number(currentBranch.lastCut.nextFund) || 0;
+      }
+      try {
+        const raw = localStorage.getItem("brito_shift_cuts_history");
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            const bCut = parsed.find((c: any) => c && (c.branchId === bId || (!c.branchId && bId === "branch-matriz")));
+            if (bCut && typeof bCut.nextFund === "number") return bCut.nextFund;
+          }
+        }
+        const branchSaved = localStorage.getItem(`brito_pos_initial_fund_${bId}`);
+        if (branchSaved !== null && !isNaN(Number(branchSaved))) return Number(branchSaved);
+      } catch (e) {}
+      return 0;
+    }
+
+    const standardFund = 1000;
     const finalFallback = fallback > 0 ? fallback : standardFund;
 
     if (currentBranch?.lastCut?.nextFund !== undefined && currentBranch?.lastCut?.nextFund !== null) {
@@ -239,7 +262,7 @@ export default function CajaPage() {
       const branchSaved = localStorage.getItem(`brito_pos_initial_fund_${bId}`);
       if (branchSaved && !isNaN(Number(branchSaved)) && Number(branchSaved) > 0) {
         const num = Number(branchSaved);
-        if (!(bId === "branch-matriz" && num === 800)) return num;
+        if (!(bId === "branch-matriz" && num === 800) && num !== 800 && num !== 1200) return num;
       }
       if (bId === "branch-matriz") {
         const saved = localStorage.getItem("brito_pos_initial_fund");

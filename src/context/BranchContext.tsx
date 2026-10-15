@@ -6,7 +6,7 @@ import { realtimeHub } from "@/lib/realtime/realtimeHub";
 import { recordCashOutflowAsExpense } from "@/lib/expenses";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/context/AuthContext";
-import { parseDateTimeSafe, getStoredShiftStartBoundary, formatDateTimeSafe, compareMovementsDesc, resolveBranchId } from "@/lib/utils";
+import { parseDateTimeSafe, getStoredShiftStartBoundary, formatDateTimeSafe, compareMovementsDesc, resolveBranchId, isAfternoonShift } from "@/lib/utils";
 import { normalizeOrder, getOrderShiftCollection } from "@/lib/orders";
 import { CLEAN_SLATE_EPOCH } from "@/lib/wipeOperationalData";
 
@@ -121,7 +121,7 @@ const DEFAULT_BRANCHES: Branch[] = [
     dailyGoal: 8000,
     todaySales: 0,
     todayTickets: 0,
-    cashInDrawer: 800,
+    cashInDrawer: 1000,
     color: "rose",
     topProduct: {
       name: "Bolillo de Sal",
@@ -131,10 +131,10 @@ const DEFAULT_BRANCHES: Branch[] = [
     },
     currentShift: {
       id: "shift-ben-201",
-      name: "Turno Matutino (06:30 - 14:30)",
+      name: "Turno Matutino (06:00 - 14:00)",
       cashier: "Carlos Mendoza",
-      openedAt: "06:30 AM",
-      initialFund: 800,
+      openedAt: "06:00 AM",
+      initialFund: 1000,
       cashSales: 0,
       cardSales: 0,
       transferSales: 0,
@@ -169,9 +169,9 @@ const DEFAULT_BRANCHES: Branch[] = [
     },
     currentShift: {
       id: "shift-sju-201",
-      name: "Turno General",
+      name: "Turno Matutino (06:00 - 14:00)",
       cashier: "noe velasquez",
-      openedAt: "06:00 hrs",
+      openedAt: "06:00 AM",
       initialFund: 1000,
       cashSales: 0,
       cardSales: 0,
@@ -188,15 +188,15 @@ const DEFAULT_BRANCHES: Branch[] = [
     code: "FLO-03",
     address: "Calzada Oriente #88, Plaza Las Flores",
     phone: "55 9988 7766",
-    manager: "Elena Brito",
-    assignedUserId: "usr-elena",
-    assignedUserName: "Elena Brito",
-    assignedUserEmail: "elena@panaderiabrito.com",
+    manager: "Sofía Morales",
+    assignedUserId: "usr-sofia",
+    assignedUserName: "Sofía Morales",
+    assignedUserEmail: "sofia@panaderiabrito.com",
     status: "abierta",
     dailyGoal: 9500,
     todaySales: 0,
     todayTickets: 0,
-    cashInDrawer: 1200,
+    cashInDrawer: 1000,
     color: "amber",
     topProduct: {
       name: "Cuerno de Mantequilla",
@@ -206,10 +206,10 @@ const DEFAULT_BRANCHES: Branch[] = [
     },
     currentShift: {
       id: "shift-flo-301",
-      name: "Turno Matutino (07:00 - 15:00)",
-      cashier: "Elena Brito",
-      openedAt: "07:00 AM",
-      initialFund: 1200,
+      name: "Turno Matutino (06:00 - 14:00)",
+      cashier: "Sofía Morales",
+      openedAt: "06:00 AM",
+      initialFund: 1000,
       cashSales: 0,
       cardSales: 0,
       transferSales: 0,
@@ -280,7 +280,7 @@ const DEFAULT_BRANCHES: Branch[] = [
     },
     currentShift: {
       id: "shift-ang-301",
-      name: "Turno General",
+      name: "Turno Matutino (06:00 - 14:00)",
       cashier: "andres sanchez",
       openedAt: "06:00 AM",
       initialFund: 1000,
@@ -378,7 +378,8 @@ export function syncBranchWithUsers(branch: Branch, users: any[]): Branch {
   // 2. Si no se encuentra o el usuario asignado no coincide con la sucursal, buscar usuario activo cuya sucursal asignada coincida con este ID
   if (!assignedUser || (assignedUser.assignedBranchId && assignedUser.assignedBranchId !== branch.id)) {
     const branchUsers = users.filter((u: any) => u.assignedBranchId === branch.id && u.status !== "inactivo");
-    assignedUser = branchUsers.find((u: any) => u.role === "cajero") || 
+    assignedUser = branchUsers.find((u: any) => u.role === "cajero" && !isAfternoonShift("", "", u)) ||
+                   branchUsers.find((u: any) => u.role === "cajero") || 
                    branchUsers.find((u: any) => u.role === "supervisor") || 
                    branchUsers[0] || 
                    assignedUser;
@@ -1544,32 +1545,6 @@ function resolveBranchParam(param: string | null): string | null {
               const totalTickets = agg.deskTickets + agg.orderCount;
               const totalPieces = agg.deskPieces + agg.orderPieces;
 
-              // Fondo inicial sincronizado 100% con Caja y Corte de Turno
-              const standardFund = b.id === "branch-benito" ? 800 : b.id === "branch-flores" ? 1200 : 1000;
-              let initialFund = standardFund;
-              if (latestCut && latestCutTs >= CLEAN_SLATE_EPOCH && latestCut.nextFund !== undefined && latestCut.nextFund !== null && Number(latestCut.nextFund) > 0) {
-                const parsed = Number(latestCut.nextFund);
-                initialFund = (b.id === "branch-matriz" && parsed === 800) ? 1000 : parsed;
-              } else {
-                let savedLocalFund = 0;
-                if (typeof window !== "undefined") {
-                  const rawF = localStorage.getItem(`brito_pos_initial_fund_${b.id}`);
-                  if (rawF !== null && !isNaN(Number(rawF)) && Number(rawF) > 0) {
-                    savedLocalFund = Number(rawF);
-                  }
-                }
-                if (savedLocalFund > 0 && !(b.id === "branch-matriz" && savedLocalFund === 800)) {
-                  initialFund = savedLocalFund;
-                } else if (b.currentShift?.initialFund !== undefined && b.currentShift?.initialFund !== null && Number(b.currentShift.initialFund) > 0) {
-                  const parsed = Number(b.currentShift.initialFund);
-                  initialFund = (b.id === "branch-matriz" && parsed === 800) ? 1000 : parsed;
-                }
-              }
-
-              // Flujo de salidas: evitar doble deducción entre cash_movements y cash_expenses
-              const totalOutflows = Math.max(agg.cashOutflow, agg.expCash);
-              const calculatedCash = Math.max(0, initialFund + agg.deskCash + agg.orderCash + agg.cashInflow - totalOutflows);
-
               // Cajero del turno activo vinculado estrictamente a la plantilla de perfiles del administrador:
               const assignedEmployee = usersList.find((u) => 
                 (b.assignedUserId && u.id === b.assignedUserId && u.status !== "inactivo") || 
@@ -1580,12 +1555,12 @@ function resolveBranchParam(param: string | null): string | null {
 
               if (user && user.role === "cajero" && (user.id === b.assignedUserId || user.assignedBranchId === b.id) && user.name) {
                 activeCashier = user.name;
+              } else if (latestCut?.incomingCashier && usersList.some((u) => u.name === latestCut.incomingCashier)) {
+                activeCashier = latestCut.incomingCashier;
               } else if (assignedEmployee?.name) {
                 activeCashier = assignedEmployee.name;
               } else if (b.currentShift?.cashier && usersList.some((u) => u.name === b.currentShift.cashier)) {
                 activeCashier = b.currentShift.cashier;
-              } else if (latestCut?.incomingCashier && usersList.some((u) => u.name === latestCut.incomingCashier)) {
-                activeCashier = latestCut.incomingCashier;
               } else if (agg.lastCashier && usersList.some((u) => u.name === agg.lastCashier)) {
                 activeCashier = agg.lastCashier;
               } else if (b.manager && usersList.some((u) => u.name === b.manager)) {
@@ -1593,6 +1568,45 @@ function resolveBranchParam(param: string | null): string | null {
               } else {
                 activeCashier = "Don Toño Brito";
               }
+
+              // Determinar turno activo: si hubo corte previo, es el nextShift; de lo contrario Turno Matutino (o según cajero)
+              const activeUserObj = usersList.find((u) => u.name === activeCashier) || (user?.name === activeCashier ? user : undefined);
+              const isAfternoon = isAfternoonShift(latestCut?.nextShift || b.currentShift?.name, activeCashier, activeUserObj);
+              const shiftName = latestCut?.nextShift || (isAfternoon ? "Turno Vespertino (14:00 - 22:00)" : "Turno Matutino (06:00 - 14:00)");
+
+              // Fondo inicial sincronizado 100% con Caja y Corte de Turno:
+              // - Turno Matutino: $1,000 en todas las sucursales
+              // - Turno Vespertino: $0 hasta recibir el corte y remanente de la mañana
+              let initialFund = 1000;
+              if (isAfternoon) {
+                if (latestCut && latestCutTs >= CLEAN_SLATE_EPOCH && latestCut.nextFund !== undefined && latestCut.nextFund !== null) {
+                  initialFund = Number(latestCut.nextFund) || 0;
+                } else {
+                  initialFund = 0;
+                }
+              } else {
+                if (latestCut && latestCutTs >= CLEAN_SLATE_EPOCH && latestCut.nextFund !== undefined && latestCut.nextFund !== null && Number(latestCut.nextFund) > 0) {
+                  const parsed = Number(latestCut.nextFund);
+                  initialFund = (b.id === "branch-matriz" && parsed === 800) ? 1000 : parsed;
+                } else {
+                  let savedLocalFund = 0;
+                  if (typeof window !== "undefined") {
+                    const rawF = localStorage.getItem(`brito_pos_initial_fund_${b.id}`);
+                    if (rawF !== null && !isNaN(Number(rawF)) && Number(rawF) > 0) {
+                      savedLocalFund = Number(rawF);
+                    }
+                  }
+                  if (savedLocalFund > 0 && !(b.id === "branch-matriz" && savedLocalFund === 800) && savedLocalFund !== 800 && savedLocalFund !== 1200) {
+                    initialFund = savedLocalFund;
+                  } else {
+                    initialFund = 1000;
+                  }
+                }
+              }
+
+              // Flujo de salidas: evitar doble deducción entre cash_movements y cash_expenses
+              const totalOutflows = Math.max(agg.cashOutflow, agg.expCash);
+              const calculatedCash = Math.max(0, initialFund + agg.deskCash + agg.orderCash + agg.cashInflow - totalOutflows);
 
               return {
                 ...b,
@@ -1614,7 +1628,7 @@ function resolveBranchParam(param: string | null): string | null {
                 dayAccumulatedPieces: agg.dayAccumulatedPieces,
                 currentShift: {
                   id: b.currentShift?.id || `shift-${b.id}`,
-                  name: latestCut?.nextShift || b.currentShift?.name || (b.id === "branch-1790889237862" ? "Turno Matutino" : "Turno General"),
+                  name: shiftName,
                   cashier: activeCashier,
                   openedAt: latestCut?.date || b.currentShift?.openedAt || "06:00 AM",
                   initialFund: initialFund,

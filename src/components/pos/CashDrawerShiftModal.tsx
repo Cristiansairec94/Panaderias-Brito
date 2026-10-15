@@ -104,10 +104,16 @@ export default function CashDrawerShiftModal({
   // Fondo Inicial Sincronizado en tiempo real
   const targetBranch = (branchId ? branches.find((b) => b.id === branchId) : null) || currentBranch || branches[0];
   const targetBranchId = resolveBranchId(targetBranch?.id || branchId, cashierName);
-  const standardBranchFund = targetBranchId === "branch-benito" ? 800 : targetBranchId === "branch-flores" ? 1200 : 1000;
+  const standardBranchFund = 1000;
 
   const [syncedFund, setSyncedFund] = useState<number>(() => {
-    return resolveShiftInitialFund(targetBranchId, targetBranch, initialFund);
+    return resolveShiftInitialFund(
+      targetBranchId,
+      targetBranch,
+      initialFund,
+      shiftName || cashierName,
+      user && user.role === "cajero" ? user : undefined
+    );
   });
 
   // Limpieza defensiva en localStorage para asegurar que ningún abono de pedido o 6000 fantasma contamine las entradas
@@ -139,43 +145,15 @@ export default function CashDrawerShiftModal({
   }, [isOpen]);
 
   useEffect(() => {
-    if (currentBranch?.lastCut?.nextFund !== undefined && currentBranch?.lastCut?.nextFund !== null) {
-      const f = Number(currentBranch.lastCut.nextFund);
-      if (f > 0 && !(targetBranchId === "branch-matriz" && f === 800)) {
-        setSyncedFund(f);
-        return;
-      }
-    }
-    if (currentBranch?.currentShift?.initialFund !== undefined) {
-      const f = Number(currentBranch.currentShift.initialFund);
-      if (f > 0 && !(targetBranchId === "branch-matriz" && f === 800)) {
-        setSyncedFund(f);
-        return;
-      }
-    }
-    if (typeof window !== "undefined") {
-      const branchSaved = localStorage.getItem(`brito_pos_initial_fund_${targetBranchId}`);
-      if (branchSaved !== null && !isNaN(Number(branchSaved)) && Number(branchSaved) > 0) {
-        const num = Number(branchSaved);
-        if (!(targetBranchId === "branch-matriz" && num === 800)) {
-          setSyncedFund(num);
-          return;
-        }
-      }
-      if (targetBranchId === "branch-matriz") {
-        const saved = localStorage.getItem("brito_pos_initial_fund");
-        if (saved !== null && !isNaN(Number(saved)) && Number(saved) > 0 && Number(saved) !== 800) {
-          setSyncedFund(Number(saved));
-          return;
-        }
-      }
-    }
-    if (typeof initialFund === "number" && initialFund > 0 && !(targetBranchId === "branch-matriz" && initialFund === 800)) {
-      setSyncedFund(initialFund);
-      return;
-    }
-    setSyncedFund(standardBranchFund);
-  }, [initialFund, isOpen, currentBranch?.id, currentBranch?.lastCut, currentBranch?.currentShift?.initialFund, targetBranchId, standardBranchFund]);
+    const fund = resolveShiftInitialFund(
+      targetBranchId,
+      targetBranch,
+      initialFund,
+      shiftName || cashierName,
+      user && user.role === "cajero" ? user : undefined
+    );
+    setSyncedFund(fund);
+  }, [initialFund, isOpen, currentBranch?.id, currentBranch?.lastCut, currentBranch?.currentShift?.initialFund, targetBranchId, shiftName, cashierName, user, targetBranch]);
 
   useEffect(() => {
     const handleSync = () => {

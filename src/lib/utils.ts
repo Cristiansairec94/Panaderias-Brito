@@ -909,3 +909,11 @@ export function isOrderSale(sale: any): boolean {
   }
   return false;
 }
+
+/**
+ * Determina si un turno, cajero o usuario corresponde al Turno Vespertino (Turno de la Tarde).
+ */
+export function isAfternoonShift(shiftName?: string | null, cashierName?: string | null, userObj?: any): boolean {
+  const combined = `${shiftName || ""} ${cashierName || ""} ${userObj?.name || ""} ${userObj?.jobTitle || ""} ${userObj?.roleLabel || ""}`.toLowerCase();
+  return combined.includes("vespertino") || combined.includes("tarde") || combined.includes("vesp");
+}

@@ -354,12 +354,13 @@ export default function LoginForm() {
                   </div>
                   <div className="flex flex-wrap gap-1.5">
                     {[
-                      { name: "Silvia Puga", user: "silvia", pass: "1234", branch: "San Ildefonso", avatar: "👩‍💼" },
+                      { name: "Silvia Puga (Mañana)", user: "silvia", pass: "1234", branch: "San Ildefonso", avatar: "👩‍💼" },
+                      { name: "Cajero Ildefonso (Tarde)", user: "cajero.ildefonso", pass: "1234", branch: "San Ildefonso", avatar: "👨‍🍳" },
+                      { name: "Andrés Sánchez (Mañana)", user: "andres", pass: "1234", branch: "Los Ángeles", avatar: "👨‍💼" },
+                      { name: "Cajero Ángeles (Tarde)", user: "angeles", pass: "1234", branch: "Los Ángeles", avatar: "👨‍🍳" },
+                      { name: "Noé Velásquez (Mañana)", user: "noe", pass: "1234", branch: "San Juan", avatar: "👨‍🍳" },
                       { name: "Don Toño", user: "admin", pass: "admin", branch: "Dueño / Admin", avatar: "👨‍🍳" },
                       { name: "Paulina Brito", user: "paulina", pass: "1234", branch: "Admin General", avatar: "👩‍💼" },
-                      { name: "Noé Velásquez", user: "noe", pass: "1234", branch: "San Juan", avatar: "👨‍🍳" },
-                      { name: "Cajero Ángeles", user: "angeles", pass: "1234", branch: "Los Ángeles", avatar: "👨‍🍳" },
-                      { name: "Andrés Sánchez", user: "andres", pass: "1234", branch: "Los Ángeles", avatar: "👨‍💼" },
                     ].map((demo) => (
                       <button
                         key={demo.user}

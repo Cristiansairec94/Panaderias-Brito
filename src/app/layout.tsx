@@ -64,7 +64,7 @@ export default function RootLayout({
             __html: `
               (function() {
                 try {
-                  var WIPE_KEY = 'brito_clean_slate_epoch_1792088450000';
+                  var WIPE_KEY = 'brito_clean_slate_epoch_1792088600000';
                   if (localStorage.getItem(WIPE_KEY) !== 'true') {
                     var keys = [
                       'brito_notifications',
