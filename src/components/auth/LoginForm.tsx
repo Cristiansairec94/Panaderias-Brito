@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { Lock, User as UserIcon, ArrowRight, Eye, EyeOff, AlertCircle, Sparkles, ShieldCheck, ShieldAlert } from "lucide-react";
@@ -8,7 +8,7 @@ import { useAuth, getFriendlyName, User } from "@/context/AuthContext";
 
 export default function LoginForm() {
   const router = useRouter();
-  const { login, verifyCredentials, getDefaultRouteForUser, canAccessRoute } = useAuth();
+  const { login, verifyCredentials, getDefaultRouteForUser, canAccessRoute, usersList } = useAuth();
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -352,35 +352,55 @@ export default function LoginForm() {
                     <span className="text-[11px] font-bold text-stone-400">Acceso rápido por perfil:</span>
                     <span className="text-[10px] text-amber-400/90 font-medium">Clic para seleccionar</span>
                   </div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {[
-                      { name: "Silvia Puga (Mañana)", user: "silvia", pass: "1234", branch: "San Ildefonso", avatar: "👩‍💼" },
-                      { name: "Cajero Ildefonso (Tarde)", user: "cajero.ildefonso", pass: "1234", branch: "San Ildefonso", avatar: "👨‍🍳" },
-                      { name: "Andrés Sánchez (Mañana)", user: "andres", pass: "1234", branch: "Los Ángeles", avatar: "👨‍💼" },
-                      { name: "Cajero Ángeles (Tarde)", user: "angeles", pass: "1234", branch: "Los Ángeles", avatar: "👨‍🍳" },
-                      { name: "Noé Velásquez (Mañana)", user: "noe", pass: "1234", branch: "San Juan", avatar: "👨‍🍳" },
-                      { name: "Don Toño", user: "admin", pass: "admin", branch: "Dueño / Admin", avatar: "👨‍🍳" },
-                      { name: "Paulina Brito", user: "paulina", pass: "1234", branch: "Admin General", avatar: "👩‍💼" },
-                    ].map((demo) => (
-                      <button
-                        key={demo.user}
-                        type="button"
-                        onClick={() => {
-                          setIdentifier(demo.user);
-                          setPassword(demo.pass);
-                          setError("");
-                        }}
-                        className={`px-2.5 py-1.5 rounded-xl border text-[11px] font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
-                          identifier.toLowerCase() === demo.user
-                            ? "bg-amber-500/25 border-amber-400 text-amber-200 shadow-xs ring-1 ring-amber-400/40"
-                            : "bg-stone-900/90 border-stone-800 text-stone-300 hover:border-stone-700 hover:text-white"
-                        }`}
-                        title={`${demo.name} (${demo.branch}) - Usuario: ${demo.user}, PIN: ${demo.pass}`}
-                      >
-                        <span>{demo.avatar}</span>
-                        <span>{demo.name}</span>
-                      </button>
-                    ))}
+                  <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto pr-1">
+                    {(() => {
+                      const baseList = [
+                        { name: "Silvia Puga (Mañana)", user: "silvia", pass: "1234", branch: "San Ildefonso", avatar: "👩‍💼" },
+                        { name: "Cajero Ildefonso (Tarde)", user: "cajero.ildefonso", pass: "1234", branch: "San Ildefonso", avatar: "👨‍🍳" },
+                        { name: "Andrés Sánchez (Mañana)", user: "andres", pass: "1234", branch: "Los Ángeles", avatar: "👨‍💼" },
+                        { name: "Cajero Ángeles (Tarde)", user: "angeles", pass: "1234", branch: "Los Ángeles", avatar: "👨‍🍳" },
+                        { name: "Noé Velásquez (Mañana)", user: "noe", pass: "1234", branch: "San Juan", avatar: "👨‍🍳" },
+                        { name: "Don Toño", user: "admin", pass: "admin", branch: "Dueño / Admin", avatar: "👨‍🍳" },
+                        { name: "Paulina Brito", user: "paulina", pass: "1234", branch: "Admin General", avatar: "👩‍💼" },
+                      ];
+
+                      const customUsers = (usersList || [])
+                        .filter((u) => {
+                          if (!u.hasSystemAccess || u.status === "inactivo") return false;
+                          const uName = (u.username || "").toLowerCase().trim();
+                          return uName && !baseList.some((b) => b.user.toLowerCase() === uName);
+                        })
+                        .map((u) => ({
+                          name: `${u.name} (${u.shiftName || (u.shift === "vespertino" ? "Tarde" : "Mañana")})`,
+                          user: u.username || u.id,
+                          pass: u.password || "1234",
+                          branch: u.assignedBranchName || "General",
+                          avatar: u.avatar || "👤",
+                        }));
+
+                      const allProfiles = [...baseList, ...customUsers];
+
+                      return allProfiles.map((demo) => (
+                        <button
+                          key={demo.user}
+                          type="button"
+                          onClick={() => {
+                            setIdentifier(demo.user);
+                            setPassword(demo.pass);
+                            setError("");
+                          }}
+                          className={`px-2.5 py-1.5 rounded-xl border text-[11px] font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                            identifier.toLowerCase() === demo.user.toLowerCase()
+                              ? "bg-amber-500/25 border-amber-400 text-amber-200 shadow-xs ring-1 ring-amber-400/40"
+                              : "bg-stone-900/90 border-stone-800 text-stone-300 hover:border-stone-700 hover:text-white"
+                          }`}
+                          title={`${demo.name} (${demo.branch}) - Usuario: ${demo.user}, PIN: ${demo.pass}`}
+                        >
+                          <span>{demo.avatar}</span>
+                          <span>{demo.name}</span>
+                        </button>
+                      ));
+                    })()}
                   </div>
                 </div>
               </form>

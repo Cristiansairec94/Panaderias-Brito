@@ -374,7 +374,19 @@ export default function CajaPage() {
   const handleOpenCorteModal = () => {
     const auto = getShiftSuggestionByCurrentTime();
     setNextShiftName(auto.nextShift);
-    const candidate = usersList.find((u) => u.status !== "inactivo" && !matchesCashier(u.name, currentShiftResponsible)) || usersList[0];
+    const branchCandidates = usersList.filter(
+      (u) =>
+        u.status !== "inactivo" &&
+        !matchesCashier(u.name, currentShiftResponsible) &&
+        (resolveBranchId(u.assignedBranchId, u.name) === currentBranch?.id ||
+         u.assignedBranchId === currentBranch?.id ||
+         (!u.assignedBranchId && !u.assignedBranchName))
+    );
+    const candidate =
+      branchCandidates.find((u) => !u.id.includes("tarde") && !u.name.toLowerCase().includes("cajero san")) ||
+      branchCandidates[0] ||
+      usersList.find((u) => u.status !== "inactivo" && !matchesCashier(u.name, currentShiftResponsible)) ||
+      usersList[0];
     setIncomingCashier(candidate ? candidate.name : "Don Toño Brito");
     setPasswordError(null);
     setDeliveryPassword("");
@@ -3587,11 +3599,43 @@ export default function CajaPage() {
                       onChange={(e) => setIncomingCashier(e.target.value)}
                       className="w-full mt-1 bg-stone-50 border border-stone-300 rounded-lg px-2 py-1 text-xs font-bold text-stone-900 focus:ring-2 focus:ring-amber-500 focus:outline-none cursor-pointer"
                     >
-                      {usersList && usersList.map((u) => (
-                        <option key={u.id} value={u.name}>
-                          {u.avatar || "👤"} {u.name} — {u.jobTitle || u.roleLabel || u.role}
-                        </option>
-                      ))}
+                      {(() => {
+                        const targetShort = (currentBranch?.shortName || "").toLowerCase();
+                        const targetName = (currentBranch?.name || "").toLowerCase();
+                        const branchUsers = usersList.filter((u) => {
+                          const uBranchId = u.assignedBranchId;
+                          const uBranchName = (u.assignedBranchName || "").toLowerCase();
+                          return (
+                            (currentBranch?.id && uBranchId === currentBranch.id) ||
+                            (uBranchId && currentBranch?.id && resolveBranchId(uBranchId) === resolveBranchId(currentBranch.id)) ||
+                            (targetShort && uBranchName.includes(targetShort)) ||
+                            (targetName && targetName.includes(uBranchName))
+                          );
+                        });
+                        const otherUsers = usersList.filter(
+                          (u) => !branchUsers.some((bu) => bu.id === u.id)
+                        );
+                        return (
+                          <>
+                            <optgroup label={`Compañeros de ${currentBranch?.shortName || "esta Sucursal"}`}>
+                              {branchUsers.map((u) => (
+                                <option key={u.id} value={u.name}>
+                                  {u.avatar || "👤"} {u.name} — {u.shiftName || u.jobTitle || u.roleLabel || u.role}
+                                </option>
+                              ))}
+                            </optgroup>
+                            {otherUsers.length > 0 && (
+                              <optgroup label="Otros Compañeros / Empresa">
+                                {otherUsers.map((u) => (
+                                  <option key={u.id} value={u.name}>
+                                    {u.avatar || "👤"} {u.name} ({u.assignedBranchName || "General"})
+                                  </option>
+                                ))}
+                              </optgroup>
+                            )}
+                          </>
+                        );
+                      })()}
                     </select>
                   </div>
                 </div>
