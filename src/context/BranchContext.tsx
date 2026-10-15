@@ -21,7 +21,7 @@ export interface SimulatedSale {
   timestamp: string;
 }
 
-export const DELETED_BRANCHES_STORAGE_KEY = "brito_deleted_branch_ids";
+export const DELETED_BRANCHES_STORAGE_KEY = "brito_deleted_branch_ids_v2";
 
 export const CANONICAL_BRANCH_IDS = new Set<string>([
   "branch-matriz",
@@ -40,12 +40,9 @@ export function getDeletedBranchIds(): Set<string> {
       const arr = JSON.parse(raw);
       if (Array.isArray(arr)) {
         const filtered = arr.filter(
-          (id) => typeof id === "string" && id.trim().length > 0 && !CANONICAL_BRANCH_IDS.has(id.trim())
+          (id) => typeof id === "string" && id.trim().length > 0
         );
-        if (filtered.length !== arr.length) {
-          localStorage.setItem(DELETED_BRANCHES_STORAGE_KEY, JSON.stringify(filtered));
-        }
-        return new Set(filtered);
+        return new Set(filtered.map((id: string) => id.trim()));
       }
     }
   } catch {}
@@ -53,10 +50,10 @@ export function getDeletedBranchIds(): Set<string> {
 }
 
 export function recordDeletedBranchId(id: string): void {
-  if (typeof window === "undefined" || !id || CANONICAL_BRANCH_IDS.has(id)) return;
+  if (typeof window === "undefined" || !id) return;
   try {
     const set = getDeletedBranchIds();
-    set.add(id);
+    set.add(id.trim());
     localStorage.setItem(DELETED_BRANCHES_STORAGE_KEY, JSON.stringify(Array.from(set)));
   } catch {}
 }
@@ -65,7 +62,7 @@ export function removeDeletedBranchId(id: string): void {
   if (typeof window === "undefined" || !id) return;
   try {
     const set = getDeletedBranchIds();
-    if (set.delete(id)) {
+    if (set.delete(id.trim())) {
       localStorage.setItem(DELETED_BRANCHES_STORAGE_KEY, JSON.stringify(Array.from(set)));
     }
   } catch {}
@@ -670,6 +667,13 @@ function resolveBranchParam(param: string | null): string | null {
           const res = await fetch("/api/branches");
           if (res.ok) {
             const data = await res.json();
+            if (Array.isArray(data.deletedIds)) {
+              data.deletedIds.forEach((delId: string) => {
+                if (typeof delId === "string" && delId.trim()) {
+                  recordDeletedBranchId(delId.trim());
+                }
+              });
+            }
             if (data.success && Array.isArray(data.branches) && data.branches.length > 0) {
               serverBranches = data.branches;
             }
@@ -740,9 +744,15 @@ function resolveBranchParam(param: string | null): string | null {
             : [];
           const dbBranches = branchesRes.status === "fulfilled" && !branchesRes.value.error ? branchesRes.value.data || [] : [];
 
-          // Sincronizar sucursales inactivas de Supabase con los tombstones locales (nunca ocultar las 6 canónicas)
+          // Sincronizar sucursales eliminadas de Supabase con los tombstones locales
           dbBranches.forEach((dbB: any) => {
-            if (dbB && dbB.id && dbB.is_active === false && !CANONICAL_BRANCH_IDS.has(dbB.id)) {
+            if (
+              dbB &&
+              dbB.id &&
+              (dbB.short_name === "__DELETED__" ||
+                dbB.name === "__DELETED__" ||
+                (dbB.is_active === false && !CANONICAL_BRANCH_IDS.has(dbB.id)))
+            ) {
               recordDeletedBranchId(dbB.id);
             }
           });
@@ -1470,7 +1480,16 @@ function resolveBranchParam(param: string | null): string | null {
 
             // 4. Sincronizar datos de Supabase si existen
             dbBranches.forEach((dbB: any) => {
-              if (!dbB || !dbB.id || currentDeletedIds.has(dbB.id) || (dbB.is_active === false && !CANONICAL_BRANCH_IDS.has(dbB.id))) return;
+              if (
+                !dbB ||
+                !dbB.id ||
+                currentDeletedIds.has(dbB.id) ||
+                dbB.short_name === "__DELETED__" ||
+                dbB.name === "__DELETED__" ||
+                (dbB.is_active === false && !CANONICAL_BRANCH_IDS.has(dbB.id))
+              ) {
+                return;
+              }
               const existing = branchMap.get(dbB.id);
               if (existing) {
                 branchMap.set(dbB.id, {
@@ -1946,6 +1965,7 @@ function resolveBranchParam(param: string | null): string | null {
         .on("postgres_changes", { event: "*", schema: "public", table: "cash_movements" }, () => syncBranchesWithServer())
         .on("postgres_changes", { event: "*", schema: "public", table: "cash_expenses" }, () => syncBranchesWithServer())
         .on("postgres_changes", { event: "*", schema: "public", table: "cash_shifts" }, () => syncBranchesWithServer())
+        .on("postgres_changes", { event: "*", schema: "public", table: "branches" }, () => syncBranchesWithServer())
         .subscribe();
     } catch {}
 
@@ -2596,6 +2616,12 @@ function resolveBranchParam(param: string | null): string | null {
     }
 
     if (typeof window !== "undefined") {
+      fetch("/api/branches", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ branch: newBranch }),
+      }).catch((e) => console.warn("[BranchContext] Error calling POST /api/branches:", e));
+
       try {
         const supabase = createClient();
         supabase.from("branches").upsert({
@@ -2679,7 +2705,9 @@ function resolveBranchParam(param: string | null): string | null {
       setBranches((prev) => {
         if (prev.length <= 1) return prev;
         remainingBranches = prev.filter((b) => b.id !== branchId);
-        persistBranches(remainingBranches, true);
+        try {
+          localStorage.setItem("brito_branches_data", JSON.stringify(remainingBranches));
+        } catch {}
         return remainingBranches;
       });
 
@@ -2700,35 +2728,40 @@ function resolveBranchParam(param: string | null): string | null {
         realtimeHub.broadcastBranch("delete", targetBranch);
       }
 
-      // 4. Eliminar / Inactivar en Supabase para sincronización permanente entre terminales
+      // 4. Eliminar primero en el servidor (/api/branches) para registrar el tombstone en disco
+      if (typeof window !== "undefined") {
+        try {
+          await fetch(`/api/branches?id=${encodeURIComponent(branchId)}`, {
+            method: "DELETE",
+          });
+        } catch (e) {
+          console.warn("[BranchContext] Error calling DELETE /api/branches:", e);
+        }
+        persistBranches(remainingBranches, true);
+      }
+
+      // 5. Marcar como eliminada (__DELETED__) en Supabase para sincronización permanente entre terminales y perfiles
       try {
         const supabase = createClient();
-        const { error: delError } = await supabase.from("branches").delete().eq("id", branchId);
-        if (delError) {
-          console.warn("[BranchContext] Fallback a soft-delete en Supabase:", delError);
-          await supabase.from("branches").update({ is_active: false }).eq("id", branchId);
-        } else {
-          await supabase.from("branches").upsert(
-            {
-              id: branchId,
-              name: targetBranch?.name || "Sucursal Eliminada",
-              short_name: targetBranch?.shortName || "Eliminada",
-              address: targetBranch?.address || "N/A",
-              phone: targetBranch?.phone || null,
-              is_active: false,
-            },
-            { onConflict: "id" }
-          );
+        const { error: upsertError } = await supabase.from("branches").upsert(
+          {
+            id: branchId,
+            name: targetBranch?.name || "Sucursal Eliminada",
+            short_name: "__DELETED__",
+            address: targetBranch?.address || "N/A",
+            phone: targetBranch?.phone || null,
+            is_active: false,
+          },
+          { onConflict: "id" }
+        );
+        if (upsertError) {
+          await supabase
+            .from("branches")
+            .update({ is_active: false, short_name: "__DELETED__" })
+            .eq("id", branchId);
         }
       } catch (err) {
         console.warn("[BranchContext] Error syncing branch deletion with Supabase:", err);
-      }
-
-      // 5. Eliminar en el servidor (/api/branches)
-      if (typeof window !== "undefined") {
-        fetch(`/api/branches?id=${encodeURIComponent(branchId)}`, {
-          method: "DELETE",
-        }).catch((e) => console.warn("[BranchContext] Error calling DELETE /api/branches:", e));
       }
 
       try {

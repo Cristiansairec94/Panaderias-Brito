@@ -5,9 +5,11 @@ import { Branch } from "@/types";
 
 const DATA_DIR = path.join(process.cwd(), "src", "data");
 const BRANCHES_FILE = path.join(DATA_DIR, "branches.json");
+const DELETED_BRANCHES_FILE = path.join(DATA_DIR, "deleted_branches.json");
 
 let inMemoryBranchesCache: Branch[] | null = null;
 const deletedBranchIdsSet = new Set<string>();
+let deletedIdsLoaded = false;
 
 function ensureDataDirectory() {
   try {
@@ -19,7 +21,44 @@ function ensureDataDirectory() {
   }
 }
 
+function loadDeletedBranchIds(): Set<string> {
+  if (!deletedIdsLoaded) {
+    try {
+      ensureDataDirectory();
+      if (fs.existsSync(DELETED_BRANCHES_FILE)) {
+        const content = fs.readFileSync(DELETED_BRANCHES_FILE, "utf-8");
+        const parsed = JSON.parse(content);
+        if (Array.isArray(parsed)) {
+          parsed.forEach((id) => {
+            if (typeof id === "string" && id.trim()) {
+              deletedBranchIdsSet.add(id.trim());
+            }
+          });
+        }
+      }
+      deletedIdsLoaded = true;
+    } catch (err) {
+      console.warn("[API Branches] Error al leer deleted_branches.json:", err);
+    }
+  }
+  return deletedBranchIdsSet;
+}
+
+function saveDeletedBranchIds() {
+  try {
+    ensureDataDirectory();
+    fs.writeFileSync(
+      DELETED_BRANCHES_FILE,
+      JSON.stringify(Array.from(deletedBranchIdsSet), null, 2),
+      "utf-8"
+    );
+  } catch (err) {
+    console.warn("[API Branches] No se pudo escribir en deleted_branches.json:", err);
+  }
+}
+
 function readStoredBranches(): Branch[] {
+  loadDeletedBranchIds();
   let branches: Branch[] = [];
   if (inMemoryBranchesCache && inMemoryBranchesCache.length > 0) {
     branches = inMemoryBranchesCache;
@@ -43,6 +82,7 @@ function readStoredBranches(): Branch[] {
 }
 
 function writeStoredBranches(branches: Branch[]): boolean {
+  loadDeletedBranchIds();
   inMemoryBranchesCache = branches.filter((b) => !deletedBranchIdsSet.has(b.id));
   try {
     ensureDataDirectory();
@@ -57,6 +97,7 @@ function writeStoredBranches(branches: Branch[]): boolean {
 // GET: Obtener todas las sucursales
 export async function GET() {
   try {
+    loadDeletedBranchIds();
     const branches = readStoredBranches();
     return NextResponse.json({
       success: true,
@@ -76,6 +117,7 @@ export async function GET() {
 // POST: Registrar una nueva sucursal o sincronizar lista completa
 export async function POST(req: NextRequest) {
   try {
+    loadDeletedBranchIds();
     const body = await req.json();
     let currentBranches = readStoredBranches();
 
@@ -99,9 +141,18 @@ export async function POST(req: NextRequest) {
           updated = Array.from(mergedMap.values());
         }
         writeStoredBranches(updated);
-        return NextResponse.json({ success: true, branches: updated, count: updated.length });
+        return NextResponse.json({
+          success: true,
+          branches: updated,
+          deletedIds: Array.from(deletedBranchIdsSet),
+          count: updated.length,
+        });
       }
-      return NextResponse.json({ success: true, branches: currentBranches });
+      return NextResponse.json({
+        success: true,
+        branches: currentBranches,
+        deletedIds: Array.from(deletedBranchIdsSet),
+      });
     }
 
     // Caso 2: Alta de una sola sucursal
@@ -114,7 +165,9 @@ export async function POST(req: NextRequest) {
     }
 
     // Permitir recreación si fue previamente eliminada
-    deletedBranchIdsSet.delete(newBranch.id);
+    if (deletedBranchIdsSet.delete(newBranch.id)) {
+      saveDeletedBranchIds();
+    }
 
     // Comprobar si ya existe por ID o Código
     const existingIndex = currentBranches.findIndex(
@@ -136,6 +189,7 @@ export async function POST(req: NextRequest) {
       success: true,
       branch: newBranch,
       branches: updatedList,
+      deletedIds: Array.from(deletedBranchIdsSet),
       count: updatedList.length,
     });
   } catch (err: any) {
@@ -149,6 +203,7 @@ export async function POST(req: NextRequest) {
 // PUT: Modificar sucursal existente
 export async function PUT(req: NextRequest) {
   try {
+    loadDeletedBranchIds();
     const body = await req.json();
     const { id, updates } = body;
 
@@ -174,6 +229,7 @@ export async function PUT(req: NextRequest) {
     return NextResponse.json({
       success: true,
       branches: updatedList,
+      deletedIds: Array.from(deletedBranchIdsSet),
     });
   } catch (err: any) {
     return NextResponse.json(
@@ -186,6 +242,7 @@ export async function PUT(req: NextRequest) {
 // DELETE: Eliminar sucursal
 export async function DELETE(req: NextRequest) {
   try {
+    loadDeletedBranchIds();
     const { searchParams } = new URL(req.url);
     const id = searchParams.get("id");
 
@@ -196,16 +253,16 @@ export async function DELETE(req: NextRequest) {
       );
     }
 
-    deletedBranchIdsSet.add(id);
-
     const currentBranches = readStoredBranches();
-    if (currentBranches.length === 1 && currentBranches[0]?.id === id) {
-      deletedBranchIdsSet.delete(id);
+    if (currentBranches.length <= 1 && currentBranches.some((b) => b.id === id)) {
       return NextResponse.json(
         { success: false, error: "No se puede eliminar la única sucursal activa" },
         { status: 400 }
       );
     }
+
+    deletedBranchIdsSet.add(id);
+    saveDeletedBranchIds();
 
     const updatedList = currentBranches.filter((b) => b.id !== id);
     writeStoredBranches(updatedList);
@@ -213,6 +270,7 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({
       success: true,
       branches: updatedList,
+      deletedIds: Array.from(deletedBranchIdsSet),
       count: updatedList.length,
     });
   } catch (err: any) {
