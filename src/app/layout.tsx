@@ -64,7 +64,7 @@ export default function RootLayout({
             __html: `
               (function() {
                 try {
-                  var WIPE_KEY = 'brito_clean_slate_epoch_1791929999000';
+                  var WIPE_KEY = 'brito_clean_slate_epoch_1792088450000';
                   if (localStorage.getItem(WIPE_KEY) !== 'true') {
                     var keys = [
                       'brito_notifications',
@@ -100,10 +100,22 @@ export default function RootLayout({
                     localStorage.removeItem('brito_branches_data');
                     localStorage.removeItem('brito_branches');
                     localStorage.removeItem('brito_current_shift_start_timestamp');
+                    localStorage.removeItem('brito_current_shift_cashier');
+                    localStorage.removeItem('brito_current_shift_name');
+                    localStorage.removeItem('brito_pos_shift_locked');
                     for (var j = localStorage.length - 1; j >= 0; j--) {
                       var k = localStorage.key(j);
-                      if (k && (k.indexOf('brito_shift_start_') === 0 || k.indexOf('brito_pos_initial_fund_') === 0 || k.indexOf('brito_dismissed_terminal_orders_') === 0)) {
-                        localStorage.removeItem(k);
+                      if (k && (
+                        k.indexOf('brito_shift_start_') === 0 ||
+                        k.indexOf('brito_pos_initial_fund') === 0 ||
+                        k.indexOf('brito_dismissed_terminal_orders_') === 0 ||
+                        k.indexOf('brito_read_notifs_') === 0 ||
+                        k.indexOf('brito_active_tab_') === 0 ||
+                        k.indexOf('brito_clean_slate_epoch_') === 0
+                      )) {
+                        if (k !== WIPE_KEY) {
+                          localStorage.removeItem(k);
+                        }
                       }
                     }
                     localStorage.setItem(WIPE_KEY, 'true');

@@ -3,7 +3,7 @@
 import { createClient } from "@/lib/supabase/client";
 
 // Epoch timestamp for clean slate: all operational data (notifications, orders, sales, expenses) before this epoch is discarded
-export const CLEAN_SLATE_EPOCH = 1791929999000; // 2026-10-13T22:19:59.000Z
+export const CLEAN_SLATE_EPOCH = 1792088450000; // 2026-10-15T18:20:50.000Z
 export const WIPE_VERSION_KEY = `brito_clean_slate_epoch_${CLEAN_SLATE_EPOCH}`;
 
 // Ejecución sincrónica en el cliente en cuanto el módulo se carga en el navegador
@@ -47,15 +47,23 @@ if (typeof window !== "undefined") {
       localStorage.removeItem("brito_branches_data");
       localStorage.removeItem("brito_branches");
       localStorage.removeItem("brito_current_shift_start_timestamp");
+      localStorage.removeItem("brito_current_shift_cashier");
+      localStorage.removeItem("brito_current_shift_name");
+      localStorage.removeItem("brito_pos_shift_locked");
       for (let i = localStorage.length - 1; i >= 0; i--) {
         const k = localStorage.key(i);
         if (
           k &&
           (k.startsWith("brito_shift_start_") ||
-            k.startsWith("brito_pos_initial_fund_") ||
-            k.startsWith("brito_dismissed_terminal_orders_"))
+            k.startsWith("brito_pos_initial_fund") ||
+            k.startsWith("brito_dismissed_terminal_orders_") ||
+            k.startsWith("brito_read_notifs_") ||
+            k.startsWith("brito_active_tab_") ||
+            k.startsWith("brito_clean_slate_epoch_"))
         ) {
-          localStorage.removeItem(k);
+          if (k !== WIPE_VERSION_KEY) {
+            localStorage.removeItem(k);
+          }
         }
       }
       localStorage.setItem(WIPE_VERSION_KEY, "true");
@@ -64,6 +72,8 @@ if (typeof window !== "undefined") {
       window.dispatchEvent(new Event("brito_sales_updated"));
       window.dispatchEvent(new Event("brito_incomes_updated"));
       window.dispatchEvent(new Event("brito_gastos_updated"));
+      window.dispatchEvent(new Event("brito_branches_updated"));
+      window.dispatchEvent(new Event("brito_branches_data_updated"));
     }
   } catch (e) {}
 }
@@ -125,15 +135,24 @@ export async function executeCompleteOperationalWipe(options: { wipeSupabase?: b
 
   // Limpiar llaves dinámicas como brito_shift_start_*
   try {
+    localStorage.removeItem("brito_current_shift_start_timestamp");
+    localStorage.removeItem("brito_current_shift_cashier");
+    localStorage.removeItem("brito_current_shift_name");
+    localStorage.removeItem("brito_pos_shift_locked");
     for (let i = localStorage.length - 1; i >= 0; i--) {
       const k = localStorage.key(i);
       if (
         k &&
         (k.startsWith("brito_shift_start_") ||
-          k.startsWith("brito_pos_initial_fund_") ||
-          k.startsWith("brito_dismissed_terminal_orders_"))
+          k.startsWith("brito_pos_initial_fund") ||
+          k.startsWith("brito_dismissed_terminal_orders_") ||
+          k.startsWith("brito_read_notifs_") ||
+          k.startsWith("brito_active_tab_") ||
+          k.startsWith("brito_clean_slate_epoch_"))
       ) {
-        localStorage.removeItem(k);
+        if (k !== WIPE_VERSION_KEY) {
+          localStorage.removeItem(k);
+        }
       }
     }
   } catch (e) {}
@@ -156,7 +175,7 @@ export async function executeCompleteOperationalWipe(options: { wipeSupabase?: b
   if (wipeSupabase) {
     try {
       const supabase = createClient();
-      await supabase.from("sale_items").delete().neq("id", "00000000-0000-0000-0000-000000000000");
+      await supabase.from("sale_items").delete().neq("id", "none");
       await supabase.from("sales").delete().neq("id", "none");
       await supabase.from("custom_orders").delete().neq("id", "none");
       await supabase.from("cash_expenses").delete().neq("id", "none");
