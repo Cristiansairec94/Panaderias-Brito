@@ -223,8 +223,8 @@ export const DEMO_USERS: User[] = [
     jobTitle: "Cajero Turno Matutino",
     avatar: "📋",
     phone: "55 3344 5566",
-    status: "activo",
-    hasSystemAccess: true,
+    status: "inactivo",
+    hasSystemAccess: false,
     assignedBranchId: "branch-benito",
     assignedBranchName: "Sucursal San Benito (Mercado)",
     createdAt: "10 feb 2024",
@@ -232,6 +232,48 @@ export const DEMO_USERS: User[] = [
     shiftName: "Turno Mañana",
     shiftStartTime: "06:00",
     shiftEndTime: "14:00",
+  },
+  {
+    id: "usr-luisa",
+    name: "Luisa",
+    username: "luisa",
+    email: "luisa@panaderiabrito.com",
+    password: "1234",
+    role: "cajero",
+    roleLabel: "Cajero(a) Turno Mañana",
+    jobTitle: "Cajera Turno Matutino",
+    avatar: "👩‍💼",
+    phone: "55 2233 4455",
+    status: "activo",
+    hasSystemAccess: true,
+    assignedBranchId: "branch-benito",
+    assignedBranchName: "Sucursal San Benito (Mercado)",
+    createdAt: "15 oct 2026",
+    shift: "matutino",
+    shiftName: "Turno Mañana",
+    shiftStartTime: "06:00",
+    shiftEndTime: "14:00",
+  },
+  {
+    id: "usr-jorge",
+    name: "Jorge",
+    username: "jorge",
+    email: "jorge@panaderiabrito.com",
+    password: "1234",
+    role: "cajero",
+    roleLabel: "Cajero(a) Turno Tarde",
+    jobTitle: "Cajero Turno Vespertino",
+    avatar: "👨‍🍳",
+    phone: "55 9988 7766",
+    status: "activo",
+    hasSystemAccess: true,
+    assignedBranchId: "branch-benito",
+    assignedBranchName: "Sucursal San Benito (Mercado)",
+    createdAt: "15 oct 2026",
+    shift: "vespertino",
+    shiftName: "Turno Tarde",
+    shiftStartTime: "14:00",
+    shiftEndTime: "22:00",
   },
   {
     id: "usr-benito-tarde",
@@ -1529,6 +1571,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         : [...prevUsers, newUser];
       try {
         localStorage.setItem("brito_custom_users", JSON.stringify(updated));
+        localStorage.setItem("brito_users_list", JSON.stringify(updated));
       } catch (e) {
         console.warn("Storage quota warning saving user:", e);
       }
@@ -1546,14 +1589,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             const updatedBranches = branches.map((b: any) => {
               if (b.id === newUser.assignedBranchId) {
                 bChanged = true;
+                const isAfternoon = newUser.shift === "vespertino";
+                const shouldBeManager = (!isAfternoon && !b.manager) || b.manager === "silvia puga";
+                const shouldBeCurrentCashier = !isAfternoon || !b.currentShift?.cashier;
                 return {
                   ...b,
-                  assignedUserId: newUser.id,
-                  assignedUserName: newUser.name,
-                  manager: (b.manager === "silvia puga" || !b.manager) ? newUser.name : b.manager,
+                  assignedUserId: (!isAfternoon || !b.assignedUserId) ? newUser.id : b.assignedUserId,
+                  assignedUserName: (!isAfternoon || !b.assignedUserName) ? newUser.name : b.assignedUserName,
+                  manager: shouldBeManager ? newUser.name : b.manager,
                   currentShift: b.currentShift ? {
                     ...b.currentShift,
-                    cashier: newUser.name,
+                    cashier: shouldBeCurrentCashier ? newUser.name : b.currentShift.cashier,
                   } : b.currentShift,
                 };
               }
@@ -1593,6 +1639,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
       try {
         localStorage.setItem("brito_custom_users", JSON.stringify(updated));
+        localStorage.setItem("brito_users_list", JSON.stringify(updated));
       } catch (e) {
         console.warn("Storage quota warning updating user:", e);
       }

@@ -32,7 +32,7 @@ import {
   FileText
 } from "lucide-react";
 import { Product, Sale, CashExpense, CashIncome, ShiftCutRecord, CustomOrder } from "@/types";
-import { formatCurrency, onlyNumbersKeyDown, cleanDecimalNumbers, formatDateTimeSafe, parseDateTimeSafe, matchesCashier, getStoredShiftStartBoundary, resolveBranchId, isOrderSale, isAfternoonShift } from "@/lib/utils";
+import { formatCurrency, onlyNumbersKeyDown, cleanDecimalNumbers, formatDateTimeSafe, parseDateTimeSafe, matchesCashier, getStoredShiftStartBoundary, resolveBranchId, isOrderSale, isAfternoonShift, getEffectiveAvatar } from "@/lib/utils";
 import { getStoredOrders, syncOrdersWithServer, normalizeOrder, getOrderShiftCollection } from "@/lib/orders";
 import { getShiftFinancialSummary, resolveShiftInitialFund } from "@/lib/shiftCalculations";
 import { useNotifications, FBNotification } from "@/context/NotificationContext";
@@ -260,20 +260,41 @@ export default function CashDrawerShiftModal({
   const findProfile = useCallback((nameOrUsername: string) => {
     if (!nameOrUsername) return null;
     const clean = nameOrUsername.toLowerCase().trim();
-    return (
-      usersList.find((u) => {
-        const uName = (u.name || "").toLowerCase().trim();
-        const uUser = (u.username || "").toLowerCase().trim();
-        return (
-          uName === clean ||
-          uUser === clean ||
-          uName.includes(clean) ||
-          clean.includes(uName) ||
-          matchesCashier(u.name, nameOrUsername) ||
-          matchesCashier(u.username, nameOrUsername)
-        );
-      }) || null
-    );
+    let found = usersList.find((u) => {
+      const uName = (u.name || "").toLowerCase().trim();
+      const uUser = (u.username || "").toLowerCase().trim();
+      return (
+        uName === clean ||
+        uUser === clean ||
+        uName.includes(clean) ||
+        clean.includes(uName) ||
+        matchesCashier(u.name, nameOrUsername) ||
+        matchesCashier(u.username, nameOrUsername)
+      );
+    });
+    if (!found && typeof window !== "undefined") {
+      try {
+        const raw = localStorage.getItem("brito_custom_users") || localStorage.getItem("brito_users_list");
+        if (raw) {
+          const list = JSON.parse(raw);
+          if (Array.isArray(list)) {
+            found = list.find((u: any) => {
+              const uName = (u.name || "").toLowerCase().trim();
+              const uUser = (u.username || "").toLowerCase().trim();
+              return (
+                uName === clean ||
+                uUser === clean ||
+                uName.includes(clean) ||
+                clean.includes(uName) ||
+                matchesCashier(u.name, nameOrUsername) ||
+                matchesCashier(u.username, nameOrUsername)
+              );
+            });
+          }
+        }
+      } catch {}
+    }
+    return found || null;
   }, [usersList]);
 
   const outgoingProfile = useMemo(() => findProfile(outgoingCashier), [outgoingCashier, findProfile]);
@@ -1202,7 +1223,7 @@ export default function CashDrawerShiftModal({
 
                       <div className="flex items-center gap-2.5 mt-1">
                         <div className="w-10 h-10 rounded-2xl bg-rose-50 border border-rose-200 flex items-center justify-center text-xl shrink-0 shadow-2xs">
-                          {outgoingProfile?.avatar || "👩‍🍳"}
+                          {getEffectiveAvatar(outgoingProfile, outgoingCashier)}
                         </div>
 
                         <div className="flex-1 min-w-0">
@@ -1237,7 +1258,7 @@ export default function CashDrawerShiftModal({
 
                       <div className="flex items-center gap-2.5 mt-1">
                         <div className="w-10 h-10 rounded-2xl bg-emerald-50 border border-emerald-300 flex items-center justify-center text-xl shrink-0 shadow-2xs">
-                          {incomingProfile?.avatar || "👩‍💼"}
+                          {getEffectiveAvatar(incomingProfile, incomingCashier)}
                         </div>
 
                         <div className="flex-1 min-w-0">

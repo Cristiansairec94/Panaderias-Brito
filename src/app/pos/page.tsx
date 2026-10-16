@@ -52,7 +52,7 @@ import {
   ArrowUpRight
 } from "lucide-react";
 import { Product, CartItem, Sale, CashExpense, Customer, BreadDeliveryRecord, TransferAccount, CardTerminalAccount, CashIncome, CustomOrder, OrderItem, ShiftCutRecord } from "@/types";
-import { formatCurrency, onlyNumbersKeyDown, cleanOnlyNumbers, cleanDecimalNumbers, playScanBeep, formatDateTimeSafe, parseDateTimeSafe, compareMovementsDesc, matchesCashier, getStoredShiftStartBoundary, deduplicateExpenses, deduplicateIncomes, resolveBranchId, formatTime24, isAfternoonShift } from "@/lib/utils";
+import { formatCurrency, onlyNumbersKeyDown, cleanOnlyNumbers, cleanDecimalNumbers, playScanBeep, formatDateTimeSafe, parseDateTimeSafe, compareMovementsDesc, matchesCashier, getStoredShiftStartBoundary, deduplicateExpenses, deduplicateIncomes, resolveBranchId, formatTime24, isAfternoonShift, getEffectiveAvatar } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import { CLEAN_SLATE_EPOCH } from "@/lib/wipeOperationalData";
 import { getStoredProducts, saveStoredProducts, DEFAULT_PRODUCTS, PRODUCT_CATEGORIES, findProductByBarcodeOrCode, fetchProductsFromDb, getDeletedProductIds } from "@/lib/products";
@@ -2888,7 +2888,7 @@ export default function POSPage() {
                   <div className="flex items-center justify-between p-3.5 bg-gradient-to-r from-emerald-950/80 to-stone-900 border border-emerald-500/40 rounded-2xl">
                     <div className="flex items-center gap-2.5 min-w-0">
                       <div className="w-9 h-9 bg-emerald-600/30 rounded-xl border border-emerald-400/40 flex items-center justify-center text-lg shrink-0">
-                        {matchedUser?.avatar || "👨‍🍳"}
+                        {getEffectiveAvatar(matchedUser, incomingCashierName)}
                       </div>
                       <div className="min-w-0">
                         <span className="text-[10px] text-emerald-400 uppercase font-black tracking-wider block">

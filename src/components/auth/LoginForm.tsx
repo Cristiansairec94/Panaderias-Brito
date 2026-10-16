@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { Lock, User as UserIcon, ArrowRight, Eye, EyeOff, AlertCircle, Sparkles, ShieldCheck, ShieldAlert } from "lucide-react";
 import { useAuth, getFriendlyName, User } from "@/context/AuthContext";
+import { getEffectiveAvatar } from "@/lib/utils";
 
 export default function LoginForm() {
   const router = useRouter();
@@ -359,6 +360,8 @@ export default function LoginForm() {
                         : [
                             { name: "Sebastián Brito", username: "sebastian", password: "1234", assignedBranchName: "San Ildefonso", avatar: "👨‍💼", shiftName: "Mañana" },
                             { name: "Enrique", username: "enrique", password: "1234", assignedBranchName: "San Ildefonso", avatar: "👨‍🍳", shiftName: "Tarde" },
+                            { name: "Luisa", username: "luisa", password: "1234", assignedBranchName: "San Benito", avatar: "👩‍💼", shiftName: "Mañana" },
+                            { name: "Jorge", username: "jorge", password: "1234", assignedBranchName: "San Benito", avatar: "👨‍🍳", shiftName: "Tarde" },
                             { name: "Andrés Sánchez", username: "andres", password: "1234", assignedBranchName: "Los Ángeles", avatar: "👨‍💼", shiftName: "Mañana" },
                             { name: "Cajero Ángeles", username: "angeles", password: "1234", assignedBranchName: "Los Ángeles", avatar: "👨‍🍳", shiftName: "Tarde" },
                             { name: "Noé Velásquez", username: "noe", password: "1234", assignedBranchName: "San Juan", avatar: "👨‍🍳", shiftName: "Mañana" },
@@ -370,7 +373,7 @@ export default function LoginForm() {
                         user: u.username || u.id,
                         pass: u.password || "1234",
                         branch: u.assignedBranchName || "General",
-                        avatar: u.avatar || "👤",
+                        avatar: getEffectiveAvatar(u, u.name),
                       }));
 
                       return allProfiles.map((demo) => (

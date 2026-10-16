@@ -39,7 +39,7 @@ import {
 } from "lucide-react";
 import { useAuth, User } from "@/context/AuthContext";
 import { useBranch } from "@/context/BranchContext";
-import { onlyNumbersKeyDown, cleanOnlyNumbers, compressImageFile, isAfternoonShift } from "@/lib/utils";
+import { onlyNumbersKeyDown, cleanOnlyNumbers, compressImageFile, isAfternoonShift, getEffectiveAvatar } from "@/lib/utils";
 import { UserRole } from "@/types";
 
 const PUESTOS_PANADERIA = [
@@ -374,12 +374,15 @@ export default function EmployeeManagement({ onGoToUsersTab }: EmployeeManagemen
       }
     }
 
+    const finalAvatar = formPhotoUrl || getEffectiveAvatar({ avatar: formAvatar, name: formName.trim() }, formName.trim());
+    const targetUserId = editingEmployeeId || `emp-${Date.now()}`;
+
     if (editingEmployeeId) {
       updateUser(editingEmployeeId, {
         name: formName.trim(),
         jobTitle: finalJobTitle,
         phone: formPhone.trim(),
-        avatar: formPhotoUrl || formAvatar,
+        avatar: finalAvatar,
         photoUrl: formPhotoUrl || undefined,
         status: formStatus,
         assignedBranchId: formBranchId || undefined,
@@ -399,9 +402,8 @@ export default function EmployeeManagement({ onGoToUsersTab }: EmployeeManagemen
       });
       showToast(`Ficha y credenciales de "${formName}" actualizadas con éxito.`);
     } else {
-      const newId = `emp-${Date.now()}`;
       const newUser: User = {
-        id: newId,
+        id: targetUserId,
         name: formName.trim(),
         jobTitle: finalJobTitle,
         username: formHasAccess ? finalUsername : undefined,
@@ -410,7 +412,7 @@ export default function EmployeeManagement({ onGoToUsersTab }: EmployeeManagemen
         password: formHasAccess ? finalPassword : undefined,
         role: formHasAccess ? formRole : "cajero",
         roleLabel: formHasAccess ? roleLabelToSave : finalJobTitle,
-        avatar: formPhotoUrl || formAvatar,
+        avatar: finalAvatar,
         photoUrl: formPhotoUrl || undefined,
         status: formStatus,
         hasSystemAccess: formHasAccess,
@@ -430,16 +432,23 @@ export default function EmployeeManagement({ onGoToUsersTab }: EmployeeManagemen
     if (formBranchId) {
       const targetB = branches.find((b) => b.id === formBranchId);
       if (targetB) {
-        updateBranch(formBranchId, {
-          assignedUserId: editingEmployeeId || undefined,
-          assignedUserName: formName.trim(),
-          assignedUserEmail: formHasAccess ? `${finalUsername}@panaderiabrito.com` : undefined,
-          manager: formName.trim(),
-          currentShift: targetB.currentShift ? {
-            ...targetB.currentShift,
-            cashier: formName.trim(),
-          } : undefined,
-        });
+        const isAfternoon = formShift === "vespertino";
+        const isAlreadyManager = targetB.assignedUserId === targetUserId || targetB.manager === formName.trim();
+        const shouldSetManager = (!isAfternoon && (!targetB.manager || targetB.manager === "silvia puga")) || isAlreadyManager;
+        const shouldSetCashier = !isAfternoon || !targetB.currentShift?.cashier;
+
+        if (shouldSetManager || shouldSetCashier) {
+          updateBranch(formBranchId, {
+            assignedUserId: shouldSetManager ? targetUserId : targetB.assignedUserId,
+            assignedUserName: shouldSetManager ? formName.trim() : targetB.assignedUserName,
+            assignedUserEmail: (shouldSetManager && formHasAccess) ? `${finalUsername}@panaderiabrito.com` : targetB.assignedUserEmail,
+            manager: shouldSetManager ? formName.trim() : targetB.manager,
+            currentShift: targetB.currentShift ? {
+              ...targetB.currentShift,
+              cashier: shouldSetCashier ? formName.trim() : targetB.currentShift.cashier,
+            } : undefined,
+          });
+        }
       }
     }
 
@@ -1039,6 +1048,13 @@ export default function EmployeeManagement({ onGoToUsersTab }: EmployeeManagemen
                         // Auto-fill username if empty or matching previous name
                         if (!editingEmployeeId && (!formUsername || formUsername === generateSuggestedUsername(formName))) {
                           setFormUsername(generateSuggestedUsername(val));
+                        }
+                        // Auto-adjust default avatar for new employee if they haven't uploaded a photo
+                        if (!editingEmployeeId && !formPhotoUrl) {
+                          const suggested = getEffectiveAvatar({ avatar: formAvatar, name: val }, val);
+                          if (suggested && (formAvatar === "👩‍💼" || formAvatar === "👨‍💼" || formAvatar === "👨‍🍳")) {
+                            setFormAvatar(suggested);
+                          }
                         }
                       }}
                       className="w-full px-3.5 py-2.5 bg-stone-50 border border-stone-200 rounded-xl font-bold text-stone-900 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none"

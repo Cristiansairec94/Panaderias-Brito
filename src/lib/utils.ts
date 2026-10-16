@@ -558,6 +558,23 @@ export function matchesCashier(itemCashier?: string, targetCashier?: string): bo
 }
 
 /**
+ * Obtiene el avatar representativo para un usuario o cajero, detectando inteligentemente
+ * el género por el nombre si el avatar guardado es el placeholder genérico 👩‍💼 o está vacío.
+ */
+export function getEffectiveAvatar(user?: { name?: string; avatar?: string; photoUrl?: string } | null, fallbackName?: string): string {
+  if (user?.photoUrl) return user.photoUrl;
+  const name = (user?.name || fallbackName || "").toLowerCase().trim();
+  const isMale = /^(jorge|carlos|juan|pedro|sebastian|sebastián|andres|andrés|enrique|luis|miguel|jose|josé|antonio|francisco|alejandro|fernando|manuel|roberto|ricardo|victor|víctor|mario|diego|angel|ángel|raul|raúl|hector|héctor|gustavo|javier|arturo|salvador|oscar|óscar|noe|noé|cajero)\b/i.test(name);
+  if (user?.avatar && user.avatar !== "👩‍💼" && user.avatar !== "👩‍🍳") {
+    return user.avatar;
+  }
+  if (isMale) {
+    return "👨‍🍳";
+  }
+  return user?.avatar || "👩‍💼";
+}
+
+/**
  * Obtiene el timestamp de inicio del turno actual a partir del último corte cerrado
  * o de la clave almacenada de inicio de turno (con soporte para aislamiento por sucursal).
  */
@@ -839,7 +856,7 @@ export function resolveBranchId(rawBranchId: string | null | undefined, cashierN
           }
         } catch {}
 
-        const rawUsers = localStorage.getItem("brito_custom_users");
+        const rawUsers = localStorage.getItem("brito_custom_users") || localStorage.getItem("brito_users_list");
         if (rawUsers) {
           const users = JSON.parse(rawUsers);
           if (Array.isArray(users)) {
@@ -894,7 +911,7 @@ export function resolveBranchId(rawBranchId: string | null | undefined, cashierN
 
     // 3. Reconocimiento de palabras clave y nombres canónicos con normalización estricta
     if (cNorm.includes("angeles") || cNorm.includes("lazaro") || cNorm.includes("andres")) return "branch-angeles";
-    if (cNorm.includes("benito") || cNorm.includes("mendoza") || cNorm === "ana" || cNorm.startsWith("ana ")) return "branch-benito";
+    if (cNorm.includes("benito") || cNorm.includes("mendoza") || cNorm.includes("jorge") || cNorm.includes("luisa") || cNorm === "ana" || cNorm.startsWith("ana ")) return "branch-benito";
     if (cNorm.includes("ildefonso") || cNorm.includes("sebastian") || cNorm.includes("silvia") || cNorm.includes("puga") || cNorm.includes("enrique")) return "branch-1790889237862";
     if (cNorm.includes("sanjuan") || cNorm.includes("san juan") || cNorm.includes("noe") || cNorm.includes("velasquez")) return "branch-sanjuan";
     if (cNorm.includes("flores") || cNorm.includes("sofia") || cNorm.includes("elena") || cNorm.includes("carmen")) return "branch-flores";
@@ -942,8 +959,30 @@ export function isAfternoonShift(shiftName?: string | null, cashierName?: string
   if (combined.includes("vespertino") || combined.includes("tarde") || combined.includes("vesp")) {
     return true;
   }
-  if (combined.includes("enrique") || combined.includes("bueno") || combined.includes("elena")) {
+  if (combined.includes("enrique") || combined.includes("bueno") || combined.includes("elena") || combined.includes("jorge")) {
     return true;
+  }
+  if (cashierName && typeof window !== "undefined") {
+    try {
+      const rawUsers = localStorage.getItem("brito_custom_users") || localStorage.getItem("brito_users_list");
+      if (rawUsers) {
+        const users = JSON.parse(rawUsers);
+        if (Array.isArray(users)) {
+          const cNorm = cashierName.toLowerCase().trim();
+          const u = users.find((user: any) => {
+            const uName = (user.name || "").toLowerCase().trim();
+            const uUser = (user.username || "").toLowerCase().trim();
+            return uName === cNorm || uUser === cNorm || (uName.length > 2 && cNorm.includes(uName)) || (cNorm.length > 2 && uName.includes(cNorm));
+          });
+          if (u) {
+            const uShift = `${u.shift || ""} ${u.shiftName || ""} ${u.jobTitle || ""} ${u.roleLabel || ""}`.toLowerCase();
+            if (uShift.includes("vespertino") || uShift.includes("tarde") || uShift.includes("vesp")) {
+              return true;
+            }
+          }
+        }
+      }
+    } catch {}
   }
   return false;
 }
