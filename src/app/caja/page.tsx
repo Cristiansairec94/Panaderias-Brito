@@ -377,15 +377,15 @@ export default function CajaPage() {
     const branchCandidates = usersList.filter(
       (u) =>
         u.status !== "inactivo" &&
+        u.role !== "admin" &&
+        u.role !== "panadero" &&
         !matchesCashier(u.name, currentShiftResponsible) &&
         (resolveBranchId(u.assignedBranchId, u.name) === currentBranch?.id ||
-         u.assignedBranchId === currentBranch?.id ||
-         (!u.assignedBranchId && !u.assignedBranchName))
+         u.assignedBranchId === currentBranch?.id)
     );
     const candidate =
-      branchCandidates.find((u) => !u.id.includes("tarde") && !u.name.toLowerCase().includes("cajero san")) ||
       branchCandidates[0] ||
-      usersList.find((u) => u.status !== "inactivo" && !matchesCashier(u.name, currentShiftResponsible)) ||
+      usersList.find((u) => u.status !== "inactivo" && u.role !== "admin" && !matchesCashier(u.name, currentShiftResponsible)) ||
       usersList[0];
     setIncomingCashier(candidate ? candidate.name : "Don Toño Brito");
     setPasswordError(null);
@@ -3606,35 +3606,21 @@ export default function CajaPage() {
                           const uBranchId = u.assignedBranchId;
                           const uBranchName = (u.assignedBranchName || "").toLowerCase();
                           return (
-                            (currentBranch?.id && uBranchId === currentBranch.id) ||
-                            (uBranchId && currentBranch?.id && resolveBranchId(uBranchId) === resolveBranchId(currentBranch.id)) ||
-                            (targetShort && uBranchName.includes(targetShort)) ||
-                            (targetName && targetName.includes(uBranchName))
+                            u.status !== "inactivo" &&
+                            u.role !== "admin" &&
+                            u.role !== "panadero" &&
+                            ((currentBranch?.id && uBranchId === currentBranch.id) ||
+                             (uBranchId && currentBranch?.id && resolveBranchId(uBranchId) === resolveBranchId(currentBranch.id)) ||
+                             (targetShort && uBranchName.includes(targetShort)) ||
+                             (targetName && targetName.includes(uBranchName)))
                           );
                         });
-                        const otherUsers = usersList.filter(
-                          (u) => !branchUsers.some((bu) => bu.id === u.id)
-                        );
-                        return (
-                          <>
-                            <optgroup label={`Compañeros de ${currentBranch?.shortName || "esta Sucursal"}`}>
-                              {branchUsers.map((u) => (
-                                <option key={u.id} value={u.name}>
-                                  {u.avatar || "👤"} {u.name} — {u.shiftName || u.jobTitle || u.roleLabel || u.role}
-                                </option>
-                              ))}
-                            </optgroup>
-                            {otherUsers.length > 0 && (
-                              <optgroup label="Otros Compañeros / Empresa">
-                                {otherUsers.map((u) => (
-                                  <option key={u.id} value={u.name}>
-                                    {u.avatar || "👤"} {u.name} ({u.assignedBranchName || "General"})
-                                  </option>
-                                ))}
-                              </optgroup>
-                            )}
-                          </>
-                        );
+                        const list = branchUsers.length > 0 ? branchUsers : usersList.filter(u => u.status !== "inactivo");
+                        return list.map((u) => (
+                          <option key={u.id} value={u.name}>
+                            {u.avatar || "👤"} {u.name} — {u.shiftName || u.jobTitle || u.roleLabel || u.role}
+                          </option>
+                        ));
                       })()}
                     </select>
                   </div>

@@ -274,49 +274,27 @@ export default function CashDrawerShiftModal({
     return resolveBranchId(branchId || currentBranch?.id, cashierName);
   }, [branchId, currentBranch?.id, cashierName]);
 
-  // Candidatos de esta sucursal a recibir el turno (sin recortar a 2 perfiles)
-  const branchRecipientCandidates = useMemo(() => {
+  // Filtrar única y estrictamente los cajeros de ESTA sucursal (máximo 2: Turno Mañana y Turno Tarde)
+  // Los perfiles deben permanecer estables y asignados a su sucursal
+  const branchUsers = useMemo(() => {
     const list = usersList.filter(
       (u) =>
         u.status !== "inactivo" &&
         u.role !== "admin" &&
+        u.role !== "auxiliar_admin" &&
         u.role !== "panadero" &&
-        !matchesCashier(u.name, outgoingCashier) &&
         (resolveBranchId(u.assignedBranchId, u.name) === effectiveBranchId ||
-         u.assignedBranchId === effectiveBranchId ||
-         (!u.assignedBranchId && !u.assignedBranchName))
+         u.assignedBranchId === effectiveBranchId)
     );
-    // Ordenar: primero los empleados creados o personalizados reales (no los genéricos si hay otro), luego por turno
+    // Ordenar siempre: primero Turno Matutino, luego Turno Vespertino
     list.sort((a, b) => {
-      const isGenericA = a.id.includes("tarde") || a.name.toLowerCase().includes("cajero san") ? 1 : 0;
-      const isGenericB = b.id.includes("tarde") || b.name.toLowerCase().includes("cajero san") ? 1 : 0;
-      if (isGenericA !== isGenericB) return isGenericA - isGenericB;
       const isVespA = getShiftType(a) === "Turno Vespertino" ? 1 : 0;
       const isVespB = getShiftType(b) === "Turno Vespertino" ? 1 : 0;
       return isVespA - isVespB;
     });
-    // Si no hay candidatos distintos a quien entrega, incluir a todos los de la sucursal
-    if (list.length === 0) {
-      return usersList.filter(
-        (u) =>
-          u.status !== "inactivo" &&
-          u.role !== "admin" &&
-          (resolveBranchId(u.assignedBranchId, u.name) === effectiveBranchId ||
-           u.assignedBranchId === effectiveBranchId)
-      );
-    }
-    return list;
-  }, [usersList, effectiveBranchId, outgoingCashier]);
-
-  // Otros candidatos de apoyo / relevo de otras sucursales
-  const otherRecipientCandidates = useMemo(() => {
-    return usersList.filter(
-      (u) =>
-        u.status !== "inactivo" &&
-        !matchesCashier(u.name, outgoingCashier) &&
-        !branchRecipientCandidates.some((bc) => bc.id === u.id)
-    );
-  }, [usersList, outgoingCashier, branchRecipientCandidates]);
+    // Garantizar que no exceda 2 perfiles estables
+    return list.slice(0, 2);
+  }, [usersList, effectiveBranchId]);
 
   const outgoingShiftType = useMemo(() => {
     return getShiftType(outgoingProfile, outgoingCashier);
@@ -344,31 +322,44 @@ export default function CashDrawerShiftModal({
   useEffect(() => {
     if (!isOpen) return;
 
-    // Determinar saliente
-    const currentOutgoing = cashierName || currentBranch?.currentShift?.cashier || "Cajero";
-    setOutgoingCashier(currentOutgoing);
+    if (branchUsers.length === 0) {
+      const currentOutgoing = cashierName || currentBranch?.currentShift?.cashier || "Cajero";
+      setOutgoingCashier(currentOutgoing);
+      setIncomingCashier("Siguiente Cajero(a)");
+      setNextShiftName(new Date().getHours() >= 14 ? "Turno Matutino (06:00 - 14:00)" : "Turno Vespertino (14:00 - 22:00)");
+      return;
+    }
+
+    const morningCashier = branchUsers.find((u) => getShiftType(u) === "Turno Matutino") || branchUsers[0];
+    const afternoonCashier = branchUsers.find((u) => getShiftType(u) === "Turno Vespertino") || branchUsers[1] || branchUsers[0];
+    const activeBranchObj = (branchId ? branches.find((b) => b.id === branchId) : null) || currentBranch;
+    const branchActiveCashier = activeBranchObj?.currentShift?.cashier || "";
 
     // Determinar si quien entrega es turno de la tarde o de la mañana
-    const outgoingProf = findProfile(currentOutgoing);
-    const isAfternoonActive = getShiftType(outgoingProf, currentOutgoing) === "Turno Vespertino";
-
-    // Buscar compañero del turno opuesto en esta sucursal (priorizar empleados reales)
-    const targetShiftType = isAfternoonActive ? "Turno Matutino" : "Turno Vespertino";
-    const bestCandidate =
-      branchRecipientCandidates.find((u) => getShiftType(u) === targetShiftType && !u.id.includes("tarde") && !u.name.toLowerCase().includes("cajero san")) ||
-      branchRecipientCandidates.find((u) => getShiftType(u) === targetShiftType) ||
-      branchRecipientCandidates[0] ||
-      otherRecipientCandidates[0];
-
-    if (bestCandidate) {
-      setIncomingCashier(bestCandidate.name);
-      setNextShiftName(
-        getShiftType(bestCandidate) === "Turno Vespertino"
-          ? "Turno Vespertino (14:00 - 22:00)"
-          : "Turno Matutino (06:00 - 14:00)"
-      );
+    let isAfternoonActive = false;
+    if (cashierName && matchesCashier(afternoonCashier.name, cashierName)) {
+      isAfternoonActive = true;
+    } else if (cashierName && matchesCashier(morningCashier.name, cashierName)) {
+      isAfternoonActive = false;
+    } else if (branchActiveCashier && matchesCashier(afternoonCashier.name, branchActiveCashier)) {
+      isAfternoonActive = true;
+    } else if (branchActiveCashier && matchesCashier(morningCashier.name, branchActiveCashier)) {
+      isAfternoonActive = false;
+    } else {
+      // Si es administrador o no coincide, usar la hora del día (>= 14:00 turno tarde)
+      isAfternoonActive = new Date().getHours() >= 14;
     }
-  }, [isOpen, branchRecipientCandidates, otherRecipientCandidates, cashierName, currentBranch?.currentShift?.cashier, findProfile]);
+
+    if (isAfternoonActive) {
+      setOutgoingCashier(afternoonCashier.name);
+      setIncomingCashier(morningCashier.name);
+      setNextShiftName("Turno Matutino (06:00 - 14:00)");
+    } else {
+      setOutgoingCashier(morningCashier.name);
+      setIncomingCashier(afternoonCashier.name);
+      setNextShiftName("Turno Vespertino (14:00 - 22:00)");
+    }
+  }, [isOpen, branchUsers, cashierName, branchId, branches, currentBranch]);
 
   useEffect(() => {
     if (isOpen) {
@@ -1200,67 +1191,35 @@ export default function CashDrawerShiftModal({
                       </div>
                     </div>
 
-                    {/* Tarjeta: QUIÉN RECIBE (Interactivo con Selector de Compañero) */}
-                    <div className="bg-white p-3 sm:p-3.5 rounded-2xl border-2 border-emerald-400 shadow-xs flex flex-col justify-between gap-1.5 ring-2 ring-emerald-500/15 transition-all">
+                    {/* Tarjeta: QUIÉN RECIBE */}
+                    <div className="bg-white p-3 sm:p-3.5 rounded-2xl border-2 border-emerald-300 shadow-xs flex flex-col justify-between gap-1.5 ring-2 ring-emerald-500/10 transition-all">
                       <div className="flex items-center justify-between gap-2">
-                        <label htmlFor="incoming-cashier-select" className="font-black text-emerald-800 uppercase shrink-0 text-xs sm:text-sm flex items-center gap-1.5">
-                          <span className="text-base">🤝</span> ¿A QUIÉN ENTREGA EL TURNO? (RECIBE):
-                        </label>
-                        <span className="text-[10px] text-emerald-800 font-bold bg-emerald-100 border border-emerald-300 px-2 py-0.5 rounded-md truncate">
-                          Relevo de Caja
+                        <span className="font-black text-emerald-700 uppercase shrink-0 text-xs sm:text-sm flex items-center gap-1.5">
+                          <span className="text-base">👤</span> RECIBE:
                         </span>
+                        {(incomingProfile?.assignedBranchName || currentBranch?.name) && (
+                          <span className="text-[10px] text-emerald-800 font-bold bg-emerald-100/80 border border-emerald-200 px-2 py-0.5 rounded-md truncate max-w-[150px]">
+                            📍 {(incomingProfile?.assignedBranchName || currentBranch?.name || "").replace("Sucursal ", "")}
+                          </span>
+                        )}
                       </div>
 
-                      <div className="flex items-center gap-2.5 mt-1.5">
-                        <div className="w-10 h-10 rounded-2xl bg-emerald-100/80 border border-emerald-300 flex items-center justify-center text-xl shrink-0 shadow-2xs">
+                      <div className="flex items-center gap-2.5 mt-1">
+                        <div className="w-10 h-10 rounded-2xl bg-emerald-50 border border-emerald-300 flex items-center justify-center text-xl shrink-0 shadow-2xs">
                           {incomingProfile?.avatar || "👩‍💼"}
                         </div>
 
-                        <div className="flex-1 min-w-0 space-y-1">
-                          <select
-                            id="incoming-cashier-select"
-                            value={incomingCashier}
-                            onChange={(e) => {
-                              const chosenName = e.target.value;
-                              setIncomingCashier(chosenName);
-                              const chosenProfile = findProfile(chosenName);
-                              const shiftT = getShiftType(chosenProfile, chosenName);
-                              if (shiftT === "Turno Vespertino") {
-                                setNextShiftName("Turno Vespertino (14:00 - 22:00)");
-                              } else {
-                                setNextShiftName("Turno Matutino (06:00 - 14:00)");
-                              }
-                            }}
-                            className="w-full bg-emerald-50/70 hover:bg-emerald-50 border-2 border-emerald-300 rounded-xl px-2.5 py-1.5 text-xs font-black text-emerald-950 focus:ring-2 focus:ring-emerald-500 focus:outline-none cursor-pointer"
-                          >
-                            <optgroup label={`Compañeros de ${targetBranch?.shortName || "esta Sucursal"}`}>
-                              {branchRecipientCandidates.map((u) => (
-                                <option key={u.id} value={u.name}>
-                                  {u.avatar || "👤"} {u.name} — {u.shiftName || (getShiftType(u) === "Turno Vespertino" ? "Turno Tarde" : "Turno Mañana")}
-                                </option>
-                              ))}
-                            </optgroup>
-                            {otherRecipientCandidates.length > 0 && (
-                              <optgroup label="Otros compañeros de la empresa / Relevo">
-                                {otherRecipientCandidates.map((u) => (
-                                  <option key={u.id} value={u.name}>
-                                    {u.avatar || "👤"} {u.name} ({u.assignedBranchName || "General"})
-                                  </option>
-                                ))}
-                              </optgroup>
-                            )}
-                          </select>
-
-                          <div className="flex items-center gap-2 flex-wrap text-[10.5px]">
-                            <span className={`font-bold px-2 py-0.5 rounded-full inline-flex items-center shrink-0 border ${
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-black text-emerald-950 text-xs sm:text-sm capitalize truncate">
+                              {incomingCashier}
+                            </span>
+                            <span className={`text-[10.5px] font-bold px-2.5 py-0.5 rounded-full inline-flex items-center shrink-0 border shadow-2xs ${
                               incomingShiftType === "Turno Matutino"
                                 ? "bg-amber-100 text-amber-900 border-amber-300"
                                 : "bg-indigo-100 text-indigo-900 border-indigo-300"
                             }`}>
                               {incomingShiftType}
-                            </span>
-                            <span className="text-stone-500 text-[10px] font-medium">
-                              {incomingProfile?.jobTitle || "Cajero(a) entrante"}
                             </span>
                           </div>
                         </div>

@@ -2823,47 +2823,23 @@ export default function POSPage() {
               </div>
 
               {/* 3. RELEVO DE QUIÉN TOMA EL TURNO */}
-              <div className="p-3.5 bg-gradient-to-r from-emerald-950/80 to-stone-900 border border-emerald-500/40 rounded-2xl space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] text-emerald-400 uppercase font-black tracking-wider flex items-center gap-1.5">
-                    <span>👩‍🍳</span> Compañero(a) que toma el turno ahora:
-                  </span>
-                  <span className="text-[10px] font-bold text-emerald-300 bg-emerald-900/60 px-2 py-0.5 rounded border border-emerald-500/30">
-                    {shiftName.split(" ")[0]}
-                  </span>
-                </div>
-
-                <div className="flex items-center gap-2.5">
+              <div className="flex items-center justify-between p-3.5 bg-gradient-to-r from-emerald-950/80 to-stone-900 border border-emerald-500/40 rounded-2xl">
+                <div className="flex items-center gap-2.5 min-w-0">
                   <div className="w-9 h-9 bg-emerald-600/30 rounded-xl border border-emerald-400/40 flex items-center justify-center text-lg shrink-0">
                     {usersList.find((u) => u.name === cashierName)?.avatar || "👩‍🍳"}
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <select
-                      value={cashierName}
-                      onChange={(e) => handleCashierChange(e.target.value)}
-                      className="w-full bg-stone-900 border border-emerald-500/50 text-white rounded-xl px-2.5 py-1.5 text-xs font-bold focus:ring-2 focus:ring-emerald-400 focus:outline-none cursor-pointer"
-                    >
-                      <optgroup label={`Compañeros de ${activeBranch?.shortName || "esta Sucursal"}`}>
-                        {usersList
-                          .filter((u) => u.status !== "inactivo" && (resolveBranchId(u.assignedBranchId, u.name) === activeBranch?.id || u.assignedBranchId === activeBranch?.id))
-                          .map((u) => (
-                            <option key={u.id} value={u.name}>
-                              {u.avatar || "👤"} {u.name} — {u.shiftName || u.jobTitle || "Cajero"}
-                            </option>
-                          ))}
-                      </optgroup>
-                      <optgroup label="Otros compañeros de Panaderías Brito">
-                        {usersList
-                          .filter((u) => u.status !== "inactivo" && resolveBranchId(u.assignedBranchId, u.name) !== activeBranch?.id && u.assignedBranchId !== activeBranch?.id)
-                          .map((u) => (
-                            <option key={u.id} value={u.name}>
-                              {u.avatar || "👤"} {u.name} ({u.assignedBranchName || "General"})
-                            </option>
-                          ))}
-                      </optgroup>
-                    </select>
+                  <div className="min-w-0">
+                    <span className="text-[10px] text-emerald-400 uppercase font-black tracking-wider block">
+                      Toma el turno ahora:
+                    </span>
+                    <span className="text-sm font-black text-white truncate block">
+                      {cashierName}
+                    </span>
                   </div>
                 </div>
+                <span className="text-[11px] font-bold text-emerald-300 bg-emerald-900/60 px-2.5 py-1 rounded-lg border border-emerald-500/30 shrink-0">
+                  {shiftName.split(" ")[0]}
+                </span>
               </div>
 
               {/* 4. BOTÓN DIRECTO DE 1 SOLO TOQUE PARA COMENZAR INMEDIATAMENTE (SIN CONTRASEÑAS) */}
