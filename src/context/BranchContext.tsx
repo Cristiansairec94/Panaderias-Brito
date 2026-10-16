@@ -6,7 +6,7 @@ import { realtimeHub } from "@/lib/realtime/realtimeHub";
 import { recordCashOutflowAsExpense } from "@/lib/expenses";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/context/AuthContext";
-import { parseDateTimeSafe, getStoredShiftStartBoundary, formatDateTimeSafe, compareMovementsDesc, resolveBranchId, isAfternoonShift } from "@/lib/utils";
+import { parseDateTimeSafe, getStoredShiftStartBoundary, formatDateTimeSafe, compareMovementsDesc, resolveBranchId, isAfternoonShift, matchesCashier } from "@/lib/utils";
 import { normalizeOrder, getOrderShiftCollection } from "@/lib/orders";
 import { CLEAN_SLATE_EPOCH } from "@/lib/wipeOperationalData";
 
@@ -398,15 +398,22 @@ export function syncBranchWithUsers(branch: Branch, users: any[]): Branch {
   }
 
   if (assignedUser) {
+    const candidateCashier = branch.currentShift?.cashier || branch.lastCut?.incomingCashier;
+    const isCurrentCashierValidBranchMember = Boolean(
+      candidateCashier &&
+      users.some((u: any) => u.status !== "inactivo" && (matchesCashier(u.name, candidateCashier) || matchesCashier(u.username, candidateCashier)))
+    );
+    const effectiveCashier = isCurrentCashierValidBranchMember ? candidateCashier : assignedUser.name;
+
     return {
       ...branch,
       assignedUserId: assignedUser.id,
       assignedUserName: assignedUser.name,
       assignedUserEmail: assignedUser.email || branch.assignedUserEmail,
-      manager: assignedUser.name,
+      manager: effectiveCashier,
       currentShift: branch.currentShift ? {
         ...branch.currentShift,
-        cashier: assignedUser.name,
+        cashier: effectiveCashier,
       } : branch.currentShift,
     };
   }
@@ -777,13 +784,18 @@ function resolveBranchParam(param: string | null): string | null {
 
           dbCuts.forEach((dbc: any) => {
             if (dbc && dbc.id && !allCutsMap.has(dbc.id)) {
+              let parsedIncoming = "";
+              if (dbc.notes) {
+                const match = dbc.notes.match(/Entrante:\s*([^|\n→]+)/i);
+                if (match && match[1]) parsedIncoming = match[1].trim();
+              }
               allCutsMap.set(dbc.id, {
                 id: dbc.id,
                 date: formatDateTimeSafe(dbc.opened_at),
                 timestamp: new Date(dbc.opened_at).getTime(),
                 shiftRange: dbc.shift_name || "Turno",
                 outgoingCashier: dbc.cashier_name || "Cajero",
-                incomingCashier: dbc.cashier_name || "Cajero",
+                incomingCashier: parsedIncoming || dbc.incoming_cashier || dbc.cashier_name || "Cajero",
                 responsible: dbc.cashier_name,
                 branchId: dbc.branch_id,
                 previousShift: "",
@@ -1556,24 +1568,24 @@ function resolveBranchParam(param: string | null): string | null {
 
               let activeCashier = assignedEmployee?.name || b.assignedUserName || b.manager || "Don Toño Brito";
 
-              if (user && (user.id === b.assignedUserId || user.assignedBranchId === b.id) && user.name && user.id !== "usr-1" && user.id !== "usr-2") {
-                activeCashier = user.name;
-              } else if (latestCut?.incomingCashier && usersList.some((u) => u.name === latestCut.incomingCashier && u.status !== "inactivo")) {
+              if (latestCut?.incomingCashier && usersList.some((u) => (matchesCashier(u.name, latestCut.incomingCashier) || matchesCashier(u.username, latestCut.incomingCashier)) && u.status !== "inactivo")) {
                 activeCashier = latestCut.incomingCashier;
+              } else if (b.currentShift?.cashier && usersList.some((u) => (matchesCashier(u.name, b.currentShift.cashier) || matchesCashier(u.username, b.currentShift.cashier)) && u.status !== "inactivo")) {
+                activeCashier = b.currentShift.cashier;
+              } else if (user && (user.id === b.assignedUserId || user.assignedBranchId === b.id) && user.name && user.id !== "usr-1" && user.id !== "usr-2") {
+                activeCashier = user.name;
+              } else if (agg.lastCashier && usersList.some((u) => matchesCashier(u.name, agg.lastCashier) && u.status !== "inactivo")) {
+                activeCashier = agg.lastCashier;
               } else if (assignedEmployee?.name) {
                 activeCashier = assignedEmployee.name;
-              } else if (b.currentShift?.cashier && usersList.some((u) => u.name === b.currentShift.cashier && u.status !== "inactivo")) {
-                activeCashier = b.currentShift.cashier;
-              } else if (agg.lastCashier && usersList.some((u) => u.name === agg.lastCashier && u.status !== "inactivo")) {
-                activeCashier = agg.lastCashier;
-              } else if (b.manager && usersList.some((u) => u.name === b.manager && u.status !== "inactivo")) {
+              } else if (b.manager && usersList.some((u) => matchesCashier(u.name, b.manager) && u.status !== "inactivo")) {
                 activeCashier = b.manager;
               } else {
                 activeCashier = "Don Toño Brito";
               }
 
               // Determinar turno activo: si hubo corte previo, es el nextShift; de lo contrario Turno Matutino (o según cajero)
-              const activeUserObj = usersList.find((u) => u.name === activeCashier) || (user?.name === activeCashier ? user : undefined);
+              const activeUserObj = usersList.find((u) => matchesCashier(u.name, activeCashier) || matchesCashier(u.username, activeCashier)) || (user?.name === activeCashier ? user : undefined);
               const isAfternoon = isAfternoonShift(latestCut?.nextShift || b.currentShift?.name, activeCashier, activeUserObj);
               const shiftName = latestCut?.nextShift || (isAfternoon ? "Turno Vespertino (14:00 - 22:00)" : "Turno Matutino (06:00 - 14:00)");
 
@@ -2654,7 +2666,13 @@ function resolveBranchParam(param: string | null): string | null {
   }, [isAdmin]);
 
   const updateBranch = useCallback((branchId: string, updates: Partial<Branch>) => {
-    if (!isAdmin) {
+    const isShiftOperation = Boolean(
+      updates.currentShift ||
+      updates.lastCut ||
+      updates.cashInDrawer !== undefined ||
+      updates.todaySales !== undefined
+    );
+    if (!isAdmin && !isShiftOperation) {
       console.warn("[BranchContext] Acceso denegado: solo administradores pueden editar sucursales");
       return;
     }
@@ -3173,6 +3191,7 @@ function resolveBranchParam(param: string | null): string | null {
 
         return {
           ...b,
+          manager: nextCashier,
           todaySales: 0,
           todayTickets: 0,
           todayDeskSales: 0,

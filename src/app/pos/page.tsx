@@ -486,7 +486,8 @@ export default function POSPage() {
       return activeBranch.currentShift.cashier;
     }
     if (typeof window !== "undefined") {
-      const stored = localStorage.getItem("brito_current_shift_cashier");
+      const bId = activeBranch?.id || "branch-matriz";
+      const stored = localStorage.getItem(`brito_current_shift_cashier_${bId}`) || localStorage.getItem("brito_current_shift_cashier");
       if (stored && !stored.includes("Cajera 2")) return stored;
     }
     return activeBranch ? activeBranch.currentShift.cashier : "Cajera 1 - Turno Matutino";
@@ -498,7 +499,8 @@ export default function POSPage() {
     }
     if (activeBranch?.currentShift?.name) return activeBranch.currentShift.name;
     if (typeof window !== "undefined") {
-      const stored = localStorage.getItem("brito_current_shift_name");
+      const bId = activeBranch?.id || "branch-matriz";
+      const stored = localStorage.getItem(`brito_current_shift_name_${bId}`) || localStorage.getItem("brito_current_shift_name");
       if (stored) return stored;
     }
     return activeBranch ? activeBranch.currentShift.name : "Turno Matutino (06:00 - 14:00)";
@@ -542,13 +544,16 @@ export default function POSPage() {
       const fund = getStoredShiftFund(activeBranch?.id);
       setInitialCashFund(fund);
       try {
-        const storedCashier = localStorage.getItem("brito_current_shift_cashier");
+        const bId = activeBranch?.id || "branch-matriz";
+        const storedBranchCashier = localStorage.getItem(`brito_current_shift_cashier_${bId}`);
+        const storedCashier = storedBranchCashier || localStorage.getItem("brito_current_shift_cashier");
         if (storedCashier && !storedCashier.includes("Cajera 2")) {
           setCashierName(storedCashier);
         } else if (user?.name && user.role !== "admin") {
           setCashierName(user.name);
         }
-        const storedShift = localStorage.getItem("brito_current_shift_name");
+        const storedBranchShift = localStorage.getItem(`brito_current_shift_name_${bId}`);
+        const storedShift = storedBranchShift || localStorage.getItem("brito_current_shift_name");
         if (storedShift && storedShift !== shiftName) setShiftName(storedShift);
 
         const rawSales = localStorage.getItem("brito_pos_current_sales");
@@ -570,7 +575,6 @@ export default function POSPage() {
             }
           } catch {}
         }
-        const bId = activeBranch?.id || "branch-matriz";
         const shiftStart = getStoredShiftStartBoundary(bId);
         const realSales = list.filter((s: any) => {
           if (!s) return false;
@@ -1160,15 +1164,24 @@ export default function POSPage() {
 
   const handleDirectUnlockShift = () => {
     const bId = activeBranch?.id || "branch-matriz";
+    const effectiveCashier = lastCutInfo?.incomingCashier || activeBranch?.currentShift?.cashier || cashierName;
+    const isAft = isAfternoonShift(lastCutInfo?.nextShift || shiftName, effectiveCashier);
+    const effectiveShift = lastCutInfo?.nextShift || (isAft ? "Turno Vespertino (14:00 - 22:00)" : "Turno Matutino (06:00 - 14:00)");
+
+    setCashierName(effectiveCashier);
+    setShiftName(effectiveShift);
     setInitialCashFund(baseShiftFund);
+
     try {
       localStorage.setItem(`brito_pos_initial_fund_${bId}`, baseShiftFund.toString());
       if (bId === "branch-matriz") {
         localStorage.setItem("brito_pos_initial_fund", baseShiftFund.toString());
       }
       localStorage.removeItem("brito_pos_shift_locked");
-      localStorage.setItem("brito_current_shift_cashier", cashierName);
-      localStorage.setItem("brito_current_shift_name", shiftName);
+      localStorage.setItem("brito_current_shift_cashier", effectiveCashier);
+      localStorage.setItem(`brito_current_shift_cashier_${bId}`, effectiveCashier);
+      localStorage.setItem("brito_current_shift_name", effectiveShift);
+      localStorage.setItem(`brito_current_shift_name_${bId}`, effectiveShift);
       if (!localStorage.getItem("brito_pos_current_sales")) {
         localStorage.setItem("brito_pos_current_sales", "[]");
       }
@@ -1178,12 +1191,38 @@ export default function POSPage() {
       window.dispatchEvent(new Event("brito_shift_cuts_updated"));
       window.dispatchEvent(new Event("brito_sales_updated"));
     } catch (e) {}
+
+    updateBranch(bId, {
+      currentShift: {
+        id: `shift-${bId}-${Date.now()}`,
+        name: effectiveShift,
+        cashier: effectiveCashier,
+        openedAt: formatDateTimeSafe(new Date()),
+        initialFund: baseShiftFund,
+        cashSales: 0,
+        cardSales: 0,
+        transferSales: 0,
+        totalSales: 0,
+        ticketCount: 0,
+        status: "abierto",
+      },
+      manager: effectiveCashier,
+      cashInDrawer: baseShiftFund,
+      todaySales: 0,
+      todayTickets: 0,
+      todayDeskSales: 0,
+      todayDeskTickets: 0,
+      todayOrdersDeposit: 0,
+      todayOrdersTotal: 0,
+      todayOrdersCount: 0,
+    });
+
     setIsShiftLocked(false);
     setShiftVersion((v) => v + 1);
 
     // Si el cajero del relevo tiene perfil y la sesión actual era de otro cajero, vincular sesión de usuario
-    if (cashierName && user && user.role === "cajero" && !matchesCashier(user.name, cashierName)) {
-      const targetUser = usersList.find((u) => matchesCashier(u.name, cashierName) || matchesCashier(u.username, cashierName));
+    if (effectiveCashier && user && user.role === "cajero" && !matchesCashier(user.name, effectiveCashier)) {
+      const targetUser = usersList.find((u) => matchesCashier(u.name, effectiveCashier) || matchesCashier(u.username, effectiveCashier));
       if (targetUser && loginAs) {
         loginAs(targetUser);
       }
@@ -1315,18 +1354,22 @@ export default function POSPage() {
   };
 
   const handleCashierChange = (newCashier: string) => {
+    const bId = activeBranch?.id || "branch-matriz";
     setCashierName(newCashier);
     try {
       localStorage.setItem("brito_current_shift_cashier", newCashier);
+      localStorage.setItem(`brito_current_shift_cashier_${bId}`, newCashier);
       window.dispatchEvent(new Event("brito_shift_cuts_updated"));
     } catch (e) {}
     setShiftVersion((v) => v + 1);
   };
 
   const handleShiftChange = (newShift: string) => {
+    const bId = activeBranch?.id || "branch-matriz";
     setShiftName(newShift);
     try {
       localStorage.setItem("brito_current_shift_name", newShift);
+      localStorage.setItem(`brito_current_shift_name_${bId}`, newShift);
       window.dispatchEvent(new Event("brito_shift_cuts_updated"));
     } catch (e) {}
     setShiftVersion((v) => v + 1);
@@ -2835,24 +2878,33 @@ export default function POSPage() {
               </div>
 
               {/* 3. RELEVO DE QUIÉN TOMA EL TURNO */}
-              <div className="flex items-center justify-between p-3.5 bg-gradient-to-r from-emerald-950/80 to-stone-900 border border-emerald-500/40 rounded-2xl">
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <div className="w-9 h-9 bg-emerald-600/30 rounded-xl border border-emerald-400/40 flex items-center justify-center text-lg shrink-0">
-                    {usersList.find((u) => u.name === cashierName)?.avatar || "👩‍🍳"}
-                  </div>
-                  <div className="min-w-0">
-                    <span className="text-[10px] text-emerald-400 uppercase font-black tracking-wider block">
-                      Toma el turno ahora:
+              {(() => {
+                const incomingCashierName = lastCutInfo?.incomingCashier || activeBranch?.currentShift?.cashier || cashierName;
+                const isAft = isAfternoonShift(lastCutInfo?.nextShift || shiftName, incomingCashierName);
+                const incomingShiftDisplay = lastCutInfo?.nextShift || (isAft ? "Turno Vespertino" : "Turno Matutino");
+                const matchedUser = usersList.find((u) => matchesCashier(u.name, incomingCashierName) || matchesCashier(u.username, incomingCashierName));
+
+                return (
+                  <div className="flex items-center justify-between p-3.5 bg-gradient-to-r from-emerald-950/80 to-stone-900 border border-emerald-500/40 rounded-2xl">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="w-9 h-9 bg-emerald-600/30 rounded-xl border border-emerald-400/40 flex items-center justify-center text-lg shrink-0">
+                        {matchedUser?.avatar || "👨‍🍳"}
+                      </div>
+                      <div className="min-w-0">
+                        <span className="text-[10px] text-emerald-400 uppercase font-black tracking-wider block">
+                          Toma el turno ahora:
+                        </span>
+                        <span className="text-sm font-black text-white truncate block">
+                          {incomingCashierName}
+                        </span>
+                      </div>
+                    </div>
+                    <span className="text-[11px] font-bold text-emerald-300 bg-emerald-900/60 px-2.5 py-1 rounded-lg border border-emerald-500/30 shrink-0">
+                      {incomingShiftDisplay.split(" ")[0]} {incomingShiftDisplay.split(" ")[1] || ""}
                     </span>
-                    <span className="text-sm font-black text-white truncate block">
-                      {cashierName}
-                    </span>
                   </div>
-                </div>
-                <span className="text-[11px] font-bold text-emerald-300 bg-emerald-900/60 px-2.5 py-1 rounded-lg border border-emerald-500/30 shrink-0">
-                  {shiftName.split(" ")[0]}
-                </span>
-              </div>
+                );
+              })()}
 
               {/* 4. BOTÓN DIRECTO DE 1 SOLO TOQUE PARA COMENZAR INMEDIATAMENTE (SIN CONTRASEÑAS) */}
               <button

@@ -565,7 +565,9 @@ export default function CashDrawerShiftModal({
       localStorage.setItem("brito_shift_start_" + targetBranchId, cutTs.toString());
       localStorage.setItem("brito_current_shift_start_timestamp", cutTs.toString());
       localStorage.setItem("brito_current_shift_cashier", incomingCashier);
+      localStorage.setItem(`brito_current_shift_cashier_${targetBranchId}`, incomingCashier);
       localStorage.setItem("brito_current_shift_name", nextShiftName);
+      localStorage.setItem(`brito_current_shift_name_${targetBranchId}`, nextShiftName);
       localStorage.setItem("brito_pos_shift_locked", "true");
       localStorage.setItem(`brito_pos_initial_fund_${targetBranchId}`, parsedNextFund.toString());
       if (targetBranchId === "branch-matriz") {
@@ -627,7 +629,7 @@ export default function CashDrawerShiftModal({
             actual_cash: cutRecord.countedCash,
             difference: cutRecord.difference,
             status: "cerrada",
-            notes: cutRecord.notes,
+            notes: `Saliente: ${outgoingCashier} → Entrante: ${incomingCashier} | ${cutRecord.notes}`,
           }),
           supabase.from("cash_movements").upsert({
             id: `mov-${shiftId}`,
@@ -689,10 +691,6 @@ export default function CashDrawerShiftModal({
       window.dispatchEvent(new Event("brito_shift_cuts_updated"));
       window.dispatchEvent(new Event("brito_sales_updated"));
       window.dispatchEvent(new Event("brito_incomes_updated"));
-
-      if (onCompleteShiftCut) {
-        onCompleteShiftCut();
-      }
     } catch (e) {
       console.error("Error guardando corte en historial:", e);
     }
@@ -749,6 +747,9 @@ export default function CashDrawerShiftModal({
 
   const handleClose = () => {
     setHasAcceptedCash(false);
+    if (showCutSuccess && onCompleteShiftCut) {
+      onCompleteShiftCut();
+    }
     onClose();
   };
 
