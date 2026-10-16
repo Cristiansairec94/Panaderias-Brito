@@ -6,7 +6,7 @@ import { realtimeHub } from "@/lib/realtime/realtimeHub";
 import { recordCashOutflowAsExpense } from "@/lib/expenses";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/context/AuthContext";
-import { parseDateTimeSafe, getStoredShiftStartBoundary, formatDateTimeSafe, compareMovementsDesc, resolveBranchId, isAfternoonShift, matchesCashier } from "@/lib/utils";
+import { parseDateTimeSafe, getStoredShiftStartBoundary, formatDateTimeSafe, compareMovementsDesc, resolveBranchId, isAfternoonShift, matchesCashier, isAdminCashier, getOriginalBranchOperator } from "@/lib/utils";
 import { normalizeOrder, getOrderShiftCollection } from "@/lib/orders";
 import { CLEAN_SLATE_EPOCH } from "@/lib/wipeOperationalData";
 
@@ -368,57 +368,77 @@ interface BranchContextType {
 }
 
 export function syncBranchWithUsers(branch: Branch, users: any[]): Branch {
-  if (!users || users.length === 0 || !branch || !branch.id) return branch;
+  if (!branch || !branch.id) return branch;
 
-  // 1. Buscar usuario asignado explícitamente por ID que esté activo
+  // 1. Buscar usuario asignado explícitamente por ID que esté activo y NO sea administrador
   let assignedUser = branch.assignedUserId 
-    ? users.find((u: any) => u.id === branch.assignedUserId && u.status !== "inactivo") 
+    ? (users || []).find((u: any) => u.id === branch.assignedUserId && u.status !== "inactivo" && !isAdminCashier(u.name) && u.role !== "admin" && u.id !== "usr-1" && u.id !== "usr-2") 
     : undefined;
 
   // 2. Si no se encuentra, o está inactivo, o el usuario asignado pertenece a otra sucursal,
-  // buscar los empleados activos asignados a esta sucursal (sin importar su rol: cajero, auxiliar, supervisor, etc.)
+  // buscar los empleados activos asignados a esta sucursal (excluyendo administradores)
   if (!assignedUser || (assignedUser.assignedBranchId && assignedUser.assignedBranchId !== branch.id)) {
-    const branchUsers = users.filter((u: any) => u.assignedBranchId === branch.id && u.status !== "inactivo");
+    const branchUsers = (users || []).filter((u: any) => 
+      u.status !== "inactivo" && 
+      !isAdminCashier(u.name) && 
+      u.role !== "admin" && 
+      u.id !== "usr-1" && 
+      u.id !== "usr-2" &&
+      (u.assignedBranchId === branch.id || resolveBranchId(u.assignedBranchId, u.name) === branch.id)
+    );
     assignedUser = branchUsers.find((u: any) => !isAfternoonShift("", "", u)) ||
                    branchUsers.find((u: any) => u.role === "cajero") || 
                    branchUsers[0] || 
                    assignedUser;
   }
 
-  // 3. Si aún no se encuentra, buscar por coincidencia en el nombre o usuario previo
+  // 3. Si aún no se encuentra, buscar por coincidencia en el nombre o usuario previo (no admin)
   if (!assignedUser) {
-    const mgrLower = (branch.manager || "").toLowerCase().trim();
     const assLower = (branch.assignedUserName || "").toLowerCase().trim();
-    assignedUser = users.find((u: any) => 
-      u.status !== "inactivo" && (
-        (u.name && (mgrLower === u.name.toLowerCase() || assLower === u.name.toLowerCase())) ||
-        (u.username && (mgrLower === u.username.toLowerCase() || assLower === u.username.toLowerCase()))
-      )
-    );
+    if (assLower && !isAdminCashier(assLower)) {
+      assignedUser = (users || []).find((u: any) => 
+        u.status !== "inactivo" && !isAdminCashier(u.name) && u.role !== "admin" && (
+          (u.name && assLower === u.name.toLowerCase()) ||
+          (u.username && assLower === u.username.toLowerCase())
+        )
+      );
+    }
   }
 
-  if (assignedUser) {
-    const candidateCashier = branch.currentShift?.cashier || branch.lastCut?.incomingCashier;
-    const isCurrentCashierValidBranchMember = Boolean(
-      candidateCashier &&
-      users.some((u: any) => u.status !== "inactivo" && (matchesCashier(u.name, candidateCashier) || matchesCashier(u.username, candidateCashier)))
-    );
-    const effectiveCashier = isCurrentCashierValidBranchMember ? candidateCashier : assignedUser.name;
+  const canonicalOperator = getOriginalBranchOperator(branch, branch.currentShift?.name, users);
+  const candidateCashier = branch.currentShift?.cashier || branch.lastCut?.incomingCashier;
+  const isCandidateValid = Boolean(
+    candidateCashier && 
+    !isAdminCashier(candidateCashier) && 
+    !candidateCashier.includes("Cajera 2") &&
+    (users || []).some((u: any) => u.status !== "inactivo" && (matchesCashier(u.name, candidateCashier) || matchesCashier(u.username, candidateCashier)))
+  );
 
-    return {
-      ...branch,
-      assignedUserId: assignedUser.id,
-      assignedUserName: assignedUser.name,
-      assignedUserEmail: assignedUser.email || branch.assignedUserEmail,
-      manager: effectiveCashier,
-      currentShift: branch.currentShift ? {
-        ...branch.currentShift,
-        cashier: effectiveCashier,
-      } : branch.currentShift,
-    };
-  }
+  const effectiveCashier = isCandidateValid ? candidateCashier! : (assignedUser ? assignedUser.name : canonicalOperator);
 
-  return branch;
+  return {
+    ...branch,
+    assignedUserId: assignedUser?.id || branch.assignedUserId,
+    assignedUserName: assignedUser?.name || (branch.assignedUserName && !isAdminCashier(branch.assignedUserName) ? branch.assignedUserName : effectiveCashier),
+    assignedUserEmail: assignedUser?.email || branch.assignedUserEmail,
+    manager: branch.id === "branch-matriz" ? (branch.manager || "Don Toño Brito") : (effectiveCashier || branch.manager),
+    currentShift: branch.currentShift ? {
+      ...branch.currentShift,
+      cashier: effectiveCashier,
+    } : {
+      id: `shift-${branch.id}`,
+      name: "Turno Matutino (06:00 - 14:00)",
+      cashier: effectiveCashier,
+      openedAt: "06:00 AM",
+      initialFund: 1000,
+      cashSales: 0,
+      cardSales: 0,
+      transferSales: 0,
+      totalSales: 0,
+      ticketCount: 0,
+      status: "abierto" as const,
+    },
+  };
 }
 
 const BranchContext = createContext<BranchContextType | undefined>(undefined);
@@ -1561,29 +1581,37 @@ function resolveBranchParam(param: string | null): string | null {
 
               // Cajero del turno activo vinculado estrictamente a la plantilla de perfiles del administrador:
               const branchActiveUsers = usersList.filter(
-                (u) => (u.assignedBranchId === b.id || (b.assignedUserId && u.id === b.assignedUserId)) && u.status !== "inactivo"
+                (u) =>
+                  u.status !== "inactivo" &&
+                  u.id !== "usr-1" &&
+                  u.id !== "usr-2" &&
+                  u.role !== "admin" &&
+                  !isAdminCashier(u.name) &&
+                  (u.assignedBranchId === b.id || (b.assignedUserId && u.id === b.assignedUserId) || resolveBranchId(u.assignedBranchId, u.name) === b.id)
               );
               const assignedEmployee = 
                 branchActiveUsers.find((u) => u.id === b.assignedUserId) ||
                 branchActiveUsers.find((u) => !isAfternoonShift("", "", u)) ||
                 branchActiveUsers[0];
 
-              let activeCashier = assignedEmployee?.name || b.assignedUserName || b.manager || "Don Toño Brito";
+              let activeCashier = "";
 
-              if (latestCut?.incomingCashier && usersList.some((u) => (matchesCashier(u.name, latestCut.incomingCashier) || matchesCashier(u.username, latestCut.incomingCashier)) && u.status !== "inactivo")) {
+              if (latestCut?.incomingCashier && !isAdminCashier(latestCut.incomingCashier) && usersList.some((u) => (matchesCashier(u.name, latestCut.incomingCashier) || matchesCashier(u.username, latestCut.incomingCashier)) && u.status !== "inactivo")) {
                 activeCashier = latestCut.incomingCashier;
-              } else if (b.currentShift?.cashier && usersList.some((u) => (matchesCashier(u.name, b.currentShift.cashier) || matchesCashier(u.username, b.currentShift.cashier)) && u.status !== "inactivo")) {
+              } else if (b.currentShift?.cashier && !isAdminCashier(b.currentShift.cashier) && !b.currentShift.cashier.includes("Cajera 2") && usersList.some((u) => (matchesCashier(u.name, b.currentShift.cashier) || matchesCashier(u.username, b.currentShift.cashier)) && u.status !== "inactivo")) {
                 activeCashier = b.currentShift.cashier;
-              } else if (user && (user.id === b.assignedUserId || user.assignedBranchId === b.id) && user.name && user.id !== "usr-1" && user.id !== "usr-2") {
+              } else if (user && (user.id === b.assignedUserId || user.assignedBranchId === b.id) && user.name && user.id !== "usr-1" && user.id !== "usr-2" && !isAdminCashier(user.name)) {
                 activeCashier = user.name;
-              } else if (agg.lastCashier && usersList.some((u) => matchesCashier(u.name, agg.lastCashier) && u.status !== "inactivo")) {
+              } else if (agg.lastCashier && !isAdminCashier(agg.lastCashier) && usersList.some((u) => matchesCashier(u.name, agg.lastCashier) && u.status !== "inactivo")) {
                 activeCashier = agg.lastCashier;
-              } else if (assignedEmployee?.name) {
+              } else if (assignedEmployee?.name && !isAdminCashier(assignedEmployee.name)) {
                 activeCashier = assignedEmployee.name;
-              } else if (b.manager && usersList.some((u) => matchesCashier(u.name, b.manager) && u.status !== "inactivo")) {
+              } else if (b.assignedUserName && !isAdminCashier(b.assignedUserName)) {
+                activeCashier = b.assignedUserName;
+              } else if (b.manager && !isAdminCashier(b.manager) && usersList.some((u) => matchesCashier(u.name, b.manager) && u.status !== "inactivo")) {
                 activeCashier = b.manager;
               } else {
-                activeCashier = "Don Toño Brito";
+                activeCashier = getOriginalBranchOperator(b, latestCut?.nextShift || b.currentShift?.name, usersList);
               }
 
               // Determinar turno activo: si hubo corte previo, es el nextShift; de lo contrario Turno Matutino (o según cajero)
@@ -1627,8 +1655,8 @@ function resolveBranchParam(param: string | null): string | null {
 
               return {
                 ...b,
-                manager: activeCashier || assignedEmployee?.name || b.manager || "Don Toño Brito",
-                assignedUserName: assignedEmployee?.name || b.assignedUserName || "Don Toño Brito",
+                manager: b.id === "branch-matriz" ? (b.manager || "Don Toño Brito") : (activeCashier || b.manager),
+                assignedUserName: assignedEmployee?.name || (b.assignedUserName && !isAdminCashier(b.assignedUserName) ? b.assignedUserName : "") || activeCashier || getOriginalBranchOperator(b, undefined, usersList),
                 assignedUserId: assignedEmployee?.id || b.assignedUserId,
                 todaySales: totalCobrado,
                 todayTickets: totalTickets,
@@ -3172,10 +3200,10 @@ function resolveBranchParam(param: string | null): string | null {
 
         const isMatutino = b.currentShift.name.includes("Matutino");
         const nextShiftName = isMatutino ? "Turno Vespertino (14:00 - 22:00)" : "Turno Matutino (06:00 - 14:00)";
-        const branchCandidates = usersList.filter((u) => u.assignedBranchId === b.id && u.status !== "inactivo");
-        const otherCandidates = usersList.filter((u) => u.status !== "inactivo" && u.role === "cajero");
+        const branchCandidates = usersList.filter((u) => u.assignedBranchId === b.id && u.status !== "inactivo" && !isAdminCashier(u.name) && u.role !== "admin" && u.id !== "usr-1" && u.id !== "usr-2");
+        const otherCandidates = usersList.filter((u) => u.status !== "inactivo" && u.role === "cajero" && !isAdminCashier(u.name) && u.id !== "usr-1" && u.id !== "usr-2");
         const nextCandidate = branchCandidates.find((u) => u.name !== b.currentShift.cashier) || branchCandidates[0] || otherCandidates[0];
-        const nextCashier = nextCandidate ? nextCandidate.name : (b.assignedUserName || b.manager || "Don Toño Brito");
+        const nextCashier = nextCandidate ? nextCandidate.name : getOriginalBranchOperator(b, nextShiftName, usersList);
 
         const newShift: BranchShift = {
           id: `shift-${b.code.toLowerCase()}-${Date.now()}`,
@@ -3193,7 +3221,7 @@ function resolveBranchParam(param: string | null): string | null {
 
         return {
           ...b,
-          manager: nextCashier,
+          manager: b.id === "branch-matriz" ? (b.manager || "Don Toño Brito") : nextCashier,
           todaySales: 0,
           todayTickets: 0,
           todayDeskSales: 0,

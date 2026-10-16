@@ -42,7 +42,7 @@ import {
   Radio
 } from "lucide-react";
 import { CashMovement, ShiftCutRecord } from "@/types";
-import { formatCurrency, onlyNumbersKeyDown, cleanDecimalNumbers, formatDateTimeSafe, parseDateTimeSafe, getStoredShiftStartBoundary, matchesCashier, formatTime24, resolveBranchId, isOrderSale, isAfternoonShift } from "@/lib/utils";
+import { formatCurrency, onlyNumbersKeyDown, cleanDecimalNumbers, formatDateTimeSafe, parseDateTimeSafe, getStoredShiftStartBoundary, matchesCashier, formatTime24, resolveBranchId, isOrderSale, isAfternoonShift, isAdminCashier, getOriginalBranchOperator } from "@/lib/utils";
 import { getOrderShiftCollection } from "@/lib/orders";
 import { CLEAN_SLATE_EPOCH } from "@/lib/wipeOperationalData";
 import { useAuth } from "@/context/AuthContext";
@@ -385,9 +385,9 @@ export default function CajaPage() {
     );
     const candidate =
       branchCandidates[0] ||
-      usersList.find((u) => u.status !== "inactivo" && u.role !== "admin" && !matchesCashier(u.name, currentShiftResponsible)) ||
-      usersList[0];
-    setIncomingCashier(candidate ? candidate.name : "Don Toño Brito");
+      usersList.find((u) => u.status !== "inactivo" && u.role !== "admin" && !isAdminCashier(u.name) && !matchesCashier(u.name, currentShiftResponsible));
+    const fallbackOp = getOriginalBranchOperator(currentBranch, auto.nextShift, usersList);
+    setIncomingCashier(candidate ? candidate.name : fallbackOp);
     setPasswordError(null);
     setDeliveryPassword("");
     setCountedCash(expectedCashInDrawer > 0 ? expectedCashInDrawer.toString() : "0");
@@ -1893,7 +1893,7 @@ export default function CajaPage() {
               </h3>
             </div>
             <span className="text-[11px] text-stone-300 font-medium">
-              Sucursal activa en supervisión: <strong className="text-amber-300 font-black">{currentBranch?.name || "Todas"}</strong> (Cajero: <strong className="text-white">{currentBranch?.manager || currentBranch?.currentShift?.cashier || "Don Toño"}</strong>)
+              Sucursal activa en supervisión: <strong className="text-amber-300 font-black">{currentBranch?.name || "Todas"}</strong> (Cajero: <strong className="text-white">{(!isAdminCashier(currentBranch?.currentShift?.cashier) && currentBranch?.currentShift?.cashier) || (!isAdminCashier(currentBranch?.assignedUserName) && currentBranch?.assignedUserName) || getOriginalBranchOperator(currentBranch, undefined, usersList)}</strong>)
             </span>
           </div>
 

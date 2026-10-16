@@ -52,7 +52,7 @@ import {
   ArrowUpRight
 } from "lucide-react";
 import { Product, CartItem, Sale, CashExpense, Customer, BreadDeliveryRecord, TransferAccount, CardTerminalAccount, CashIncome, CustomOrder, OrderItem, ShiftCutRecord } from "@/types";
-import { formatCurrency, onlyNumbersKeyDown, cleanOnlyNumbers, cleanDecimalNumbers, playScanBeep, formatDateTimeSafe, parseDateTimeSafe, compareMovementsDesc, matchesCashier, getStoredShiftStartBoundary, deduplicateExpenses, deduplicateIncomes, resolveBranchId, formatTime24, isAfternoonShift, getEffectiveAvatar } from "@/lib/utils";
+import { formatCurrency, onlyNumbersKeyDown, cleanOnlyNumbers, cleanDecimalNumbers, playScanBeep, formatDateTimeSafe, parseDateTimeSafe, compareMovementsDesc, matchesCashier, getStoredShiftStartBoundary, deduplicateExpenses, deduplicateIncomes, resolveBranchId, formatTime24, isAfternoonShift, getEffectiveAvatar, isAdminCashier, getOriginalBranchOperator } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import { CLEAN_SLATE_EPOCH } from "@/lib/wipeOperationalData";
 import { getStoredProducts, saveStoredProducts, DEFAULT_PRODUCTS, PRODUCT_CATEGORIES, findProductByBarcodeOrCode, fetchProductsFromDb, getDeletedProductIds } from "@/lib/products";
@@ -479,18 +479,18 @@ export default function POSPage() {
   const [copiedClabe, setCopiedClabe] = useState<boolean>(false);
   
   // Shift & Cashier state
-  const isGeneralAdmin = Boolean(user && (user.id === "usr-1" || user.id === "usr-2" || user.username === "admin" || user.username === "paulina"));
+  const isGeneralAdmin = Boolean(user && (user.id === "usr-1" || user.id === "usr-2" || user.username === "admin" || user.username === "paulina" || user.role === "admin" || isAdminCashier(user.name)));
   const [cashierName, setCashierName] = useState(() => {
-    if (user?.name && !isGeneralAdmin) return user.name;
-    if (activeBranch?.currentShift?.cashier && !activeBranch.currentShift.cashier.includes("Cajera 2")) {
+    if (user?.name && !isGeneralAdmin && !isAdminCashier(user.name)) return user.name;
+    if (activeBranch?.currentShift?.cashier && !isAdminCashier(activeBranch.currentShift.cashier) && !activeBranch.currentShift.cashier.includes("Cajera 2")) {
       return activeBranch.currentShift.cashier;
     }
     if (typeof window !== "undefined") {
       const bId = activeBranch?.id || "branch-matriz";
       const stored = localStorage.getItem(`brito_current_shift_cashier_${bId}`) || localStorage.getItem("brito_current_shift_cashier");
-      if (stored && !stored.includes("Cajera 2")) return stored;
+      if (stored && !isAdminCashier(stored) && !stored.includes("Cajera 2")) return stored;
     }
-    return activeBranch ? activeBranch.currentShift.cashier : "Cajera 1 - Turno Matutino";
+    return getOriginalBranchOperator(activeBranch, undefined, usersList);
   });
   const [shiftName, setShiftName] = useState(() => {
     if (user?.name && !isGeneralAdmin) {
@@ -547,10 +547,16 @@ export default function POSPage() {
         const bId = activeBranch?.id || "branch-matriz";
         const storedBranchCashier = localStorage.getItem(`brito_current_shift_cashier_${bId}`);
         const storedCashier = storedBranchCashier || localStorage.getItem("brito_current_shift_cashier");
-        if (storedCashier && !storedCashier.includes("Cajera 2")) {
+        if (storedCashier && isAdminCashier(storedCashier)) {
+          localStorage.removeItem(`brito_current_shift_cashier_${bId}`);
+          localStorage.removeItem("brito_current_shift_cashier");
+        }
+        if (storedCashier && !isAdminCashier(storedCashier) && !storedCashier.includes("Cajera 2")) {
           setCashierName(storedCashier);
-        } else if (user?.name && user.role !== "admin") {
+        } else if (user?.name && user.role === "cajero" && !isAdminCashier(user.name)) {
           setCashierName(user.name);
+        } else {
+          setCashierName(getOriginalBranchOperator(activeBranch, undefined, usersList));
         }
         const storedBranchShift = localStorage.getItem(`brito_current_shift_name_${bId}`);
         const storedShift = storedBranchShift || localStorage.getItem("brito_current_shift_name");
@@ -655,7 +661,7 @@ export default function POSPage() {
           switchBranch(targetBranchId);
         }
       }
-      if (user.name && user.role === "cajero") {
+      if (user.name && user.role === "cajero" && !isAdminCashier(user.name)) {
         const branchCashier = activeBranch?.currentShift?.cashier;
         if (!branchCashier || branchCashier.includes("Cajera 2") || matchesCashier(branchCashier, user.name)) {
           setCashierName(user.name);
@@ -675,15 +681,17 @@ export default function POSPage() {
       if (activeBranch.currentShift?.name) {
         setShiftName(activeBranch.currentShift.name);
       }
-      if (activeBranch.currentShift?.cashier && !activeBranch.currentShift.cashier.includes("Cajera 2")) {
-        setCashierName(activeBranch.currentShift.cashier);
-      } else if (activeBranch.assignedUserName) {
-        setCashierName(activeBranch.assignedUserName);
-      } else if (user && user.name) {
+      if (user && !isGeneralAdmin && user.role === "cajero" && user.name && !isAdminCashier(user.name)) {
         setCashierName(user.name);
+      } else if (activeBranch.currentShift?.cashier && !isAdminCashier(activeBranch.currentShift.cashier) && !activeBranch.currentShift.cashier.includes("Cajera 2")) {
+        setCashierName(activeBranch.currentShift.cashier);
+      } else if (activeBranch.assignedUserName && !isAdminCashier(activeBranch.assignedUserName)) {
+        setCashierName(activeBranch.assignedUserName);
+      } else {
+        setCashierName(getOriginalBranchOperator(activeBranch, activeBranch.currentShift?.name, usersList));
       }
     }
-  }, [activeBranch?.id, activeBranch?.lastCut, activeBranch?.currentShift?.initialFund, activeBranch?.currentShift?.cashier, activeBranch?.currentShift?.name, user]);
+  }, [activeBranch?.id, activeBranch?.lastCut, activeBranch?.currentShift?.initialFund, activeBranch?.currentShift?.cashier, activeBranch?.currentShift?.name, user, isGeneralAdmin, usersList]);
 
   // Modals & Drawers state
   const [showReceiptModal, setShowReceiptModal] = useState(false);

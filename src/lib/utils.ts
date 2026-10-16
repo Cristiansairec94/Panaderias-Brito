@@ -986,3 +986,103 @@ export function isAfternoonShift(shiftName?: string | null, cashierName?: string
   }
   return false;
 }
+
+/**
+ * Determina si un nombre o identificador pertenece a una cuenta administrativa (Dueño / Administrador General),
+ * las cuales no deben figurar como cajero u operador de mostrador en los turnos de sucursales.
+ */
+export function isAdminCashier(name?: string | null): boolean {
+  if (!name) return false;
+  const n = name.trim().toLowerCase();
+  return (
+    n.includes("toño") ||
+    n.includes("tono") ||
+    n.includes("paulina") ||
+    n === "admin" ||
+    n === "usr-1" ||
+    n === "usr-2" ||
+    n.includes("dueño") ||
+    n.includes("dueno") ||
+    n.includes("administrador general") ||
+    n.includes("administradora general")
+  );
+}
+
+/**
+ * Obtiene de forma canónica e infalible el operador original asignado a una sucursal,
+ * respetando el turno activo (matutino / vespertino) y la plantilla de perfiles activa,
+ * evitando estrictamente que un administrador (Don Toño / Paulina) suplante al cajero de mostrador.
+ */
+export function getOriginalBranchOperator(
+  branchOrId?: any,
+  shiftTypeOrName?: string,
+  usersList?: any[]
+): string {
+  const bId = typeof branchOrId === "string" ? resolveBranchId(branchOrId) : resolveBranchId(branchOrId?.id);
+  const branchObj = typeof branchOrId === "object" && branchOrId !== null ? branchOrId : null;
+
+  // Cargar usuarios si no se proveyeron explícitamente
+  let users = usersList;
+  if ((!users || users.length === 0) && typeof window !== "undefined") {
+    try {
+      const raw = localStorage.getItem("brito_custom_users") || localStorage.getItem("brito_users_list") || localStorage.getItem("brito_users_data");
+      if (raw) users = JSON.parse(raw);
+    } catch {}
+  }
+
+  const isAfternoon = shiftTypeOrName
+    ? isAfternoonShift(shiftTypeOrName)
+    : (typeof window !== "undefined" ? new Date().getHours() >= 14 : false);
+
+  if (Array.isArray(users) && users.length > 0) {
+    const branchUsers = users.filter((u: any) => {
+      if (!u || u.status === "inactivo") return false;
+      if (u.id === "usr-1" || u.id === "usr-2" || u.role === "admin" || isAdminCashier(u.name)) return false;
+      const uBranch = resolveBranchId(u.assignedBranchId, u.name);
+      return uBranch === bId || u.assignedBranchId === bId;
+    });
+
+    if (branchUsers.length > 0) {
+      if (isAfternoon) {
+        const aftUser = branchUsers.find((u: any) => isAfternoonShift(u.shiftName || u.shift, u.name, u));
+        if (aftUser?.name && !isAdminCashier(aftUser.name)) return aftUser.name;
+      } else {
+        const mornUser = branchUsers.find((u: any) => !isAfternoonShift(u.shiftName || u.shift, u.name, u));
+        if (mornUser?.name && !isAdminCashier(mornUser.name)) return mornUser.name;
+      }
+      const anyUser = branchUsers.find((u: any) => !isAdminCashier(u.name));
+      if (anyUser?.name) return anyUser.name;
+    }
+  }
+
+  // Si la sucursal tiene un empleado asignado válido (no administrador)
+  if (branchObj) {
+    if (branchObj.assignedUserName && !isAdminCashier(branchObj.assignedUserName)) {
+      return branchObj.assignedUserName;
+    }
+    if (branchObj.currentShift?.cashier && !isAdminCashier(branchObj.currentShift.cashier) && !branchObj.currentShift.cashier.includes("Cajera 2")) {
+      return branchObj.currentShift.cashier;
+    }
+    if (branchObj.manager && !isAdminCashier(branchObj.manager)) {
+      return branchObj.manager;
+    }
+  }
+
+  // Operadores canónicos oficiales por sucursal
+  switch (bId) {
+    case "branch-matriz":
+      return isAfternoon ? "carlos bueno" : "Lupita Brito";
+    case "branch-benito":
+      return isAfternoon ? "Jorge" : "Luisa";
+    case "branch-sanjuan":
+      return isAfternoon ? "María" : "noe velasquez";
+    case "branch-flores":
+      return isAfternoon ? "Elena Brito" : "Sofía Morales";
+    case "branch-1790889237862":
+      return isAfternoon ? "Enrique" : "Sebastián Brito";
+    case "branch-angeles":
+      return isAfternoon ? "Cajero Los Ángeles" : "andres sanchez";
+    default:
+      return "Lupita Brito";
+  }
+}

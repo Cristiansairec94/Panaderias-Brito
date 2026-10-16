@@ -32,7 +32,7 @@ import {
   FileText
 } from "lucide-react";
 import { Product, Sale, CashExpense, CashIncome, ShiftCutRecord, CustomOrder } from "@/types";
-import { formatCurrency, onlyNumbersKeyDown, cleanDecimalNumbers, formatDateTimeSafe, parseDateTimeSafe, matchesCashier, getStoredShiftStartBoundary, resolveBranchId, isOrderSale, isAfternoonShift, getEffectiveAvatar } from "@/lib/utils";
+import { formatCurrency, onlyNumbersKeyDown, cleanDecimalNumbers, formatDateTimeSafe, parseDateTimeSafe, matchesCashier, getStoredShiftStartBoundary, resolveBranchId, isOrderSale, isAfternoonShift, getEffectiveAvatar, isAdminCashier, getOriginalBranchOperator } from "@/lib/utils";
 import { getStoredOrders, syncOrdersWithServer, normalizeOrder, getOrderShiftCollection } from "@/lib/orders";
 import { getShiftFinancialSummary, resolveShiftInitialFund } from "@/lib/shiftCalculations";
 import { useNotifications, FBNotification } from "@/context/NotificationContext";
@@ -106,15 +106,31 @@ export default function CashDrawerShiftModal({
 
   // Fondo Inicial Sincronizado en tiempo real
   const targetBranch = (branchId ? branches.find((b) => b.id === branchId) : null) || currentBranch || branches[0];
-  const targetBranchId = resolveBranchId(targetBranch?.id || branchId, cashierName);
+  const targetBranchId = resolveBranchId(targetBranch?.id || branchId, cashierName && !isAdminCashier(cashierName) ? cashierName : undefined);
   const standardBranchFund = 1000;
+
+  // Operador original canónico de la sucursal activa (evita estrictamente que administradores figuren como cajeros de turno)
+  const branchOriginalOperator = useMemo(() => {
+    return getOriginalBranchOperator(targetBranch, shiftName, usersList);
+  }, [targetBranch, shiftName, usersList]);
+
+  const effectiveCashierName = useMemo(() => {
+    if (cashierName && !isAdminCashier(cashierName)) {
+      return cashierName;
+    }
+    const branchCashier = targetBranch?.currentShift?.cashier;
+    if (branchCashier && !isAdminCashier(branchCashier) && !branchCashier.includes("Cajera 2")) {
+      return branchCashier;
+    }
+    return branchOriginalOperator;
+  }, [cashierName, targetBranch?.currentShift?.cashier, branchOriginalOperator]);
 
   const [syncedFund, setSyncedFund] = useState<number>(() => {
     return resolveShiftInitialFund(
       targetBranchId,
       targetBranch,
       initialFund,
-      shiftName || cashierName,
+      shiftName || effectiveCashierName,
       user && user.id !== "usr-1" && user.id !== "usr-2" && user.username !== "admin" && user.username !== "paulina" ? user : undefined
     );
   });
@@ -152,11 +168,11 @@ export default function CashDrawerShiftModal({
       targetBranchId,
       targetBranch,
       initialFund,
-      shiftName || cashierName,
+      shiftName || effectiveCashierName,
       user && user.id !== "usr-1" && user.id !== "usr-2" && user.username !== "admin" && user.username !== "paulina" ? user : undefined
     );
     setSyncedFund(fund);
-  }, [initialFund, isOpen, currentBranch?.id, currentBranch?.lastCut, currentBranch?.currentShift?.initialFund, targetBranchId, shiftName, cashierName, user, targetBranch]);
+  }, [initialFund, isOpen, currentBranch?.id, currentBranch?.lastCut, currentBranch?.currentShift?.initialFund, targetBranchId, shiftName, effectiveCashierName, user, targetBranch]);
 
   useEffect(() => {
     const handleSync = () => {
@@ -195,15 +211,25 @@ export default function CashDrawerShiftModal({
   const [currentTime, setCurrentTime] = useState("");
 
   // Shift Change & Cash Cut form state
-  const [outgoingCashier, setOutgoingCashier] = useState(() => cashierName || currentBranch?.currentShift?.cashier || "Cajero");
+  const [outgoingCashier, setOutgoingCashier] = useState(() => {
+    if (cashierName && !isAdminCashier(cashierName)) return cashierName;
+    const branchCashier = (targetBranch || currentBranch)?.currentShift?.cashier;
+    if (branchCashier && !isAdminCashier(branchCashier) && !branchCashier.includes("Cajera 2")) return branchCashier;
+    return getOriginalBranchOperator(targetBranch || currentBranch, shiftName, usersList);
+  });
 
   useEffect(() => {
-    if (cashierName) {
+    if (cashierName && !isAdminCashier(cashierName)) {
       setOutgoingCashier(cashierName);
-    } else if (currentBranch?.currentShift?.cashier && !currentBranch.currentShift.cashier.includes("Cajera 2")) {
-      setOutgoingCashier(currentBranch.currentShift.cashier);
+    } else {
+      const branchCashier = (targetBranch || currentBranch)?.currentShift?.cashier;
+      if (branchCashier && !isAdminCashier(branchCashier) && !branchCashier.includes("Cajera 2")) {
+        setOutgoingCashier(branchCashier);
+      } else {
+        setOutgoingCashier(getOriginalBranchOperator(targetBranch || currentBranch, shiftName, usersList));
+      }
     }
-  }, [currentBranch?.id, currentBranch?.currentShift?.cashier, cashierName]);
+  }, [currentBranch?.id, targetBranch?.id, currentBranch?.currentShift?.cashier, targetBranch?.currentShift?.cashier, cashierName, shiftName, usersList]);
   const [incomingCashier, setIncomingCashier] = useState("Siguiente Cajero(a)");
   const [nextShiftName, setNextShiftName] = useState("Turno Vespertino (14:00 - 22:00)");
   const [countedCash, setCountedCash] = useState<string>("");
@@ -297,12 +323,23 @@ export default function CashDrawerShiftModal({
     return found || null;
   }, [usersList]);
 
-  const outgoingProfile = useMemo(() => findProfile(outgoingCashier), [outgoingCashier, findProfile]);
+  const currentOperator = useMemo(() => {
+    if (outgoingCashier && !isAdminCashier(outgoingCashier)) {
+      return outgoingCashier;
+    }
+    if (effectiveCashierName && !isAdminCashier(effectiveCashierName)) {
+      return effectiveCashierName;
+    }
+    return branchOriginalOperator;
+  }, [outgoingCashier, effectiveCashierName, branchOriginalOperator]);
+
+  const outgoingProfile = useMemo(() => findProfile(currentOperator), [currentOperator, findProfile]);
   const incomingProfile = useMemo(() => findProfile(incomingCashier), [incomingCashier, findProfile]);
+  const currentOperatorAvatar = useMemo(() => getEffectiveAvatar(outgoingProfile, currentOperator), [outgoingProfile, currentOperator]);
 
   // Identificar la sucursal exacta a la que pertenece esta caja
   const effectiveBranchId = useMemo(() => {
-    return resolveBranchId(branchId || currentBranch?.id, cashierName);
+    return resolveBranchId(branchId || currentBranch?.id, (!isAdminCashier(cashierName) && cashierName) ? cashierName : undefined);
   }, [branchId, currentBranch?.id, cashierName]);
 
   // Regla estricta: exactamente DOS perfiles por sucursal (el que entrega y el que recibe: Turno Matutino y Turno Vespertino).
@@ -314,6 +351,8 @@ export default function CashDrawerShiftModal({
         u.status !== "inactivo" &&
         u.id !== "usr-1" &&
         u.id !== "usr-2" &&
+        u.role !== "admin" &&
+        !isAdminCashier(u.name) &&
         (resolveBranchId(u.assignedBranchId, u.name) === effectiveBranchId ||
          u.assignedBranchId === effectiveBranchId)
     );
@@ -372,7 +411,9 @@ export default function CashDrawerShiftModal({
     }
 
     // Si no hay ninguno, clonar el responsable de la sucursal para ambos turnos
-    const defaultName = cashierName || currentBranch?.currentShift?.cashier || "Cajero";
+    const defaultName = (!isAdminCashier(cashierName) && cashierName) || 
+      (!isAdminCashier(currentBranch?.currentShift?.cashier) && currentBranch?.currentShift?.cashier) || 
+      branchOriginalOperator;
     return [
       {
         id: `usr-${effectiveBranchId}-mat`,
@@ -391,11 +432,11 @@ export default function CashDrawerShiftModal({
         assignedBranchId: effectiveBranchId,
       } as any,
     ];
-  }, [usersList, effectiveBranchId, cashierName, currentBranch?.currentShift?.cashier]);
+  }, [usersList, effectiveBranchId, cashierName, currentBranch?.currentShift?.cashier, branchOriginalOperator]);
 
   const outgoingShiftType = useMemo(() => {
-    return getShiftType(outgoingProfile, outgoingCashier);
-  }, [outgoingProfile, outgoingCashier]);
+    return getShiftType(outgoingProfile, currentOperator);
+  }, [outgoingProfile, currentOperator]);
 
   const incomingShiftType = useMemo(() => {
     if (outgoingShiftType === "Turno Matutino") {
@@ -433,13 +474,10 @@ export default function CashDrawerShiftModal({
 
     // Determinar si quien entrega es turno de la tarde o de la mañana
     let isAfternoonActive = false;
-    if (cashierName && matchesCashier(afternoonCashier.name, cashierName)) {
+    const testCashier = (!isAdminCashier(cashierName) && cashierName) || (!isAdminCashier(branchActiveCashier) && branchActiveCashier) || "";
+    if (testCashier && matchesCashier(afternoonCashier.name, testCashier)) {
       isAfternoonActive = true;
-    } else if (cashierName && matchesCashier(morningCashier.name, cashierName)) {
-      isAfternoonActive = false;
-    } else if (branchActiveCashier && matchesCashier(afternoonCashier.name, branchActiveCashier)) {
-      isAfternoonActive = true;
-    } else if (branchActiveCashier && matchesCashier(morningCashier.name, branchActiveCashier)) {
+    } else if (testCashier && matchesCashier(morningCashier.name, testCashier)) {
       isAfternoonActive = false;
     } else {
       isAfternoonActive = new Date().getHours() >= 14;
@@ -461,19 +499,21 @@ export default function CashDrawerShiftModal({
     if (!isOpen) return;
     const interval = setInterval(() => {
       setOutgoingCashier((curr) => {
+        const isCurrentAdmin = isAdminCashier(curr);
         const stillActive = usersList.some(
-          (u) => u.status !== "inactivo" && (matchesCashier(u.name, curr) || u.name === curr)
+          (u) => u.status !== "inactivo" && !isAdminCashier(u.name) && (matchesCashier(u.name, curr) || u.name === curr)
         );
-        if (!stillActive && branchUsers.length > 0) {
+        if ((isCurrentAdmin || !stillActive) && branchUsers.length > 0) {
           return branchUsers[0].name;
         }
         return curr;
       });
       setIncomingCashier((curr) => {
+        const isCurrentAdmin = isAdminCashier(curr);
         const stillActive = usersList.some(
-          (u) => u.status !== "inactivo" && (matchesCashier(u.name, curr) || u.name === curr)
+          (u) => u.status !== "inactivo" && !isAdminCashier(u.name) && (matchesCashier(u.name, curr) || u.name === curr)
         );
-        if (!stillActive && branchUsers.length > 1) {
+        if ((isCurrentAdmin || !stillActive) && branchUsers.length > 1) {
           return branchUsers[1].name;
         }
         return curr;
@@ -851,7 +891,7 @@ export default function CashDrawerShiftModal({
 
 
   // Filtrado exclusivo para la cajera del turno actual y sucursal
-  const currentCashierKey = cashierName;
+  const currentCashierKey = currentOperator;
 
   const currentCashierCuts = useMemo(() => {
     return cutsHistory.filter((cut) => {
@@ -859,11 +899,12 @@ export default function CashDrawerShiftModal({
         return false;
       }
       return (
-        matchesCashier(cut.outgoingCashier, cashierName) ||
-        matchesCashier(cut.incomingCashier, cashierName)
+        matchesCashier(cut.outgoingCashier, currentOperator) ||
+        matchesCashier(cut.incomingCashier, currentOperator) ||
+        (targetBranch?.id && cut.branchId === targetBranch.id)
       );
     });
-  }, [cutsHistory, cashierName, currentBranch?.id]);
+  }, [cutsHistory, currentOperator, currentBranch?.id, targetBranch?.id]);
 
   const filteredHistory = useMemo(() => {
     return currentCashierCuts.filter((cut) => {
@@ -1079,8 +1120,8 @@ export default function CashDrawerShiftModal({
                     {modalView === "cut" ? "Cierre de Turno & Entrega de Caja" : "Historial de Tickets de Corte"}
                   </h2>
                   <span className="bg-amber-500/25 text-amber-200 border border-amber-400/50 text-xs sm:text-sm font-black px-3 py-1 rounded-full flex items-center gap-1.5 shadow-xs">
-                    <span>👩‍🍳</span>
-                    <span>Cajero(a) en turno: <strong className="text-white font-black">{cashierName}</strong></span>
+                    <span className="text-base leading-none">{currentOperatorAvatar}</span>
+                    <span>Cajero(a) en turno: <strong className="text-white font-black">{currentOperator}</strong></span>
                   </span>
                 </div>
               </div>
@@ -1088,15 +1129,15 @@ export default function CashDrawerShiftModal({
 
             <div className="flex items-center gap-3">
               <div className="hidden md:flex items-center gap-2.5 bg-black/40 border border-amber-400/30 px-3.5 py-1.5 rounded-2xl shadow-inner">
-                <div className="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-300 flex items-center justify-center font-black text-sm">
-                  👩‍🍳
+                <div className="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-300 flex items-center justify-center font-black text-base">
+                  {currentOperatorAvatar}
                 </div>
                 <div className="text-left">
                   <span className="block text-[10px] uppercase tracking-wider font-extrabold text-amber-300/80 leading-none">
                     Operando Turno
                   </span>
                   <strong className="text-xs sm:text-sm font-black text-white">
-                    {cashierName}
+                    {currentOperator}
                   </strong>
                 </div>
               </div>
