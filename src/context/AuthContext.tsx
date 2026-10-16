@@ -339,6 +339,27 @@ export const DEMO_USERS: User[] = [
     shiftEndTime: "22:00",
   },
   {
+    id: "usr-maria",
+    name: "María",
+    username: "maria",
+    email: "maria@panaderiabrito.com",
+    password: "1234",
+    role: "cajero",
+    roleLabel: "Cajero(a) Turno Tarde",
+    jobTitle: "Cajera Turno Vespertino",
+    avatar: "👩‍💼",
+    phone: "55 8765 4321",
+    status: "activo",
+    hasSystemAccess: true,
+    assignedBranchId: "branch-sanjuan",
+    assignedBranchName: "Sucursal San Juan",
+    createdAt: "05 oct 2026",
+    shift: "vespertino",
+    shiftName: "Turno Tarde",
+    shiftStartTime: "14:00",
+    shiftEndTime: "22:00",
+  },
+  {
     id: "usr-sofia",
     name: "Sofía Morales",
     username: "sofia",
@@ -562,6 +583,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     sessionTokenRef.current = sessionToken;
   }, [sessionToken]);
+
+  const usersListRef = React.useRef<User[]>(usersList);
+  useEffect(() => {
+    usersListRef.current = usersList;
+  }, [usersList]);
 
   // Identificador único e intransferible para cada pestaña o ventana individual
   const tabIdRef = React.useRef<string>(
@@ -803,42 +829,195 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  // Sincronización en tiempo real entre pestañas abiertas del navegador y componentes locales
+  // RECONOCIMIENTO CONTINUO DE PERFILES CADA SEGUNDO (1000ms):
+  // Detecta en tiempo real qué perfiles están de alta, qué perfiles se dieron de baja (inactivos)
+  // y qué perfiles fueron eliminados definitivamente, manteniendo actualizados los roles y turnos
   useEffect(() => {
-    const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === "brito_custom_users" && e.newValue) {
-        try {
-          const parsed = JSON.parse(e.newValue);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            const deletedIds = getDeletedUserIds();
-            const filtered = parsed.filter((u) => !deletedIds.has(u.id) && !deletedIds.has(u.username || ""));
-            setUsersList(filtered);
+    if (typeof window === "undefined") return;
+
+    let scanCount = 0;
+
+    const reconcileProfiles = () => {
+      try {
+        const deletedIds = getDeletedUserIds();
+        const raw = localStorage.getItem("brito_custom_users");
+        let currentCustom: User[] = [];
+
+        if (raw) {
+          try {
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed)) currentCustom = parsed;
+          } catch {}
+        }
+
+        // Combinar con DEMO_USERS para asegurar que perfiles oficiales (Noé, María, Sebastián, etc.) existan
+        const userMap = new Map<string, User>();
+        DEMO_USERS.forEach((u) => {
+          if (!deletedIds.has(u.id) && !deletedIds.has(u.username || "")) {
+            userMap.set(u.id, u);
           }
-        } catch {}
+        });
+
+        currentCustom.forEach((cu) => {
+          if (cu && cu.id && !deletedIds.has(cu.id) && !deletedIds.has(cu.username || "")) {
+            if (userMap.has(cu.id)) {
+              const official = userMap.get(cu.id)!;
+              userMap.set(cu.id, {
+                ...official,
+                ...cu,
+                status: cu.status || official.status,
+                assignedBranchId: cu.assignedBranchId || official.assignedBranchId,
+                assignedBranchName: cu.assignedBranchName || official.assignedBranchName,
+                shift: cu.shift || official.shift,
+                shiftName: cu.shiftName || official.shiftName,
+                role: cu.role || official.role,
+                roleLabel: cu.roleLabel || official.roleLabel,
+                jobTitle: cu.jobTitle || official.jobTitle,
+                hasSystemAccess: cu.hasSystemAccess !== undefined ? cu.hasSystemAccess : official.hasSystemAccess,
+              });
+            } else {
+              userMap.set(cu.id, cu);
+            }
+          }
+        });
+
+        // Asegurar que ningún eliminado (tombstone) sobreviva
+        let finalUsers = Array.from(userMap.values()).filter(
+          (u) => !deletedIds.has(u.id) && !deletedIds.has(u.username || "")
+        );
+
+        // Asegurar rol admin para Paulina Brito
+        finalUsers = finalUsers.map((u) => {
+          if ((u.id === "usr-2" || u.username === "paulina") && u.role !== "admin") {
+            return { ...u, role: "admin", roleLabel: "Administrador General", jobTitle: "Administradora General" };
+          }
+          return u;
+        });
+
+        // Comparar con el estado actual (usersListRef.current)
+        const prev = usersListRef.current || [];
+        const hasLengthDiff = prev.length !== finalUsers.length;
+        const hasContentDiff =
+          hasLengthDiff ||
+          prev.some((pu) => {
+            const matched = userMap.get(pu.id);
+            if (!matched) return true; // fue eliminado
+            return (
+              matched.status !== pu.status || // baja o alta de estatus
+              matched.role !== pu.role ||
+              matched.assignedBranchId !== pu.assignedBranchId ||
+              matched.shift !== pu.shift ||
+              matched.name !== pu.name ||
+              matched.hasSystemAccess !== pu.hasSystemAccess
+            );
+          }) ||
+          finalUsers.some((fu) => !prev.some((pu) => pu.id === fu.id));
+
+        if (hasContentDiff) {
+          usersListRef.current = finalUsers;
+          setUsersList(finalUsers);
+          try {
+            localStorage.setItem("brito_custom_users", JSON.stringify(finalUsers));
+          } catch {}
+          window.dispatchEvent(new Event("brito_users_updated"));
+
+          // Si el usuario actual en sesión sufrió cambios de estatus o asignación
+          setUser((curr) => {
+            if (!curr) return null;
+            if (deletedIds.has(curr.id) || deletedIds.has(curr.username || "")) {
+              handleForceLogout("Cuenta eliminada por el administrador");
+              return null;
+            }
+            const updatedProfile = finalUsers.find((u) => u.id === curr.id);
+            if (updatedProfile) {
+              if (updatedProfile.status === "inactivo") {
+                handleForceLogout("Cuenta desactivada temporalmente");
+                return null;
+              }
+              if (
+                updatedProfile.name !== curr.name ||
+                updatedProfile.role !== curr.role ||
+                updatedProfile.assignedBranchId !== curr.assignedBranchId ||
+                updatedProfile.shift !== curr.shift
+              ) {
+                const refreshed = { ...curr, ...updatedProfile };
+                try {
+                  sessionStorage.setItem("brito_user", JSON.stringify(refreshed));
+                } catch {}
+                return refreshed;
+              }
+            }
+            return curr;
+          });
+        }
+      } catch (err) {
+        // scanner silencioso y resiliente
+      }
+    };
+
+    // Ejecutar inmediatamente
+    reconcileProfiles();
+
+    // Heartbeat cada segundo (1000ms)
+    const intervalId = setInterval(() => {
+      reconcileProfiles();
+
+      // Cada 8 segundos, hacer polling silencioso a la API del servidor
+      scanCount++;
+      if (scanCount % 8 === 0) {
+        fetch("/api/users")
+          .then((res) => (res.ok ? res.json() : null))
+          .then((data) => {
+            if (data && Array.isArray(data.users)) {
+              if (Array.isArray(data.deletedIds)) {
+                data.deletedIds.forEach((id: string) => addDeletedUserId(id));
+              }
+              const dIds = getDeletedUserIds();
+              const validServer = data.users.filter((u: any) => !dIds.has(u.id) && !dIds.has(u.username || ""));
+
+              let localUsers: User[] = [];
+              try {
+                const rawL = localStorage.getItem("brito_custom_users");
+                if (rawL) localUsers = JSON.parse(rawL);
+              } catch {}
+
+              const merged = new Map<string, User>();
+              validServer.forEach((u: User) => merged.set(u.id, u));
+              localUsers.forEach((u: User) => {
+                if (!dIds.has(u.id) && !dIds.has(u.username || "") && !merged.has(u.id)) {
+                  merged.set(u.id, u);
+                }
+              });
+
+              const combinedList = Array.from(merged.values());
+              try {
+                localStorage.setItem("brito_custom_users", JSON.stringify(combinedList));
+              } catch {}
+              reconcileProfiles();
+            }
+          })
+          .catch(() => {});
+      }
+    }, 1000);
+
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === "brito_custom_users" || e.key === "brito_deleted_user_ids") {
+        reconcileProfiles();
       }
     };
 
     const handleLocalUpdate = () => {
-      try {
-        const raw = localStorage.getItem("brito_custom_users");
-        if (raw) {
-          const parsed = JSON.parse(raw);
-          if (Array.isArray(parsed)) {
-            const deletedIds = getDeletedUserIds();
-            const filtered = parsed.filter((u) => !deletedIds.has(u.id) && !deletedIds.has(u.username || ""));
-            setUsersList(filtered);
-          }
-        }
-      } catch {}
+      reconcileProfiles();
     };
 
     window.addEventListener("storage", handleStorageChange);
     window.addEventListener("brito_users_updated", handleLocalUpdate);
     return () => {
+      clearInterval(intervalId);
       window.removeEventListener("storage", handleStorageChange);
       window.removeEventListener("brito_users_updated", handleLocalUpdate);
     };
-  }, []);
+  }, [handleForceLogout]);
 
   // Sincronización en tiempo real vía RealtimeHub (Supabase WebSocket + BroadcastChannel)
   // Garantiza que cuando Paulina o Don Toño editen, eliminen o agreguen un empleado, el otro perfil lo vea al instante
@@ -1368,8 +1547,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (cleanNorm === "silvia" || cleanNorm === "puga") {
         if (email.includes("silvia") || name.includes("silvia") || name.includes("puga") || username.includes("silvia")) return true;
       }
-      if (cleanNorm === "noe" || cleanNorm === "velasquez" || cleanNorm === "sanjuan") {
-        if (email.includes("noe") || name.includes("noe") || username.includes("noe") || (u.assignedBranchId === "branch-sanjuan" && u.status !== "inactivo")) return true;
+      if (cleanNorm === "noe" || cleanNorm === "velasquez" || cleanNorm === "sanjuan" || cleanNorm === "maria") {
+        if (email.includes("noe") || name.includes("noe") || username.includes("noe") || email.includes("maria") || name.includes("maria") || username.includes("maria") || (u.assignedBranchId === "branch-sanjuan" && u.status !== "inactivo")) return true;
       }
       if (cleanNorm === "angeles" || cleanNorm === "los angeles" || cleanNorm === "sucursal angeles") {
         if (username === "angeles" || u.id === "usr-angeles" || email.includes("angeles") || name.includes("angeles") || u.assignedBranchId === "branch-angeles") return true;
@@ -1465,8 +1644,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (cleanNorm === "silvia" || cleanNorm === "puga") {
         if (email.includes("silvia") || name.includes("silvia") || name.includes("puga") || username.includes("silvia")) return true;
       }
-      if (cleanNorm === "noe" || cleanNorm === "velasquez" || cleanNorm === "sanjuan") {
-        if (email.includes("noe") || name.includes("noe") || username.includes("noe") || (u.assignedBranchId === "branch-sanjuan" && u.status !== "inactivo")) return true;
+      if (cleanNorm === "noe" || cleanNorm === "velasquez" || cleanNorm === "sanjuan" || cleanNorm === "maria") {
+        if (email.includes("noe") || name.includes("noe") || username.includes("noe") || email.includes("maria") || name.includes("maria") || username.includes("maria") || (u.assignedBranchId === "branch-sanjuan" && u.status !== "inactivo")) return true;
       }
       if (cleanNorm === "angeles" || cleanNorm === "los angeles" || cleanNorm === "sucursal angeles") {
         if (username === "angeles" || u.id === "usr-angeles" || email.includes("angeles") || name.includes("angeles") || u.assignedBranchId === "branch-angeles") return true;

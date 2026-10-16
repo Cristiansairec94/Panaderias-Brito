@@ -591,6 +591,32 @@ export default function PedidosPage() {
         return true;
       }
 
+      // 6. Coincidencia por sucursal o cajero que dio de baja / canceló el pedido
+      const bajaPorMatch = rawNotes.match(/\[BajaPor:\s*([^\|\]]+)(?:\|([^\]]+))?\]/i);
+      if (bajaPorMatch) {
+        const bajaBranch = stripAccents(bajaPorMatch[1]);
+        const bajaCashier = stripAccents(bajaPorMatch[2] || "");
+        const bajaKeywords = [...getBranchKeywords(bajaBranch), ...getBranchKeywords(bajaCashier)];
+        if (
+          bajaBranch === targetId ||
+          (targetKeywords.length > 0 && bajaKeywords.some((k) => targetKeywords.includes(k)))
+        ) {
+          return true;
+        }
+      }
+
+      const bajaMatch = rawNotes.match(/\[Baja:\s*([^\]]+)\]/i);
+      if (bajaMatch) {
+        const bajaText = stripAccents(bajaMatch[1]);
+        if (targetKeywords.length > 0 && targetKeywords.some((k) => bajaText.includes(k))) {
+          return true;
+        }
+      }
+
+      if (targetId === "branch-sanjuan" && (textToSearch.includes("noe") || textToSearch.includes("velasquez") || textToSearch.includes("velazquez"))) {
+        return true;
+      }
+
       return false;
     },
     [branches, getBranchKeywords, stripAccents]

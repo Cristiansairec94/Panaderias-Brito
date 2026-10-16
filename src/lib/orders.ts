@@ -1614,7 +1614,12 @@ export function addOrderPayment(
 /**
  * Actualiza el estado operativo de un pedido (pendiente -> en_horno -> listo -> entregado -> cancelado)
  */
-export function updateOrderStatus(orderId: string, status: CustomOrder["status"], cancelReason?: string): CustomOrder | null {
+export function updateOrderStatus(
+  orderId: string,
+  status: CustomOrder["status"],
+  cancelReason?: string,
+  cancelledBy?: { cashierName?: string; branchId?: string; branchName?: string }
+): CustomOrder | null {
   const current = getStoredOrders();
   const idx = current.findIndex(o => o.id === orderId || o.orderNumber === orderId);
   if (idx === -1) return null;
@@ -1626,10 +1631,23 @@ export function updateOrderStatus(orderId: string, status: CustomOrder["status"]
   }
 
   const nowTs = Date.now();
-  let updatedNotes = (current[idx].notes || "").replace(/\[Baja:[^\]]+\]/g, "").trim();
-  if (status === "cancelado" && cancelReason && cancelReason.trim()) {
-    const cleanReason = cancelReason.trim().replace(/[\[\]]/g, "");
-    updatedNotes = `${updatedNotes} [Baja: ${cleanReason}]`.trim();
+  let updatedNotes = (current[idx].notes || "").replace(/\[Baja:[^\]]+\]/g, "").replace(/\[BajaPor:[^\]]+\]/g, "").trim();
+  if (status === "cancelado") {
+    const cleanReason = (cancelReason || "Dado de baja").trim().replace(/[\[\]]/g, "");
+    const cleanCashier = (cancelledBy?.cashierName || "").trim();
+    const cleanBranch = (cancelledBy?.branchName || "").trim();
+    const cleanBranchId = (cancelledBy?.branchId || "").trim();
+
+    let bajaTag = `[Baja: ${cleanReason}`;
+    if (cleanCashier) bajaTag += ` | Por: ${cleanCashier}`;
+    if (cleanBranch) bajaTag += ` (${cleanBranch})`;
+    bajaTag += `]`;
+
+    if (cleanBranchId || cleanCashier) {
+      bajaTag += ` [BajaPor: ${cleanBranchId || "branch-sanjuan"}|${cleanCashier}]`;
+    }
+
+    updatedNotes = `${updatedNotes} ${bajaTag}`.trim();
   }
 
   current[idx] = {
@@ -1650,13 +1668,34 @@ export function updateOrderStatus(orderId: string, status: CustomOrder["status"]
     fetch("/api/orders", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ orderId, updates: { status, notes: current[idx].notes, timestamp: current[idx].timestamp } }),
+      body: JSON.stringify({
+        orderId,
+        order: current[idx],
+        updates: { status, notes: current[idx].notes, timestamp: current[idx].timestamp },
+      }),
     }).catch(() => {});
   }
 
   // Transmitir cambio de estado operativo
   if (typeof window !== "undefined" && realtimeHub?.broadcastOrder) {
     realtimeHub.broadcastOrder("status", current[idx]);
+  }
+
+  const { cancelReason: extractedReason } = extractOrderOriginAndNotes(current[idx]);
+  const effectiveReason = cancelReason?.trim() || extractedReason;
+
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(
+      new CustomEvent("brito_order_status_changed", {
+        detail: {
+          order: current[idx],
+          status,
+          cancelReason: effectiveReason,
+          cancelledBy,
+        },
+      })
+    );
+    window.dispatchEvent(new Event("brito_orders_updated"));
   }
 
   if (typeof window !== "undefined" && realtimeHub?.broadcastNotification) {
@@ -1675,8 +1714,6 @@ export function updateOrderStatus(orderId: string, status: CustomOrder["status"]
     const remNum = Number(ord.remainingBalance) || 0;
     const isCross = ord.operatingBranchName && ord.branchName && ord.operatingBranchName !== ord.branchName;
     const baseItemsDesc = ord.description ? `${ord.description}. ` : "";
-    const { cancelReason: extractedReason } = extractOrderOriginAndNotes(ord);
-    const effectiveReason = cancelReason?.trim() || extractedReason;
 
     realtimeHub.broadcastNotification({
       id: `notif-order-${ord.id}`,

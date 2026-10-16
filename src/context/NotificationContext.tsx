@@ -840,7 +840,7 @@ function checkBranchMatchesTargetCode(notif: Partial<FBNotification>, targetCode
   const text = `${notif.title || ""} ${notif.highlightText || ""} ${notif.description || ""} ${notif.senderName || ""} ${order?.notes || ""}`.toLowerCase();
   if (targetCode === "branch-matriz" && (text.includes("matriz") || text.includes("centro"))) return true;
   if (targetCode === "branch-angeles" && (text.includes("angeles") || text.includes("ángeles"))) return true;
-  if (targetCode === "branch-sanjuan" && (text.includes("san juan") || text.includes("sanjuan"))) return true;
+  if (targetCode === "branch-sanjuan" && (text.includes("san juan") || text.includes("sanjuan") || text.includes("noe") || text.includes("velasquez") || text.includes("velazquez"))) return true;
   if (targetCode === "branch-benito" && (text.includes("benito") || text.includes("mercado"))) return true;
   if (targetCode === "branch-1790889237862" && text.includes("ildefonso")) return true;
   if (targetCode === "branch-flores" && (text.includes("flores") || text.includes("plaza"))) return true;
@@ -1411,13 +1411,9 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
           if (!Array.isArray(arr)) return;
           const next = new Set<string>(arr);
           let changed = false;
-          keys.forEach((k) => {
-            if (next.has(k)) {
-              next.delete(k);
-              changed = true;
-            }
-            if (next.has(`${k}::${stage}`)) {
-              next.delete(`${k}::${stage}`);
+          Array.from(next).forEach((item) => {
+            if (keys.some((k) => item === k || item.startsWith(`${k}::`))) {
+              next.delete(item);
               changed = true;
             }
           });
@@ -2090,6 +2086,42 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     }
   };
 
+  // Escuchar cambios de estado operativo de pedidos en tiempo real en la pestaña activa
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const handleOrderStatusChange = (e: any) => {
+      if (!e || !e.detail || !e.detail.order) return;
+      const { order, status, cancelReason } = e.detail;
+      if (status === "cancelado") {
+        const totalNum = Number(order.total) || 0;
+        const baseItemsDesc = order.description ? `${order.description}. ` : "";
+        const effReason = cancelReason || "Dado de baja";
+        addNotification({
+          id: `notif-order-${order.id}`,
+          senderName: `🗑️ Pedido Cancelado (${order.branchName || "Sucursal"})`,
+          senderAvatar: "🗑️",
+          badgeIcon: "pastel",
+          title: `Pedido Cancelado / Dado de Baja: ${order.orderNumber}${totalNum ? ` • Total $${totalNum.toFixed(2)}` : ""}`,
+          highlightText: `${order.customerName} • Dado de Baja (${effReason})`,
+          description: `${baseItemsDesc}El pedido ${order.orderNumber} de "${order.customerName}" fue dado de baja (${effReason}).`,
+          category: "pedidos",
+          orderId: order.id,
+          orderData: { ...order, status: "cancelado" },
+          branchId: order.branchId,
+          branchName: order.branchName,
+          operatingBranchId: order.operatingBranchId,
+          operatingBranchName: order.operatingBranchName,
+          actionLabel: "Ver Pedido Cancelado",
+          actionLink: "/pedidos?filter=cancelados",
+        });
+      }
+    };
+    window.addEventListener("brito_order_status_changed", handleOrderStatusChange as EventListener);
+    return () => {
+      window.removeEventListener("brito_order_status_changed", handleOrderStatusChange as EventListener);
+    };
+  }, []);
+
   // Auto-desvanecer toast a los 5.5 segundos
   useEffect(() => {
     if (!activeToast) return;
@@ -2103,10 +2135,6 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     const target = visibleNotifications.find((n) => n.id === id) || notificationsRef.current.find((n) => n.id === id);
     if (!target) return;
     markNotificationReadForProfile(target);
-    // Si el pedido ya fue entregado o cancelado y este perfil ya vio la notificación, desaparece ÚNICAMENTE de este perfil
-    if (isTerminalOrderNotification(target)) {
-      dismissTerminalOrderForProfile(target);
-    }
   };
 
   const markAsUnread = (id: string) => {
@@ -2154,30 +2182,19 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     if (!orderOrNotif) return;
     if ("items" in orderOrNotif || "orderNumber" in orderOrNotif) {
       const ord = orderOrNotif as CustomOrder;
-      if (ord.status === "entregado" || ord.status === "cancelado") {
-        const syntheticNotif: Partial<FBNotification> = {
-          category: "pedidos",
-          orderId: ord.id,
-          orderData: ord,
-          title: ord.orderNumber,
-          highlightText: ord.status,
-        };
-        markNotificationReadForProfile(syntheticNotif);
-        dismissTerminalOrderForProfile(syntheticNotif);
-      }
+      const syntheticNotif: Partial<FBNotification> = {
+        category: "pedidos",
+        orderId: ord.id,
+        orderData: ord,
+        title: ord.orderNumber,
+        highlightText: ord.status,
+      };
+      markNotificationReadForProfile(syntheticNotif);
       setSelectedOrderForDetail(ord);
     } else {
       const notif = orderOrNotif as FBNotification;
       const order = findOrderForNotification(notif);
-      const isTerminal =
-        isTerminalOrderNotification(notif) ||
-        order?.status === "entregado" ||
-        order?.status === "cancelado";
-
       markNotificationReadForProfile(notif);
-      if (isTerminal) {
-        dismissTerminalOrderForProfile(notif);
-      }
       if (order) {
         setSelectedOrderForDetail(order);
       }
@@ -2360,48 +2377,47 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
             window.open(`https://wa.me/52${phone}?text=${message}`, "_blank");
           }
         }}
-        onDarDeBaja={selectedOrderForDetail?.status !== "entregado" ? (o) => {
+        onDarDeBaja={selectedOrderForDetail?.status !== "entregado" ? (o, reason) => {
           if (o.status === "entregado") return;
-          const isCancelled = o.status === "cancelado";
-          const confirmMsg = isCancelled
-            ? `¿Estás seguro de ELIMINAR PERMANENTEMENTE el pedido ${o.orderNumber} de "${o.customerName}"?\n\nEsta acción borrará el pedido por completo del registro histórico y no se podrá recuperar.`
-            : `¿Estás seguro de DAR DE BAJA el pedido ${o.orderNumber} de "${o.customerName}"?\n\nEl pedido se marcará como dado de baja y te mandaremos directo al historial de "Productos que se dieron de baja".`;
+          const totalNum = Number(o.total) || 0;
+          const baseItemsDesc = o.description ? `${o.description}. ` : "";
+          const reasonStr = reason || "Dado de baja por el personal";
+          addNotification({
+            id: `notif-order-${o.id}`,
+            senderName: `🗑️ Pedido Cancelado (${o.branchName || "Sucursal"})`,
+            senderAvatar: "🗑️",
+            badgeIcon: "pastel",
+            title: `Pedido Cancelado / Dado de Baja: ${o.orderNumber}${totalNum ? ` • Total $${totalNum.toFixed(2)}` : ""}`,
+            highlightText: `${o.customerName} • Dado de Baja`,
+            description: `${baseItemsDesc}El pedido ${o.orderNumber} de "${o.customerName}" fue dado de baja (${reasonStr}).`,
+            category: "pedidos",
+            orderId: o.id,
+            orderData: { ...o, status: "cancelado" },
+            branchId: o.branchId,
+            branchName: o.branchName,
+            operatingBranchId: o.operatingBranchId,
+            operatingBranchName: o.operatingBranchName,
+            actionLabel: "Ver Pedido Cancelado",
+            actionLink: "/pedidos?filter=cancelados",
+          });
+          setSelectedOrderForDetail(null);
+          if (typeof window !== "undefined") {
+            window.dispatchEvent(new Event("brito_orders_updated"));
+            window.location.href = "/pedidos?filter=cancelados";
+          }
+        } : undefined}
+        onDeleteOrderPermanently={(user?.role === "admin" || user?.role === "auxiliar_admin") ? (o) => {
+          const confirmMsg = `¿Estás seguro de ELIMINAR PERMANENTEMENTE el pedido ${o.orderNumber} de "${o.customerName}"?\n\nEsta acción borrará el pedido por completo del registro histórico y no se podrá recuperar.`;
           if (confirm(confirmMsg)) {
-            if (isCancelled) {
-              deleteCustomOrder(o.id);
-              setNotifications((prev) => {
-                const updatedNotifs = prev.filter((n) => !isSameOrderEvent(n, { orderId: o.id, title: o.orderNumber }));
-                persistNotifs(updatedNotifs);
-                return updatedNotifs;
-              });
-            } else {
-              const updated = updateOrderStatus(o.id, "cancelado") || { ...o, status: "cancelado" as const };
-              const totalNum = Number(updated.total) || 0;
-              addNotification({
-                id: `notif-order-${updated.id}`,
-                senderName: `🗑️ Pedido Cancelado (${updated.branchName || "Sucursal"})`,
-                senderAvatar: "🗑️",
-                badgeIcon: "pastel",
-                title: `Pedido Cancelado / Dado de Baja: ${updated.orderNumber}${totalNum ? ` • Total $${totalNum.toFixed(2)}` : ""}`,
-                highlightText: `${updated.customerName} • Dado de Baja`,
-                description: `${updated.description ? `${updated.description}. ` : ""}El pedido ${updated.orderNumber} de "${updated.customerName}" fue dado de baja.`,
-                category: "pedidos",
-                orderId: updated.id,
-                orderData: updated,
-                branchId: updated.branchId,
-                branchName: updated.branchName,
-                operatingBranchId: updated.operatingBranchId,
-                operatingBranchName: updated.operatingBranchName,
-                actionLabel: "Ver Pedido Cancelado",
-                actionLink: "/pedidos",
-              });
-            }
+            deleteCustomOrder(o.id);
+            setNotifications((prev) => {
+              const updatedNotifs = prev.filter((n) => !isSameOrderEvent(n, { orderId: o.id, title: o.orderNumber }));
+              persistNotifs(updatedNotifs);
+              return updatedNotifs;
+            });
             setSelectedOrderForDetail(null);
             if (typeof window !== "undefined") {
               window.dispatchEvent(new Event("brito_orders_updated"));
-              if (!isCancelled) {
-                window.location.href = "/pedidos?filter=cancelados";
-              }
             }
           }
         } : undefined}

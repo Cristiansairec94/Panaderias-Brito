@@ -376,8 +376,41 @@ export default function CashDrawerShiftModal({
       return;
     }
 
-    const morningCashier = branchUsers.find((u) => getShiftType(u) === "Turno Matutino") || branchUsers[0];
-    const afternoonCashier = branchUsers.find((u) => getShiftType(u) === "Turno Vespertino") || branchUsers[1] || branchUsers[0];
+    const morningCandidates = branchUsers.filter((u) => getShiftType(u) === "Turno Matutino");
+    const afternoonCandidates = branchUsers.filter((u) => getShiftType(u) === "Turno Vespertino");
+
+    const morningCashier = morningCandidates[0] || branchUsers[0];
+    let afternoonCashier =
+      afternoonCandidates.find((u) => u.id !== morningCashier.id && !matchesCashier(u.name, morningCashier.name)) ||
+      branchUsers.find((u) => u.id !== morningCashier.id && !matchesCashier(u.name, morningCashier.name)) ||
+      afternoonCandidates[0] ||
+      branchUsers[1] ||
+      branchUsers[0];
+
+    // Si aún así coinciden y hay más usuarios en usersList para esta sucursal o en el sistema
+    if (afternoonCashier && morningCashier && (afternoonCashier.id === morningCashier.id || matchesCashier(afternoonCashier.name, morningCashier.name))) {
+      const alt = usersList.find(
+        (u) =>
+          u.status !== "inactivo" &&
+          u.id !== morningCashier.id &&
+          !matchesCashier(u.name, morningCashier.name) &&
+          u.id !== "usr-1" &&
+          u.id !== "usr-2" &&
+          (resolveBranchId(u.assignedBranchId, u.name) === effectiveBranchId || u.assignedBranchId === effectiveBranchId)
+      );
+      if (alt) {
+        afternoonCashier = alt;
+      } else if (effectiveBranchId === "branch-sanjuan") {
+        const mariaUser = usersList.find((u) => u.name.toLowerCase().includes("maria") || u.username === "maria") || {
+          id: "usr-maria",
+          name: "María",
+          role: "cajero",
+          shift: "vespertino",
+        };
+        afternoonCashier = mariaUser as any;
+      }
+    }
+
     const activeBranchObj = (branchId ? branches.find((b) => b.id === branchId) : null) || currentBranch;
     const branchActiveCashier = activeBranchObj?.currentShift?.cashier || "";
 
@@ -405,7 +438,33 @@ export default function CashDrawerShiftModal({
       setIncomingCashier(afternoonCashier.name);
       setNextShiftName("Turno Vespertino (14:00 - 22:00)");
     }
-  }, [isOpen, branchUsers, cashierName, branchId, branches, currentBranch]);
+  }, [isOpen, branchUsers, cashierName, branchId, branches, currentBranch, effectiveBranchId, usersList]);
+
+  // Sincronización continua de cajeros cada segundo mientras el modal está abierto
+  useEffect(() => {
+    if (!isOpen) return;
+    const interval = setInterval(() => {
+      setOutgoingCashier((curr) => {
+        const stillActive = usersList.some(
+          (u) => u.status !== "inactivo" && (matchesCashier(u.name, curr) || u.name === curr)
+        );
+        if (!stillActive && branchUsers.length > 0) {
+          return branchUsers[0].name;
+        }
+        return curr;
+      });
+      setIncomingCashier((curr) => {
+        const stillActive = usersList.some(
+          (u) => u.status !== "inactivo" && (matchesCashier(u.name, curr) || u.name === curr)
+        );
+        if (!stillActive && branchUsers.length > 1) {
+          return branchUsers[1].name;
+        }
+        return curr;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [isOpen, usersList, branchUsers]);
 
   useEffect(() => {
     if (isOpen) {
@@ -1228,9 +1287,30 @@ export default function CashDrawerShiftModal({
 
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
-                            <span className="font-black text-stone-900 text-xs sm:text-sm capitalize truncate">
-                              {outgoingCashier}
-                            </span>
+                            {branchUsers.length > 1 ? (
+                              <select
+                                value={outgoingCashier}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setOutgoingCashier(val);
+                                  if (matchesCashier(val, incomingCashier) || val === incomingCashier) {
+                                    const other = branchUsers.find((u) => !matchesCashier(u.name, val) && u.name !== val);
+                                    if (other) setIncomingCashier(other.name);
+                                  }
+                                }}
+                                className="font-black text-stone-900 text-xs sm:text-sm capitalize bg-rose-50/70 hover:bg-rose-100/80 border border-rose-200/90 rounded-lg px-2 py-0.5 focus:ring-2 focus:ring-rose-500 focus:outline-none cursor-pointer transition-colors max-w-[180px]"
+                              >
+                                {branchUsers.map((u) => (
+                                  <option key={u.id} value={u.name}>
+                                    {u.name}
+                                  </option>
+                                ))}
+                              </select>
+                            ) : (
+                              <span className="font-black text-stone-900 text-xs sm:text-sm capitalize truncate">
+                                {outgoingCashier}
+                              </span>
+                            )}
                             <span className={`text-[10.5px] font-bold px-2.5 py-0.5 rounded-full inline-flex items-center shrink-0 border shadow-2xs ${
                               outgoingShiftType === "Turno Matutino"
                                 ? "bg-amber-100 text-amber-900 border-amber-300"
@@ -1263,9 +1343,30 @@ export default function CashDrawerShiftModal({
 
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
-                            <span className="font-black text-emerald-950 text-xs sm:text-sm capitalize truncate">
-                              {incomingCashier}
-                            </span>
+                            {branchUsers.length > 1 ? (
+                              <select
+                                value={incomingCashier}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setIncomingCashier(val);
+                                  if (matchesCashier(val, outgoingCashier) || val === outgoingCashier) {
+                                    const other = branchUsers.find((u) => !matchesCashier(u.name, val) && u.name !== val);
+                                    if (other) setOutgoingCashier(other.name);
+                                  }
+                                }}
+                                className="font-black text-emerald-950 text-xs sm:text-sm capitalize bg-emerald-50 hover:bg-emerald-100/80 border border-emerald-300 rounded-lg px-2 py-0.5 focus:ring-2 focus:ring-emerald-500 focus:outline-none cursor-pointer transition-colors max-w-[180px]"
+                              >
+                                {branchUsers.map((u) => (
+                                  <option key={u.id} value={u.name}>
+                                    {u.name}
+                                  </option>
+                                ))}
+                              </select>
+                            ) : (
+                              <span className="font-black text-emerald-950 text-xs sm:text-sm capitalize truncate">
+                                {incomingCashier}
+                              </span>
+                            )}
                             <span className={`text-[10.5px] font-bold px-2.5 py-0.5 rounded-full inline-flex items-center shrink-0 border shadow-2xs ${
                               incomingShiftType === "Turno Matutino"
                                 ? "bg-amber-100 text-amber-900 border-amber-300"

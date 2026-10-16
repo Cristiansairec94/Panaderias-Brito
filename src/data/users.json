@@ -210,6 +210,27 @@
     "shiftEndTime": "22:00"
   },
   {
+    "id": "usr-maria",
+    "name": "María",
+    "username": "maria",
+    "email": "maria@panaderiabrito.com",
+    "password": "1234",
+    "role": "cajero",
+    "roleLabel": "Cajero(a) Turno Tarde",
+    "jobTitle": "Cajera Turno Vespertino",
+    "avatar": "👩‍💼",
+    "phone": "55 8765 4321",
+    "status": "activo",
+    "hasSystemAccess": true,
+    "assignedBranchId": "branch-sanjuan",
+    "assignedBranchName": "Sucursal San Juan",
+    "createdAt": "05 oct 2026",
+    "shift": "vespertino",
+    "shiftName": "Turno Tarde",
+    "shiftStartTime": "14:00",
+    "shiftEndTime": "22:00"
+  },
+  {
     "id": "usr-sofia",
     "name": "Sofía Morales",
     "username": "sofia",

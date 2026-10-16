@@ -649,11 +649,13 @@ function resolveBranchParam(param: string | null): string | null {
         }
       } catch {}
     };
+    const intervalId = setInterval(handleUsersUpdated, 1000);
     window.addEventListener("brito_users_updated", handleUsersUpdated);
     window.addEventListener("storage", (e) => {
       if (e.key === "brito_custom_users") handleUsersUpdated();
     });
     return () => {
+      clearInterval(intervalId);
       window.removeEventListener("brito_users_updated", handleUsersUpdated);
     };
   }, []);

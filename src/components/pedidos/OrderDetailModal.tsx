@@ -50,6 +50,7 @@ interface OrderDetailModalProps {
   onDeliverOrder?: (order: CustomOrder) => void;
   onSendWhatsApp?: (order: CustomOrder) => void;
   onDarDeBaja?: (order: CustomOrder, reason?: string) => void;
+  onDeleteOrderPermanently?: (order: CustomOrder) => void;
 }
 
 export default function OrderDetailModal({
@@ -64,6 +65,7 @@ export default function OrderDetailModal({
   onDeliverOrder,
   onSendWhatsApp,
   onDarDeBaja,
+  onDeleteOrderPermanently,
 }: OrderDetailModalProps) {
   if (!isOpen || !order) return null;
 
@@ -210,8 +212,14 @@ export default function OrderDetailModal({
       ? `${baseReason} (${bajaExtraNote.trim()})`
       : baseReason;
 
+    const cashierInfo = {
+      cashierName: user?.name || "Cajero",
+      branchId: user?.assignedBranchId,
+      branchName: user?.assignedBranchName,
+    };
+
     setShowBajaConfirm(false);
-    const updatedOrd = updateOrderStatus(order.id, "cancelado", fullReason) || {
+    const updatedOrd = updateOrderStatus(order.id, "cancelado", fullReason, cashierInfo) || {
       ...order,
       status: "cancelado" as const,
     };
@@ -805,10 +813,16 @@ export default function OrderDetailModal({
             )}
 
             {/* Botón Eliminar Definitivamente (solo para administrador cuando el pedido ya está en historial como cancelado) */}
-            {isAdmin && onDarDeBaja && order.status === "cancelado" && (
+            {isAdmin && (onDeleteOrderPermanently || onDarDeBaja) && order.status === "cancelado" && (
               <button
                 type="button"
-                onClick={() => onDarDeBaja(order)}
+                onClick={() => {
+                  if (onDeleteOrderPermanently) {
+                    onDeleteOrderPermanently(order);
+                  } else if (onDarDeBaja) {
+                    onDarDeBaja(order);
+                  }
+                }}
                 className="px-3 py-1.5 bg-rose-700 hover:bg-rose-800 active:scale-95 text-white font-bold text-xs rounded-lg shadow-xs transition-all flex items-center gap-1.5 cursor-pointer"
                 title="Eliminar definitivamente del registro histórico"
               >
