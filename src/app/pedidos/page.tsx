@@ -294,10 +294,20 @@ export default function PedidosPage() {
       if (filterParam === "cancelados" || filterParam === "bajas") {
         setClassificationFilter("historial");
         setHistorialSubFilter("cancelados");
+        setTimePeriodFilter("todos");
+        setPaymentFilter("all");
+        setStatusFilter("all");
+        setDateFilter("all");
+        setSearchQuery("");
         setTimeout(() => scrollToCatalog(), 200);
       } else if (filterParam === "entregados") {
         setClassificationFilter("historial");
         setHistorialSubFilter("entregados");
+        setTimePeriodFilter("todos");
+        setPaymentFilter("all");
+        setStatusFilter("all");
+        setDateFilter("all");
+        setSearchQuery("");
         setTimeout(() => scrollToCatalog(), 200);
       }
     } catch (e) {}
@@ -1298,6 +1308,11 @@ export default function PedidosPage() {
       setSelectedOrderForDetail(null);
       setClassificationFilter("historial");
       setHistorialSubFilter("cancelados");
+      setTimePeriodFilter("todos");
+      setPaymentFilter("all");
+      setStatusFilter("all");
+      setDateFilter("all");
+      setSearchQuery("");
       setTimeout(() => {
         scrollToCatalog();
       }, 120);
@@ -4148,6 +4163,9 @@ export default function PedidosPage() {
         }}
         onDarDeBaja={selectedOrderForDetail?.status !== "entregado" ? (o, reason) => {
           handleDarDeBaja(o, reason);
+        } : undefined}
+        onDeleteOrderPermanently={isAdmin ? (o) => {
+          handleDarDeBaja(o);
         } : undefined}
       />
 

@@ -367,24 +367,57 @@ export async function PUT(req: NextRequest) {
       (o) => o.id === targetKey || o.orderNumber === targetKey
     );
 
-    if (idx === -1) {
+    let baseOrder: CustomOrder | null = null;
+    const targetIdx = idx;
+
+    if (targetIdx !== -1) {
+      baseOrder = currentOrders[targetIdx];
+    } else if (body.order) {
+      baseOrder = normalizeOrder(body.order);
+    } else {
+      try {
+        const res = await fetch(
+          `${SUPABASE_URL}/rest/v1/custom_orders?or=(id.eq.${targetKey},order_number.eq.${targetKey})&limit=1`,
+          {
+            headers: {
+              apikey: SUPABASE_KEY,
+              Authorization: `Bearer ${SUPABASE_KEY}`,
+            },
+            cache: "no-store",
+          }
+        );
+        if (res.ok) {
+          const rows = await res.json();
+          if (Array.isArray(rows) && rows.length > 0) {
+            baseOrder = normalizeOrder(rows[0]);
+          }
+        }
+      } catch (err) {}
+    }
+
+    if (!baseOrder) {
       return NextResponse.json(
         { success: false, error: "Pedido no encontrado en el servidor" },
         { status: 404 }
       );
     }
 
-    currentOrders[idx] = {
-      ...currentOrders[idx],
+    const updatedOrder: CustomOrder = {
+      ...baseOrder,
       ...updates,
       timestamp: updates.timestamp || Date.now(),
     };
 
+    if (targetIdx !== -1) {
+      currentOrders[targetIdx] = updatedOrder;
+    } else {
+      currentOrders.unshift(updatedOrder);
+    }
+
     writeStoredOrders(currentOrders);
-    await upsertOrderToSupabaseRest(currentOrders[idx]);
+    await upsertOrderToSupabaseRest(updatedOrder);
 
     try {
-      const updatedOrder = currentOrders[idx];
       recordServerRealtimeEvent("order", { action: updates.status ? "status" : "payment", order: updatedOrder });
 
       const originName = updatedOrder.operatingBranchName || "Sucursal";
