@@ -358,7 +358,7 @@ export default function LoginForm() {
                         ? usersList.filter((u) => u.hasSystemAccess !== false && u.status !== "inactivo" && Boolean(u.username))
                         : [
                             { name: "Sebastián Brito", username: "sebastian", password: "1234", assignedBranchName: "San Ildefonso", avatar: "👨‍💼", shiftName: "Mañana" },
-                            { name: "Cajero Ildefonso", username: "cajero.ildefonso", password: "1234", assignedBranchName: "San Ildefonso", avatar: "👨‍🍳", shiftName: "Tarde" },
+                            { name: "Enrique", username: "enrique", password: "1234", assignedBranchName: "San Ildefonso", avatar: "👨‍🍳", shiftName: "Tarde" },
                             { name: "Andrés Sánchez", username: "andres", password: "1234", assignedBranchName: "Los Ángeles", avatar: "👨‍💼", shiftName: "Mañana" },
                             { name: "Cajero Ángeles", username: "angeles", password: "1234", assignedBranchName: "Los Ángeles", avatar: "👨‍🍳", shiftName: "Tarde" },
                             { name: "Noé Velásquez", username: "noe", password: "1234", assignedBranchName: "San Juan", avatar: "👨‍🍳", shiftName: "Mañana" },

@@ -252,10 +252,10 @@
     "shiftEndTime": "14:00"
   },
   {
-    "id": "usr-ildefonso-tarde",
-    "name": "Cajero San Ildefonso",
-    "username": "cajero.ildefonso",
-    "email": "ildefonso@panaderiabrito.com",
+    "id": "usr-enrique",
+    "name": "Enrique",
+    "username": "enrique",
+    "email": "enrique@panaderiabrito.com",
     "password": "1234",
     "role": "cajero",
     "roleLabel": "Cajero(a) Turno Tarde",

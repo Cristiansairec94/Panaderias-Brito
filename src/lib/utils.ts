@@ -895,7 +895,7 @@ export function resolveBranchId(rawBranchId: string | null | undefined, cashierN
     // 3. Reconocimiento de palabras clave y nombres canónicos con normalización estricta
     if (cNorm.includes("angeles") || cNorm.includes("lazaro") || cNorm.includes("andres")) return "branch-angeles";
     if (cNorm.includes("benito") || cNorm.includes("mendoza") || cNorm === "ana" || cNorm.startsWith("ana ")) return "branch-benito";
-    if (cNorm.includes("ildefonso") || cNorm.includes("sebastian") || cNorm.includes("silvia") || cNorm.includes("puga")) return "branch-1790889237862";
+    if (cNorm.includes("ildefonso") || cNorm.includes("sebastian") || cNorm.includes("silvia") || cNorm.includes("puga") || cNorm.includes("enrique")) return "branch-1790889237862";
     if (cNorm.includes("sanjuan") || cNorm.includes("san juan") || cNorm.includes("noe") || cNorm.includes("velasquez")) return "branch-sanjuan";
     if (cNorm.includes("flores") || cNorm.includes("sofia") || cNorm.includes("elena") || cNorm.includes("carmen")) return "branch-flores";
     if (cNorm.includes("matriz") || cNorm.includes("centro") || cNorm.includes("tono") || cNorm.includes("lupita") || cNorm.includes("bueno")) return "branch-matriz";
@@ -939,5 +939,11 @@ export function isOrderSale(sale: any): boolean {
  */
 export function isAfternoonShift(shiftName?: string | null, cashierName?: string | null, userObj?: any): boolean {
   const combined = `${shiftName || ""} ${cashierName || ""} ${userObj?.name || ""} ${userObj?.jobTitle || ""} ${userObj?.roleLabel || ""} ${userObj?.shift || ""} ${userObj?.shiftName || ""}`.toLowerCase();
-  return combined.includes("vespertino") || combined.includes("tarde") || combined.includes("vesp");
+  if (combined.includes("vespertino") || combined.includes("tarde") || combined.includes("vesp")) {
+    return true;
+  }
+  if (combined.includes("enrique") || combined.includes("bueno") || combined.includes("elena")) {
+    return true;
+  }
+  return false;
 }

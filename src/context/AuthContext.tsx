@@ -381,10 +381,10 @@ export const DEMO_USERS: User[] = [
     shiftEndTime: "14:00",
   },
   {
-    id: "usr-ildefonso-tarde",
-    name: "Cajero San Ildefonso",
-    username: "cajero.ildefonso",
-    email: "ildefonso@panaderiabrito.com",
+    id: "usr-enrique",
+    name: "Enrique",
+    username: "enrique",
+    email: "enrique@panaderiabrito.com",
     password: "1234",
     role: "cajero",
     roleLabel: "Cajero(a) Turno Tarde",
@@ -1066,6 +1066,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               sessionStorage.setItem("brito_user", JSON.stringify(parsedUser));
             }
           }
+          if (parsedUser && (parsedUser.id === "usr-enrique" || parsedUser.username === "enrique" || parsedUser.name?.toLowerCase().includes("enrique"))) {
+            if (parsedUser.assignedBranchId !== "branch-1790889237862") {
+              parsedUser.assignedBranchId = "branch-1790889237862";
+              parsedUser.assignedBranchName = "Sucursal San Ildefonso";
+              sessionStorage.setItem("brito_user", JSON.stringify(parsedUser));
+            }
+          }
           if (parsedUser && (parsedUser.id === "usr-silvia" || parsedUser.username === "silvia")) {
             if (parsedUser.assignedBranchId !== "branch-1790889237862") {
               parsedUser.assignedBranchId = "branch-1790889237862";
@@ -1309,9 +1316,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (cleanNorm === "sebastian") {
         if (username.includes("sebastian") || name.includes("sebastian") || email.includes("sebastian")) return true;
       }
+      if (cleanNorm === "enrique") {
+        if (username.includes("enrique") || name.includes("enrique") || email.includes("enrique")) return true;
+      }
       if (cleanNorm === "ildefonso" || cleanNorm === "san ildefonso") {
         if (u.assignedBranchId === "branch-1790889237862" && u.status !== "inactivo") return true;
-        if (username.includes("ildefonso") || username.includes("sebastian") || name.includes("sebastian")) return true;
+        if (username.includes("ildefonso") || username.includes("sebastian") || name.includes("sebastian") || username.includes("enrique") || name.includes("enrique")) return true;
       }
       if (cleanNorm === "silvia" || cleanNorm === "puga") {
         if (email.includes("silvia") || name.includes("silvia") || name.includes("puga") || username.includes("silvia")) return true;
@@ -1403,9 +1413,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (cleanNorm === "sebastian") {
         if (username.includes("sebastian") || name.includes("sebastian") || email.includes("sebastian")) return true;
       }
+      if (cleanNorm === "enrique") {
+        if (username.includes("enrique") || name.includes("enrique") || email.includes("enrique")) return true;
+      }
       if (cleanNorm === "ildefonso" || cleanNorm === "san ildefonso") {
         if (u.assignedBranchId === "branch-1790889237862" && u.status !== "inactivo") return true;
-        if (username.includes("ildefonso") || username.includes("sebastian") || name.includes("sebastian")) return true;
+        if (username.includes("ildefonso") || username.includes("sebastian") || name.includes("sebastian") || username.includes("enrique") || name.includes("enrique")) return true;
       }
       if (cleanNorm === "silvia" || cleanNorm === "puga") {
         if (email.includes("silvia") || name.includes("silvia") || name.includes("puga") || username.includes("silvia")) return true;

@@ -32,7 +32,7 @@ import {
   FileText
 } from "lucide-react";
 import { Product, Sale, CashExpense, CashIncome, ShiftCutRecord, CustomOrder } from "@/types";
-import { formatCurrency, onlyNumbersKeyDown, cleanDecimalNumbers, formatDateTimeSafe, parseDateTimeSafe, matchesCashier, getStoredShiftStartBoundary, resolveBranchId, isOrderSale } from "@/lib/utils";
+import { formatCurrency, onlyNumbersKeyDown, cleanDecimalNumbers, formatDateTimeSafe, parseDateTimeSafe, matchesCashier, getStoredShiftStartBoundary, resolveBranchId, isOrderSale, isAfternoonShift } from "@/lib/utils";
 import { getStoredOrders, syncOrdersWithServer, normalizeOrder, getOrderShiftCollection } from "@/lib/orders";
 import { getShiftFinancialSummary, resolveShiftInitialFund } from "@/lib/shiftCalculations";
 import { useNotifications, FBNotification } from "@/context/NotificationContext";
@@ -68,8 +68,11 @@ interface CashDrawerShiftModalProps {
 const DEFAULT_SAMPLE_CUTS: ShiftCutRecord[] = [];
 
 const getShiftType = (u: any, fallbackName?: string): "Turno Matutino" | "Turno Vespertino" => {
+  if (isAfternoonShift(u?.shiftName || u?.shift, u?.name || fallbackName, u)) {
+    return "Turno Vespertino";
+  }
   const combined = `${u?.roleLabel || ""} ${u?.jobTitle || ""} ${u?.name || ""} ${fallbackName || ""}`.toLowerCase();
-  if (combined.includes("vespertino") || combined.includes("tarde") || combined.includes("vesp")) {
+  if (combined.includes("vespertino") || combined.includes("tarde") || combined.includes("vesp") || combined.includes("enrique") || combined.includes("bueno") || combined.includes("elena")) {
     return "Turno Vespertino";
   }
   return "Turno Matutino";
@@ -99,7 +102,7 @@ export default function CashDrawerShiftModal({
 }: CashDrawerShiftModalProps) {
   const { addNotification } = useNotifications();
   const { currentBranch, branches, updateBranch, cashMovements } = useBranch();
-  const { user, usersList } = useAuth();
+  const { user, usersList, loginAs } = useAuth();
 
   // Fondo Inicial Sincronizado en tiempo real
   const targetBranch = (branchId ? branches.find((b) => b.id === branchId) : null) || currentBranch || branches[0];
@@ -261,7 +264,14 @@ export default function CashDrawerShiftModal({
       usersList.find((u) => {
         const uName = (u.name || "").toLowerCase().trim();
         const uUser = (u.username || "").toLowerCase().trim();
-        return uName === clean || uUser === clean || uName.includes(clean) || clean.includes(uName);
+        return (
+          uName === clean ||
+          uUser === clean ||
+          uName.includes(clean) ||
+          clean.includes(uName) ||
+          matchesCashier(u.name, nameOrUsername) ||
+          matchesCashier(u.username, nameOrUsername)
+        );
       }) || null
     );
   }, [usersList]);
@@ -274,9 +284,9 @@ export default function CashDrawerShiftModal({
     return resolveBranchId(branchId || currentBranch?.id, cashierName);
   }, [branchId, currentBranch?.id, cashierName]);
 
-  // Filtrar única y estrictamente los perfiles activos de ESTA sucursal (incluyendo roles diversos asignados a caja)
+  // Filtrar única y estrictamente los perfiles activos de ESTA sucursal (priorizando empleados reales sobre placeholders)
   const branchUsers = useMemo(() => {
-    const list = usersList.filter(
+    let list = usersList.filter(
       (u) =>
         u.status !== "inactivo" &&
         u.id !== "usr-1" &&
@@ -284,6 +294,17 @@ export default function CashDrawerShiftModal({
         (resolveBranchId(u.assignedBranchId, u.name) === effectiveBranchId ||
          u.assignedBranchId === effectiveBranchId)
     );
+
+    // Priorizar empleados reales sobre placeholders genéricos ("Cajero San Ildefonso", etc.)
+    const hasNamedAfternoon = list.some((u) => getShiftType(u) === "Turno Vespertino" && !u.name.toLowerCase().startsWith("cajer"));
+    if (hasNamedAfternoon) {
+      list = list.filter((u) => !(getShiftType(u) === "Turno Vespertino" && u.name.toLowerCase().startsWith("cajer")));
+    }
+    const hasNamedMorning = list.some((u) => getShiftType(u) === "Turno Matutino" && !u.name.toLowerCase().startsWith("cajer"));
+    if (hasNamedMorning) {
+      list = list.filter((u) => !(getShiftType(u) === "Turno Matutino" && u.name.toLowerCase().startsWith("cajer")));
+    }
+
     // Ordenar siempre: primero Turno Matutino, luego Turno Vespertino
     list.sort((a, b) => {
       const isVespA = getShiftType(a) === "Turno Vespertino" ? 1 : 0;
@@ -298,8 +319,15 @@ export default function CashDrawerShiftModal({
   }, [outgoingProfile, outgoingCashier]);
 
   const incomingShiftType = useMemo(() => {
+    // En un corte y relevo de turno, quien recibe NUNCA puede ser del mismo turno que quien entrega
+    if (outgoingShiftType === "Turno Matutino") {
+      return "Turno Vespertino";
+    }
+    if (outgoingShiftType === "Turno Vespertino") {
+      return "Turno Matutino";
+    }
     return getShiftType(incomingProfile, incomingCashier);
-  }, [incomingProfile, incomingCashier]);
+  }, [incomingProfile, incomingCashier, outgoingShiftType]);
 
   const [syncedOrders, setSyncedOrders] = useState<CustomOrder[]>(() => getStoredOrders());
 
@@ -709,6 +737,11 @@ export default function CashDrawerShiftModal({
     onChangeCashier(incomingCashier);
     onChangeShift(nextShiftName);
     onChangeInitialFund(parsedNextFund);
+
+    // Si el perfil entrante existe en la lista de usuarios y quien opera es cajero (o no es admin general), vincular sesión activa
+    if (incomingProfile && user && user.role === "cajero" && loginAs) {
+      loginAs(incomingProfile);
+    }
 
     setIsFinalizing(false);
     setShowCutSuccess(true);

@@ -407,7 +407,7 @@ function CartPriceInput({
 }
 
 export default function POSPage() {
-  const { user, usersList } = useAuth();
+  const { user, usersList, loginAs } = useAuth();
   const isAdmin = user?.role === "admin" || user?.role === "auxiliar_admin";
   const { branches, currentBranch, switchBranch, updateBranch, registerRealSale, cancelRealSale, cashMovements } = useBranch();
   const { addNotification, openShiftCutDetail } = useNotifications();
@@ -652,10 +652,13 @@ export default function POSPage() {
         }
       }
       if (user.name && user.role === "cajero") {
-        setCashierName(user.name);
-        try {
-          localStorage.setItem("brito_current_shift_cashier", user.name);
-        } catch {}
+        const branchCashier = activeBranch?.currentShift?.cashier;
+        if (!branchCashier || branchCashier.includes("Cajera 2") || matchesCashier(branchCashier, user.name)) {
+          setCashierName(user.name);
+          try {
+            localStorage.setItem("brito_current_shift_cashier", user.name);
+          } catch {}
+        }
       }
     }
   }, [user, branches]);
@@ -1177,6 +1180,14 @@ export default function POSPage() {
     } catch (e) {}
     setIsShiftLocked(false);
     setShiftVersion((v) => v + 1);
+
+    // Si el cajero del relevo tiene perfil y la sesión actual era de otro cajero, vincular sesión de usuario
+    if (cashierName && user && user.role === "cajero" && !matchesCashier(user.name, cashierName)) {
+      const targetUser = usersList.find((u) => matchesCashier(u.name, cashierName) || matchesCashier(u.username, cashierName));
+      if (targetUser && loginAs) {
+        loginAs(targetUser);
+      }
+    }
   };
 
   useEffect(() => {
