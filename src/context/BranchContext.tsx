@@ -225,10 +225,10 @@ const DEFAULT_BRANCHES: Branch[] = [
     code: "ILF-04",
     address: "Av. San Benito #123, Col. Centro Histórico",
     phone: "55 8361 7480",
-    manager: "silvia puga",
-    assignedUserId: "usr-silvia",
-    assignedUserName: "silvia puga",
-    assignedUserEmail: "silvia@panaderiabrito.com",
+    manager: "Sebastián Brito",
+    assignedUserId: "usr-sebastian",
+    assignedUserName: "Sebastián Brito",
+    assignedUserEmail: "sebastian@panaderiabrito.com",
     status: "abierta",
     dailyGoal: 6000,
     todaySales: 0,
@@ -244,7 +244,7 @@ const DEFAULT_BRANCHES: Branch[] = [
     currentShift: {
       id: "shift-ilf-401",
       name: "Turno Matutino (06:00 - 14:00)",
-      cashier: "silvia puga",
+      cashier: "Sebastián Brito",
       openedAt: "06:00 AM",
       initialFund: 1000,
       cashSales: 0,
@@ -370,22 +370,22 @@ interface BranchContextType {
 export function syncBranchWithUsers(branch: Branch, users: any[]): Branch {
   if (!users || users.length === 0 || !branch || !branch.id) return branch;
 
-  // 1. Buscar usuario asignado explícitamente por ID
+  // 1. Buscar usuario asignado explícitamente por ID que esté activo
   let assignedUser = branch.assignedUserId 
     ? users.find((u: any) => u.id === branch.assignedUserId && u.status !== "inactivo") 
     : undefined;
 
-  // 2. Si no se encuentra o el usuario asignado no coincide con la sucursal, buscar usuario activo cuya sucursal asignada coincida con este ID
+  // 2. Si no se encuentra, o está inactivo, o el usuario asignado pertenece a otra sucursal,
+  // buscar los empleados activos asignados a esta sucursal (sin importar su rol: cajero, auxiliar, supervisor, etc.)
   if (!assignedUser || (assignedUser.assignedBranchId && assignedUser.assignedBranchId !== branch.id)) {
     const branchUsers = users.filter((u: any) => u.assignedBranchId === branch.id && u.status !== "inactivo");
-    assignedUser = branchUsers.find((u: any) => u.role === "cajero" && !isAfternoonShift("", "", u)) ||
+    assignedUser = branchUsers.find((u: any) => !isAfternoonShift("", "", u)) ||
                    branchUsers.find((u: any) => u.role === "cajero") || 
-                   branchUsers.find((u: any) => u.role === "supervisor") || 
                    branchUsers[0] || 
                    assignedUser;
   }
 
-  // 3. Si no se encuentra, buscar por coincidencia en el nombre o usuario previo
+  // 3. Si aún no se encuentra, buscar por coincidencia en el nombre o usuario previo
   if (!assignedUser) {
     const mgrLower = (branch.manager || "").toLowerCase().trim();
     const assLower = (branch.assignedUserName || "").toLowerCase().trim();
@@ -1546,24 +1546,27 @@ function resolveBranchParam(param: string | null): string | null {
               const totalPieces = agg.deskPieces + agg.orderPieces;
 
               // Cajero del turno activo vinculado estrictamente a la plantilla de perfiles del administrador:
-              const assignedEmployee = usersList.find((u) => 
-                (b.assignedUserId && u.id === b.assignedUserId && u.status !== "inactivo") || 
-                (u.assignedBranchId === b.id && u.status !== "inactivo")
+              const branchActiveUsers = usersList.filter(
+                (u) => (u.assignedBranchId === b.id || (b.assignedUserId && u.id === b.assignedUserId)) && u.status !== "inactivo"
               );
+              const assignedEmployee = 
+                branchActiveUsers.find((u) => u.id === b.assignedUserId) ||
+                branchActiveUsers.find((u) => !isAfternoonShift("", "", u)) ||
+                branchActiveUsers[0];
 
               let activeCashier = assignedEmployee?.name || b.assignedUserName || b.manager || "Don Toño Brito";
 
-              if (user && user.role === "cajero" && (user.id === b.assignedUserId || user.assignedBranchId === b.id) && user.name) {
+              if (user && (user.id === b.assignedUserId || user.assignedBranchId === b.id) && user.name && user.id !== "usr-1" && user.id !== "usr-2") {
                 activeCashier = user.name;
-              } else if (latestCut?.incomingCashier && usersList.some((u) => u.name === latestCut.incomingCashier)) {
+              } else if (latestCut?.incomingCashier && usersList.some((u) => u.name === latestCut.incomingCashier && u.status !== "inactivo")) {
                 activeCashier = latestCut.incomingCashier;
               } else if (assignedEmployee?.name) {
                 activeCashier = assignedEmployee.name;
-              } else if (b.currentShift?.cashier && usersList.some((u) => u.name === b.currentShift.cashier)) {
+              } else if (b.currentShift?.cashier && usersList.some((u) => u.name === b.currentShift.cashier && u.status !== "inactivo")) {
                 activeCashier = b.currentShift.cashier;
-              } else if (agg.lastCashier && usersList.some((u) => u.name === agg.lastCashier)) {
+              } else if (agg.lastCashier && usersList.some((u) => u.name === agg.lastCashier && u.status !== "inactivo")) {
                 activeCashier = agg.lastCashier;
-              } else if (b.manager && usersList.some((u) => u.name === b.manager)) {
+              } else if (b.manager && usersList.some((u) => u.name === b.manager && u.status !== "inactivo")) {
                 activeCashier = b.manager;
               } else {
                 activeCashier = "Don Toño Brito";

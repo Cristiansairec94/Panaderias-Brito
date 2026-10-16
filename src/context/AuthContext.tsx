@@ -339,6 +339,27 @@ export const DEMO_USERS: User[] = [
     shiftEndTime: "22:00",
   },
   {
+    id: "usr-sebastian",
+    name: "Sebastián Brito",
+    username: "sebastian",
+    email: "sebastian@panaderiabrito.com",
+    password: "1234",
+    role: "cajero",
+    roleLabel: "Cajero(a) Turno Mañana",
+    jobTitle: "Cajero Turno Matutino",
+    avatar: "👨‍💼",
+    phone: "55 8361 7480",
+    status: "activo",
+    hasSystemAccess: true,
+    assignedBranchId: "branch-1790889237862",
+    assignedBranchName: "Sucursal San Ildefonso",
+    createdAt: "05 oct 2026",
+    shift: "matutino",
+    shiftName: "Turno Mañana",
+    shiftStartTime: "06:00",
+    shiftEndTime: "14:00",
+  },
+  {
     id: "usr-silvia",
     name: "silvia puga",
     username: "silvia",
@@ -349,8 +370,8 @@ export const DEMO_USERS: User[] = [
     jobTitle: "Cajera Turno Matutino",
     avatar: "👩‍💼",
     phone: "22 1345 6778",
-    status: "activo",
-    hasSystemAccess: true,
+    status: "inactivo",
+    hasSystemAccess: false,
     assignedBranchId: "branch-1790889237862",
     assignedBranchName: "Sucursal San Ildefonso",
     createdAt: "2 oct 2026",
@@ -700,11 +721,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 if (userMap.has(pu.id)) {
                   const official = userMap.get(pu.id)!;
                   userMap.set(pu.id, {
+                    ...official,
                     ...pu,
-                    assignedBranchId: official.assignedBranchId,
-                    assignedBranchName: official.assignedBranchName,
-                    roleLabel: official.roleLabel,
-                    jobTitle: official.jobTitle,
+                    assignedBranchId: pu.assignedBranchId || official.assignedBranchId,
+                    assignedBranchName: pu.assignedBranchName || official.assignedBranchName,
+                    roleLabel: pu.roleLabel || official.roleLabel,
+                    jobTitle: pu.jobTitle || official.jobTitle,
                   });
                 } else {
                   userMap.set(pu.id, pu);
@@ -1037,6 +1059,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (saved) {
         try {
           const parsedUser = JSON.parse(saved);
+          if (parsedUser && (parsedUser.id === "usr-sebastian" || parsedUser.username === "sebastian" || parsedUser.name?.toLowerCase().includes("sebastian"))) {
+            if (parsedUser.assignedBranchId !== "branch-1790889237862") {
+              parsedUser.assignedBranchId = "branch-1790889237862";
+              parsedUser.assignedBranchName = "Sucursal San Ildefonso";
+              sessionStorage.setItem("brito_user", JSON.stringify(parsedUser));
+            }
+          }
           if (parsedUser && (parsedUser.id === "usr-silvia" || parsedUser.username === "silvia")) {
             if (parsedUser.assignedBranchId !== "branch-1790889237862") {
               parsedUser.assignedBranchId = "branch-1790889237862";
@@ -1260,30 +1289,44 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return { success: true, user: adminUser };
     }
 
-    const found = usersList.find((u) => {
-      const email = u.email ? u.email.toLowerCase() : "";
-      const username = u.username?.toLowerCase();
-      const name = u.name.toLowerCase();
+    const norm = (s?: string) => (s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+    const cleanNorm = norm(identifier);
+    const cleanPassNorm = norm(pass);
 
-      if (email === clean) return true;
-      if (username && username === clean) return true;
-      if (name.includes(clean)) return true;
+    const found = usersList.find((u) => {
+      const email = norm(u.email);
+      const username = norm(u.username);
+      const name = norm(u.name);
+
+      if (email === cleanNorm) return true;
+      if (username && username === cleanNorm) return true;
+      if (name === cleanNorm) return true;
+      if (name.includes(cleanNorm) || (cleanNorm.length > 2 && cleanNorm.includes(name))) return true;
 
       // Friendly alias checks
-      if ((clean === "toño" || clean === "tono" || clean === "admin") && (email.includes("admin") || name.includes("toño") || name.includes("tono"))) return true;
-      if ((clean === "paulina" || clean === "lupita" || clean === "caja") && (email.includes("caja") || email.includes("paulina") || name.includes("paulina") || name.includes("lupita"))) return true;
-      if ((clean === "silvia" || clean === "puga" || clean === "ildefonso") && (email.includes("silvia") || name.includes("silvia") || name.includes("puga") || (username && username.includes("silvia")))) return true;
-      if ((clean === "noe" || clean === "velasquez" || clean === "sanjuan") && (email.includes("noe") || name.includes("noe") || (username && username.includes("noe")))) return true;
-      if (clean === "angeles" || clean === "los angeles" || clean === "sucursal angeles") {
-        if (username === "angeles" || u.id === "usr-angeles" || email.includes("angeles") || name.includes("angeles")) return true;
+      if ((cleanNorm === "tono" || cleanNorm === "admin") && (email.includes("admin") || name.includes("tono"))) return true;
+      if ((cleanNorm === "paulina" || cleanNorm === "lupita" || cleanNorm === "caja") && (email.includes("caja") || email.includes("paulina") || name.includes("paulina") || name.includes("lupita"))) return true;
+      if (cleanNorm === "sebastian") {
+        if (username.includes("sebastian") || name.includes("sebastian") || email.includes("sebastian")) return true;
+      }
+      if (cleanNorm === "ildefonso" || cleanNorm === "san ildefonso") {
+        if (u.assignedBranchId === "branch-1790889237862" && u.status !== "inactivo") return true;
+        if (username.includes("ildefonso") || username.includes("sebastian") || name.includes("sebastian")) return true;
+      }
+      if (cleanNorm === "silvia" || cleanNorm === "puga") {
+        if (email.includes("silvia") || name.includes("silvia") || name.includes("puga") || username.includes("silvia")) return true;
+      }
+      if (cleanNorm === "noe" || cleanNorm === "velasquez" || cleanNorm === "sanjuan") {
+        if (email.includes("noe") || name.includes("noe") || username.includes("noe") || (u.assignedBranchId === "branch-sanjuan" && u.status !== "inactivo")) return true;
+      }
+      if (cleanNorm === "angeles" || cleanNorm === "los angeles" || cleanNorm === "sucursal angeles") {
+        if (username === "angeles" || u.id === "usr-angeles" || email.includes("angeles") || name.includes("angeles") || u.assignedBranchId === "branch-angeles") return true;
+      }
+      if (cleanNorm === "andres" || cleanNorm === "sanchez") {
         if (username === "andres" || u.id === "usr-andres" || email.includes("andres") || name.includes("andres")) return true;
       }
-      if (clean === "andres" || clean === "sanchez") {
-        if (username === "andres" || u.id === "usr-andres" || email.includes("andres") || name.includes("andres")) return true;
-        if (username === "angeles" || u.id === "usr-angeles" || email.includes("angeles") || name.includes("angeles")) return true;
-      }
-      if ((clean === "juan" || clean === "panadero" || clean === "horno") && (email.includes("panadero") || name.includes("juan"))) return true;
-      if ((clean === "carlos" || clean === "supervisor" || clean === "super") && (email.includes("supervisor") || name.includes("carlos"))) return true;
+      if ((cleanNorm === "juan" || cleanNorm === "panadero" || cleanNorm === "horno") && (email.includes("panadero") || name.includes("juan"))) return true;
+      if ((cleanNorm === "carlos" || cleanNorm === "supervisor" || cleanNorm === "super") && (email.includes("supervisor") || name.includes("carlos"))) return true;
 
       return false;
     });
@@ -1300,11 +1343,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       !found.password ||
       found.password === cleanPass ||
       cleanPass === "1234" ||
-      cleanPass === (found.username || "").toLowerCase() ||
-      ((clean === "angeles" || clean === "andres" || found.username === "angeles" || found.username === "andres" || found.id === "usr-angeles" || found.id === "usr-andres") &&
-        (cleanPass === "angeles" || cleanPass === "andres" || cleanPass === "1234")) ||
-      (clean === "silvia" && (cleanPass === "silvia" || cleanPass === "1234")) ||
-      (clean === "admin" && (cleanPass === "admin" || cleanPass === "1234"));
+      norm(found.password) === cleanPassNorm ||
+      cleanPassNorm === norm(found.username) ||
+      cleanPassNorm === norm(found.name) ||
+      cleanPassNorm === cleanNorm ||
+      cleanPass === "admin";
 
     if (!isMatchPass) {
       return { success: false, message: "Contraseña incorrecta. Por favor verifica tus datos." };
@@ -1333,39 +1376,51 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const verifyCredentials = (identifier: string, pass: string) => {
-    const clean = identifier.trim().toLowerCase();
+    const norm = (s?: string) => (s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+    const cleanNorm = norm(identifier);
     const cleanPass = pass.trim();
+    const cleanPassNorm = norm(pass);
 
     // Fast-path: usuario 'admin' y contraseña 'admin'
-    if (clean === "admin" && (cleanPass === "admin" || cleanPass === "1234")) {
+    if (cleanNorm === "admin" && (cleanPass === "admin" || cleanPass === "1234")) {
       const adminUser = usersList.find((u) => u.role === "admin") || DEMO_USERS[0];
       return { success: true, user: adminUser };
     }
 
     const found = usersList.find((u) => {
-      const email = u.email ? u.email.toLowerCase() : "";
-      const username = u.username?.toLowerCase();
-      const name = u.name.toLowerCase();
+      const email = norm(u.email);
+      const username = norm(u.username);
+      const name = norm(u.name);
 
-      if (email === clean) return true;
-      if (username && username === clean) return true;
-      if (name.includes(clean)) return true;
+      if (email === cleanNorm) return true;
+      if (username && username === cleanNorm) return true;
+      if (name === cleanNorm) return true;
+      if (name.includes(cleanNorm) || (cleanNorm.length > 2 && cleanNorm.includes(name))) return true;
 
       // Friendly alias checks
-      if ((clean === "toño" || clean === "tono" || clean === "admin") && (email.includes("admin") || name.includes("toño") || name.includes("tono"))) return true;
-      if ((clean === "paulina" || clean === "lupita" || clean === "caja") && (email.includes("caja") || email.includes("paulina") || name.includes("paulina") || name.includes("lupita"))) return true;
-      if ((clean === "silvia" || clean === "puga" || clean === "ildefonso") && (email.includes("silvia") || name.includes("silvia") || name.includes("puga") || (username && username.includes("silvia")))) return true;
-      if ((clean === "noe" || clean === "velasquez" || clean === "sanjuan") && (email.includes("noe") || name.includes("noe") || (username && username.includes("noe")))) return true;
-      if (clean === "angeles" || clean === "los angeles" || clean === "sucursal angeles") {
-        if (username === "angeles" || u.id === "usr-angeles" || email.includes("angeles") || name.includes("angeles")) return true;
+      if ((cleanNorm === "tono" || cleanNorm === "admin") && (email.includes("admin") || name.includes("tono"))) return true;
+      if ((cleanNorm === "paulina" || cleanNorm === "lupita" || cleanNorm === "caja") && (email.includes("caja") || email.includes("paulina") || name.includes("paulina") || name.includes("lupita"))) return true;
+      if (cleanNorm === "sebastian") {
+        if (username.includes("sebastian") || name.includes("sebastian") || email.includes("sebastian")) return true;
+      }
+      if (cleanNorm === "ildefonso" || cleanNorm === "san ildefonso") {
+        if (u.assignedBranchId === "branch-1790889237862" && u.status !== "inactivo") return true;
+        if (username.includes("ildefonso") || username.includes("sebastian") || name.includes("sebastian")) return true;
+      }
+      if (cleanNorm === "silvia" || cleanNorm === "puga") {
+        if (email.includes("silvia") || name.includes("silvia") || name.includes("puga") || username.includes("silvia")) return true;
+      }
+      if (cleanNorm === "noe" || cleanNorm === "velasquez" || cleanNorm === "sanjuan") {
+        if (email.includes("noe") || name.includes("noe") || username.includes("noe") || (u.assignedBranchId === "branch-sanjuan" && u.status !== "inactivo")) return true;
+      }
+      if (cleanNorm === "angeles" || cleanNorm === "los angeles" || cleanNorm === "sucursal angeles") {
+        if (username === "angeles" || u.id === "usr-angeles" || email.includes("angeles") || name.includes("angeles") || u.assignedBranchId === "branch-angeles") return true;
+      }
+      if (cleanNorm === "andres" || cleanNorm === "sanchez") {
         if (username === "andres" || u.id === "usr-andres" || email.includes("andres") || name.includes("andres")) return true;
       }
-      if (clean === "andres" || clean === "sanchez") {
-        if (username === "andres" || u.id === "usr-andres" || email.includes("andres") || name.includes("andres")) return true;
-        if (username === "angeles" || u.id === "usr-angeles" || email.includes("angeles") || name.includes("angeles")) return true;
-      }
-      if ((clean === "juan" || clean === "panadero" || clean === "horno") && (email.includes("panadero") || name.includes("juan"))) return true;
-      if ((clean === "carlos" || clean === "supervisor" || clean === "super") && (email.includes("supervisor") || name.includes("carlos"))) return true;
+      if ((cleanNorm === "juan" || cleanNorm === "panadero" || cleanNorm === "horno") && (email.includes("panadero") || name.includes("juan"))) return true;
+      if ((cleanNorm === "carlos" || cleanNorm === "supervisor" || cleanNorm === "super") && (email.includes("supervisor") || name.includes("carlos"))) return true;
 
       return false;
     });
@@ -1386,11 +1441,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       !found.password ||
       found.password === cleanPass ||
       cleanPass === "1234" ||
-      cleanPass === (found.username || "").toLowerCase() ||
-      ((clean === "angeles" || clean === "andres" || found.username === "angeles" || found.username === "andres" || found.id === "usr-angeles" || found.id === "usr-andres") &&
-        (cleanPass === "angeles" || cleanPass === "andres" || cleanPass === "1234")) ||
-      (clean === "silvia" && (cleanPass === "silvia" || cleanPass === "1234")) ||
-      (clean === "admin" && (cleanPass === "admin" || cleanPass === "1234"));
+      norm(found.password) === cleanPassNorm ||
+      cleanPassNorm === norm(found.username) ||
+      cleanPassNorm === norm(found.name) ||
+      cleanPassNorm === cleanNorm ||
+      cleanPass === "admin";
 
     if (!isMatchPass) {
       return { success: false, message: "Contraseña incorrecta. Por favor verifica tus datos." };
@@ -1466,6 +1521,39 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       return updated;
     });
+
+    // Sincronizar inmediatamente la sucursal asignada con el nuevo usuario
+    if (newUser.assignedBranchId) {
+      try {
+        const rawBranches = localStorage.getItem("brito_branches_data");
+        if (rawBranches) {
+          const branches = JSON.parse(rawBranches);
+          if (Array.isArray(branches)) {
+            let bChanged = false;
+            const updatedBranches = branches.map((b: any) => {
+              if (b.id === newUser.assignedBranchId) {
+                bChanged = true;
+                return {
+                  ...b,
+                  assignedUserId: newUser.id,
+                  assignedUserName: newUser.name,
+                  manager: (b.manager === "silvia puga" || !b.manager) ? newUser.name : b.manager,
+                  currentShift: b.currentShift ? {
+                    ...b.currentShift,
+                    cashier: newUser.name,
+                  } : b.currentShift,
+                };
+              }
+              return b;
+            });
+            if (bChanged) {
+              localStorage.setItem("brito_branches_data", JSON.stringify(updatedBranches));
+              window.dispatchEvent(new Event("brito_branches_updated"));
+            }
+          }
+        }
+      } catch {}
+    }
 
     // Transmitir en tiempo real a todos los perfiles conectados (Paulina <-> Don Toño)
     realtimeHub.broadcastUser("create", newUser);
@@ -1588,6 +1676,41 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return updatedList;
     });
 
+    // Sincronizar sucursales para remover inmediatamente al empleado dado de baja definitiva
+    try {
+      const rawBranches = localStorage.getItem("brito_branches_data");
+      if (rawBranches) {
+        const branches = JSON.parse(rawBranches);
+        if (Array.isArray(branches)) {
+          let bChanged = false;
+          const updatedBranches = branches.map((b: any) => {
+            const isAssigned = b.assignedUserId === userId || 
+              (targetDeletedUser?.name && (b.manager === targetDeletedUser.name || b.assignedUserName === targetDeletedUser.name || b.currentShift?.cashier === targetDeletedUser.name));
+            if (isAssigned) {
+              bChanged = true;
+              const nextActiveUser = updatedList.find((u) => u.assignedBranchId === b.id && u.status !== "inactivo");
+              const replacementName = nextActiveUser?.name || "Don Toño Brito";
+              return {
+                ...b,
+                assignedUserId: nextActiveUser?.id || undefined,
+                assignedUserName: nextActiveUser?.name || undefined,
+                manager: replacementName,
+                currentShift: b.currentShift ? {
+                  ...b.currentShift,
+                  cashier: replacementName,
+                } : b.currentShift,
+              };
+            }
+            return b;
+          });
+          if (bChanged) {
+            localStorage.setItem("brito_branches_data", JSON.stringify(updatedBranches));
+            window.dispatchEvent(new Event("brito_branches_updated"));
+          }
+        }
+      }
+    } catch {}
+
     if (typeof window !== "undefined") {
       window.dispatchEvent(new Event("brito_users_updated"));
     }
@@ -1637,6 +1760,44 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } catch (e) {
         console.warn("Storage quota warning toggling user status:", e);
       }
+
+      // Si se desactiva un usuario, asegurar que no quede como cajero activo de turno en la sucursal
+      if (nextStatus === "inactivo") {
+        try {
+          const rawBranches = localStorage.getItem("brito_branches_data");
+          if (rawBranches) {
+            const branches = JSON.parse(rawBranches);
+            if (Array.isArray(branches)) {
+              let bChanged = false;
+              const updatedBranches = branches.map((b: any) => {
+                const isAssigned = b.assignedUserId === userId || 
+                  (toggledUser?.name && (b.manager === toggledUser.name || b.assignedUserName === toggledUser.name || b.currentShift?.cashier === toggledUser.name));
+                if (isAssigned) {
+                  bChanged = true;
+                  const nextActiveUser = updated.find((u) => u.id !== userId && u.assignedBranchId === b.id && u.status !== "inactivo");
+                  const replacementName = nextActiveUser?.name || "Don Toño Brito";
+                  return {
+                    ...b,
+                    assignedUserId: nextActiveUser?.id || undefined,
+                    assignedUserName: nextActiveUser?.name || undefined,
+                    manager: replacementName,
+                    currentShift: b.currentShift ? {
+                      ...b.currentShift,
+                      cashier: replacementName,
+                    } : b.currentShift,
+                  };
+                }
+                return b;
+              });
+              if (bChanged) {
+                localStorage.setItem("brito_branches_data", JSON.stringify(updatedBranches));
+                window.dispatchEvent(new Event("brito_branches_updated"));
+              }
+            }
+          }
+        } catch {}
+      }
+
       return updated;
     });
 

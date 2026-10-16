@@ -479,8 +479,9 @@ export default function POSPage() {
   const [copiedClabe, setCopiedClabe] = useState<boolean>(false);
   
   // Shift & Cashier state
+  const isGeneralAdmin = Boolean(user && (user.id === "usr-1" || user.id === "usr-2" || user.username === "admin" || user.username === "paulina"));
   const [cashierName, setCashierName] = useState(() => {
-    if (user?.name && user.role !== "admin") return user.name;
+    if (user?.name && !isGeneralAdmin) return user.name;
     if (activeBranch?.currentShift?.cashier && !activeBranch.currentShift.cashier.includes("Cajera 2")) {
       return activeBranch.currentShift.cashier;
     }
@@ -491,7 +492,7 @@ export default function POSPage() {
     return activeBranch ? activeBranch.currentShift.cashier : "Cajera 1 - Turno Matutino";
   });
   const [shiftName, setShiftName] = useState(() => {
-    if (user?.name && user.role !== "admin") {
+    if (user?.name && !isGeneralAdmin) {
       const isAft = isAfternoonShift("", user.name, user);
       return isAft ? "Turno Vespertino (14:00 - 22:00)" : "Turno Matutino (06:00 - 14:00)";
     }
@@ -504,14 +505,14 @@ export default function POSPage() {
   });
   const getStoredShiftFund = (targetBranchId?: string, fallback?: number): number => {
     const bId = targetBranchId || activeBranch?.id || "branch-matriz";
-    const curCashier = cashierName || activeBranch?.currentShift?.cashier || (user?.role !== "admin" ? user?.name : "");
+    const curCashier = cashierName || activeBranch?.currentShift?.cashier || (!isGeneralAdmin ? user?.name : "");
     const curShift = shiftName || activeBranch?.currentShift?.name || "";
     return resolveShiftInitialFund(
       bId,
       activeBranch,
       fallback,
       curShift || curCashier,
-      user && user.role === "cajero" ? user : undefined
+      !isGeneralAdmin && user ? user : undefined
     );
   };
 

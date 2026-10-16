@@ -112,7 +112,7 @@ export default function CashDrawerShiftModal({
       targetBranch,
       initialFund,
       shiftName || cashierName,
-      user && user.role === "cajero" ? user : undefined
+      user && user.id !== "usr-1" && user.id !== "usr-2" && user.username !== "admin" && user.username !== "paulina" ? user : undefined
     );
   });
 
@@ -150,7 +150,7 @@ export default function CashDrawerShiftModal({
       targetBranch,
       initialFund,
       shiftName || cashierName,
-      user && user.role === "cajero" ? user : undefined
+      user && user.id !== "usr-1" && user.id !== "usr-2" && user.username !== "admin" && user.username !== "paulina" ? user : undefined
     );
     setSyncedFund(fund);
   }, [initialFund, isOpen, currentBranch?.id, currentBranch?.lastCut, currentBranch?.currentShift?.initialFund, targetBranchId, shiftName, cashierName, user, targetBranch]);
@@ -274,15 +274,13 @@ export default function CashDrawerShiftModal({
     return resolveBranchId(branchId || currentBranch?.id, cashierName);
   }, [branchId, currentBranch?.id, cashierName]);
 
-  // Filtrar única y estrictamente los cajeros de ESTA sucursal (máximo 2: Turno Mañana y Turno Tarde)
-  // Los perfiles deben permanecer estables y asignados a su sucursal
+  // Filtrar única y estrictamente los perfiles activos de ESTA sucursal (incluyendo roles diversos asignados a caja)
   const branchUsers = useMemo(() => {
     const list = usersList.filter(
       (u) =>
         u.status !== "inactivo" &&
-        u.role !== "admin" &&
-        u.role !== "auxiliar_admin" &&
-        u.role !== "panadero" &&
+        u.id !== "usr-1" &&
+        u.id !== "usr-2" &&
         (resolveBranchId(u.assignedBranchId, u.name) === effectiveBranchId ||
          u.assignedBranchId === effectiveBranchId)
     );
@@ -292,8 +290,7 @@ export default function CashDrawerShiftModal({
       const isVespB = getShiftType(b) === "Turno Vespertino" ? 1 : 0;
       return isVespA - isVespB;
     });
-    // Garantizar que no exceda 2 perfiles estables
-    return list.slice(0, 2);
+    return list;
   }, [usersList, effectiveBranchId]);
 
   const outgoingShiftType = useMemo(() => {

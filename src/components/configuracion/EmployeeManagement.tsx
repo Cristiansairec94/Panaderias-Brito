@@ -427,6 +427,22 @@ export default function EmployeeManagement({ onGoToUsersTab }: EmployeeManagemen
       showToast(`Empleado "${formName}" registrado ${formHasAccess ? `con usuario @${finalUsername}` : ""} con éxito.`);
     }
 
+    if (formBranchId) {
+      const targetB = branches.find((b) => b.id === formBranchId);
+      if (targetB) {
+        updateBranch(formBranchId, {
+          assignedUserId: editingEmployeeId || undefined,
+          assignedUserName: formName.trim(),
+          assignedUserEmail: formHasAccess ? `${finalUsername}@panaderiabrito.com` : undefined,
+          manager: formName.trim(),
+          currentShift: targetB.currentShift ? {
+            ...targetB.currentShift,
+            cashier: formName.trim(),
+          } : undefined,
+        });
+      }
+    }
+
     setIsModalOpen(false);
   };
 
@@ -439,15 +455,22 @@ export default function EmployeeManagement({ onGoToUsersTab }: EmployeeManagemen
         return;
       }
       branches.forEach((b) => {
-        if (b.assignedUserId === emp.id) {
+        if (b.assignedUserId === emp.id || b.manager === emp.name || b.currentShift?.cashier === emp.name) {
+          const nextActive = usersList.find((u) => u.id !== emp.id && u.assignedBranchId === b.id && u.status !== "inactivo");
+          const replName = nextActive?.name || "Don Toño Brito";
           updateBranch(b.id, {
-            assignedUserId: undefined,
-            assignedUserName: undefined,
-            assignedUserEmail: undefined,
+            assignedUserId: nextActive?.id || undefined,
+            assignedUserName: nextActive?.name || undefined,
+            assignedUserEmail: nextActive?.email || undefined,
+            manager: replName,
+            currentShift: b.currentShift ? {
+              ...b.currentShift,
+              cashier: replName,
+            } : undefined,
           });
         }
       });
-      showToast(`Empleado "${emp.name}" eliminado.`);
+      showToast(`Empleado "${emp.name}" dado de baja definitivamente.`);
     }
   };
 

@@ -965,7 +965,7 @@ export function findShiftCutForNotification(notif: FBNotification): ShiftCutReco
     const relevoMatch = notif.highlightText.match(/^(?:Cambio de Turno:\s*)?([^\➔\-]+)\s*[➔\-]\s*([^\.]+)/i);
     const outgoing = relevoMatch
       ? relevoMatch[1].trim()
-      : notif.senderName.replace(/^🏁\s*Cierre de Turno\s*\(|\)$/g, "").trim() || "silvia puga";
+      : notif.senderName.replace(/^🏁\s*Cierre de Turno\s*\(|\)$/g, "").trim() || "Cajero en Turno";
     const incoming = relevoMatch ? relevoMatch[2].trim() : "Don Toño Brito";
 
     const initialFund = branchStandardFund;

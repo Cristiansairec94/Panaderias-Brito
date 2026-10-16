@@ -806,9 +806,16 @@ export function compressImageFile(
  * considerando el ID provisto, nombres alternativos, códigos y el cajero asignado.
  */
 export function resolveBranchId(rawBranchId: string | null | undefined, cashierName?: string): string {
+  const normalize = (s?: string) =>
+    (s || "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .trim();
+
   if (rawBranchId) {
-    const lower = rawBranchId.toLowerCase().trim();
-    if (lower.includes("angeles") || lower.includes("ángeles") || lower.includes("suc-les")) return "branch-angeles";
+    const lower = normalize(rawBranchId);
+    if (lower.includes("angeles") || lower.includes("suc-les")) return "branch-angeles";
     if (lower.includes("ildefonso") || lower.includes("1790889237862") || lower.includes("ilf-04")) return "branch-1790889237862";
     if (lower.includes("benito") || lower.includes("ben-02")) return "branch-benito";
     if (lower.includes("sanjuan") || lower.includes("san-juan") || lower.includes("san juan") || lower.includes("sju-02")) return "branch-sanjuan";
@@ -818,23 +825,35 @@ export function resolveBranchId(rawBranchId: string | null | undefined, cashierN
   }
 
   if (cashierName) {
-    const cLower = cashierName.toLowerCase().trim();
+    const cNorm = normalize(cashierName);
 
     // 1. Consultar dinámicamente la plantilla de usuarios del administrador (brito_custom_users)
     if (typeof window !== "undefined") {
       try {
+        let deletedSet = new Set<string>();
+        try {
+          const rawDel = localStorage.getItem("brito_deleted_user_ids");
+          if (rawDel) {
+            const arr = JSON.parse(rawDel);
+            if (Array.isArray(arr)) arr.forEach((x: string) => deletedSet.add(x.toLowerCase()));
+          }
+        } catch {}
+
         const rawUsers = localStorage.getItem("brito_custom_users");
         if (rawUsers) {
           const users = JSON.parse(rawUsers);
           if (Array.isArray(users)) {
             const matchedUser = users.find((u: any) => {
-              const uName = (u.name || "").toLowerCase().trim();
-              const uUser = (u.username || "").toLowerCase().trim();
+              if (u.status === "inactivo") return false;
+              if (deletedSet.has((u.id || "").toLowerCase()) || deletedSet.has((u.username || "").toLowerCase())) return false;
+              const uName = normalize(u.name);
+              const uUser = normalize(u.username);
               return (
-                uName === cLower ||
-                uUser === cLower ||
-                (uName.length > 2 && cLower.includes(uName)) ||
-                (cLower.length > 2 && uName.includes(cLower))
+                uName === cNorm ||
+                uUser === cNorm ||
+                (uName.length > 2 && cNorm.includes(uName)) ||
+                (cNorm.length > 2 && uName.includes(cNorm)) ||
+                (uUser.length > 2 && cNorm.includes(uUser))
               );
             });
             if (matchedUser?.assignedBranchId) {
@@ -849,15 +868,20 @@ export function resolveBranchId(rawBranchId: string | null | undefined, cashierN
           const branches = JSON.parse(rawBranches);
           if (Array.isArray(branches)) {
             const matchedBranch = branches.find((b: any) => {
-              const mName = (b.manager || "").toLowerCase().trim();
-              const aName = (b.assignedUserName || "").toLowerCase().trim();
-              const cName = (b.currentShift?.cashier || "").toLowerCase().trim();
+              const mName = normalize(b.manager);
+              const aName = normalize(b.assignedUserName);
+              const cName = normalize(b.currentShift?.cashier);
+              const bName = normalize(b.name);
+              const bShort = normalize(b.shortName);
               return (
-                mName === cLower ||
-                aName === cLower ||
-                cName === cLower ||
-                (mName.length > 2 && cLower.includes(mName)) ||
-                (aName.length > 2 && cLower.includes(aName))
+                mName === cNorm ||
+                aName === cNorm ||
+                cName === cNorm ||
+                (mName.length > 2 && cNorm.includes(mName)) ||
+                (aName.length > 2 && cNorm.includes(aName)) ||
+                (cName.length > 2 && cNorm.includes(cName)) ||
+                (bName.length > 2 && cNorm.includes(bName)) ||
+                (bShort.length > 2 && cNorm.includes(bShort))
               );
             });
             if (matchedBranch?.id) {
@@ -868,13 +892,13 @@ export function resolveBranchId(rawBranchId: string | null | undefined, cashierN
       } catch {}
     }
 
-    // 3. Reconocimiento de palabras clave y nombres canónicos
-    if (cLower.includes("angeles") || cLower.includes("ángeles") || cLower.includes("lazaro") || cLower.includes("lázaro") || cLower.includes("andres") || cLower.includes("andrés")) return "branch-angeles";
-    if (cLower.includes("benito") || cLower.includes("mendoza") || cLower === "ana" || cLower.startsWith("ana ")) return "branch-benito";
-    if (cLower.includes("ildefonso") || cLower.includes("silvia") || cLower.includes("puga")) return "branch-1790889237862";
-    if (cLower.includes("sanjuan") || cLower.includes("san juan") || cLower.includes("noe") || cLower.includes("noé") || cLower.includes("velasquez") || cLower.includes("velásquez")) return "branch-sanjuan";
-    if (cLower.includes("flores") || cLower.includes("sofia") || cLower.includes("sofía") || cLower.includes("elena") || cLower.includes("carmen")) return "branch-flores";
-    if (cLower.includes("matriz") || cLower.includes("centro") || cLower.includes("toño") || cLower.includes("tono") || cLower.includes("lupita") || cLower.includes("bueno")) return "branch-matriz";
+    // 3. Reconocimiento de palabras clave y nombres canónicos con normalización estricta
+    if (cNorm.includes("angeles") || cNorm.includes("lazaro") || cNorm.includes("andres")) return "branch-angeles";
+    if (cNorm.includes("benito") || cNorm.includes("mendoza") || cNorm === "ana" || cNorm.startsWith("ana ")) return "branch-benito";
+    if (cNorm.includes("ildefonso") || cNorm.includes("sebastian") || cNorm.includes("silvia") || cNorm.includes("puga")) return "branch-1790889237862";
+    if (cNorm.includes("sanjuan") || cNorm.includes("san juan") || cNorm.includes("noe") || cNorm.includes("velasquez")) return "branch-sanjuan";
+    if (cNorm.includes("flores") || cNorm.includes("sofia") || cNorm.includes("elena") || cNorm.includes("carmen")) return "branch-flores";
+    if (cNorm.includes("matriz") || cNorm.includes("centro") || cNorm.includes("tono") || cNorm.includes("lupita") || cNorm.includes("bueno")) return "branch-matriz";
   }
 
   return rawBranchId || "branch-matriz";

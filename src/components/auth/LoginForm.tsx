@@ -354,31 +354,24 @@ export default function LoginForm() {
                   </div>
                   <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto pr-1">
                     {(() => {
-                      const baseList = [
-                        { name: "Silvia Puga (Mañana)", user: "silvia", pass: "1234", branch: "San Ildefonso", avatar: "👩‍💼" },
-                        { name: "Cajero Ildefonso (Tarde)", user: "cajero.ildefonso", pass: "1234", branch: "San Ildefonso", avatar: "👨‍🍳" },
-                        { name: "Andrés Sánchez (Mañana)", user: "andres", pass: "1234", branch: "Los Ángeles", avatar: "👨‍💼" },
-                        { name: "Cajero Ángeles (Tarde)", user: "angeles", pass: "1234", branch: "Los Ángeles", avatar: "👨‍🍳" },
-                        { name: "Noé Velásquez (Mañana)", user: "noe", pass: "1234", branch: "San Juan", avatar: "👨‍🍳" },
-                        { name: "Don Toño", user: "admin", pass: "admin", branch: "Dueño / Admin", avatar: "👨‍🍳" },
-                        { name: "Paulina Brito", user: "paulina", pass: "1234", branch: "Admin General", avatar: "👩‍💼" },
-                      ];
-
-                      const customUsers = (usersList || [])
-                        .filter((u) => {
-                          if (!u.hasSystemAccess || u.status === "inactivo") return false;
-                          const uName = (u.username || "").toLowerCase().trim();
-                          return uName && !baseList.some((b) => b.user.toLowerCase() === uName);
-                        })
-                        .map((u) => ({
-                          name: `${u.name} (${u.shiftName || (u.shift === "vespertino" ? "Tarde" : "Mañana")})`,
-                          user: u.username || u.id,
-                          pass: u.password || "1234",
-                          branch: u.assignedBranchName || "General",
-                          avatar: u.avatar || "👤",
-                        }));
-
-                      const allProfiles = [...baseList, ...customUsers];
+                      const allProfiles = (usersList && usersList.length > 0
+                        ? usersList.filter((u) => u.hasSystemAccess !== false && u.status !== "inactivo" && Boolean(u.username))
+                        : [
+                            { name: "Sebastián Brito", username: "sebastian", password: "1234", assignedBranchName: "San Ildefonso", avatar: "👨‍💼", shiftName: "Mañana" },
+                            { name: "Cajero Ildefonso", username: "cajero.ildefonso", password: "1234", assignedBranchName: "San Ildefonso", avatar: "👨‍🍳", shiftName: "Tarde" },
+                            { name: "Andrés Sánchez", username: "andres", password: "1234", assignedBranchName: "Los Ángeles", avatar: "👨‍💼", shiftName: "Mañana" },
+                            { name: "Cajero Ángeles", username: "angeles", password: "1234", assignedBranchName: "Los Ángeles", avatar: "👨‍🍳", shiftName: "Tarde" },
+                            { name: "Noé Velásquez", username: "noe", password: "1234", assignedBranchName: "San Juan", avatar: "👨‍🍳", shiftName: "Mañana" },
+                            { name: "Don Toño", username: "admin", password: "admin", assignedBranchName: "Dueño / Admin", avatar: "👨‍🍳", shiftName: "General" },
+                            { name: "Paulina Brito", username: "paulina", password: "1234", assignedBranchName: "Admin General", avatar: "👩‍💼", shiftName: "General" },
+                          ]
+                      ).map((u: any) => ({
+                        name: `${u.name} (${u.shiftName || (u.shift === "vespertino" ? "Tarde" : "Mañana")})`,
+                        user: u.username || u.id,
+                        pass: u.password || "1234",
+                        branch: u.assignedBranchName || "General",
+                        avatar: u.avatar || "👤",
+                      }));
 
                       return allProfiles.map((demo) => (
                         <button
