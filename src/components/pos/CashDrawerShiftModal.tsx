@@ -863,10 +863,6 @@ export default function CashDrawerShiftModal({
 
     addNotification(shiftNotif);
 
-    if (realtimeHub?.broadcastNotification) {
-      realtimeHub.broadcastNotification(shiftNotif);
-    }
-
     // Actualizar al nuevo cajero y turno
     onChangeCashier(incomingCashier);
     onChangeShift(nextShiftName);
@@ -900,9 +896,6 @@ export default function CashDrawerShiftModal({
       actionLink: "/caja",
     };
     addNotification(takeTurnNotif);
-    if (realtimeHub?.broadcastNotification) {
-      realtimeHub.broadcastNotification(takeTurnNotif);
-    }
 
     // Si el perfil entrante existe en la lista de usuarios y quien opera es cajero (o no es admin general), vincular sesión activa
     if (incomingProfile && user && user.role === "cajero" && loginAs) {

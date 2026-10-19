@@ -1005,7 +1005,6 @@ export async function syncOrdersWithServer(): Promise<CustomOrder[]> {
           if (realtimeHub?.broadcastOrder) {
             realtimeHub.broadcastOrder("create", p);
           }
-          broadcastOrderCreatedNotification(p);
         }
 
         fetch("/api/orders", {

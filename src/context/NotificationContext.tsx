@@ -416,23 +416,114 @@ export function isTerminalOrderNotification(n: Partial<FBNotification>): boolean
 }
 
 /**
- * Dos notificaciones pertenecen al mismo pedido si comparten el mismo folio (PED-XXX) o el mismo orderId.
- * Esto permite RECICLAR siempre la misma notificación por pedido y subirla hasta arriba cuando cambia de estado
- * (creado -> abono -> liquidado -> listo en sucursal -> entregado -> cancelado), evitando acumular múltiples tarjetas del mismo pedido.
+ * Detección integral de notificaciones duplicadas o del mismo evento operativo:
+ * 1. Mismo ID exacto.
+ * 2. Pedidos: Mismo folio (PED-XXX) u orderId (reutilizar y reciclar la misma tarjeta).
+ * 3. Cortes de caja: Mismo cutId, mismo folio de corte (CORTE-...) o mismo cierre de sucursal.
+ * 4. Inicios de turno: Mismo cajero y sucursal en el mismo turno.
+ * 5. Título y descripción idénticos o casi idénticos en la misma ventana de tiempo.
  */
-export function isSameOrderEvent(a: Partial<FBNotification>, b: Partial<FBNotification>): boolean {
-  if (a.id && b.id && a.id === b.id) return true;
+export function isSameNotification(a: Partial<FBNotification>, b: Partial<FBNotification>): boolean {
+  if (!a || !b) return false;
+  if (a.id && b.id && a.id.toLowerCase().trim() === b.id.toLowerCase().trim()) return true;
 
-  const { folio: folioA, orderId: idA } = extractOrderFolioOrId(a);
-  const { folio: folioB, orderId: idB } = extractOrderFolioOrId(b);
+  // 1. Chequeo de Pedidos (por folio PED-XXX u orderId)
+  const isOrderA = a.category === "pedidos" || Boolean(a.orderId) || Boolean(a.orderData) || (a.title && /ped[-_]?\d+/i.test(a.title));
+  const isOrderB = b.category === "pedidos" || Boolean(b.orderId) || Boolean(b.orderData) || (b.title && /ped[-_]?\d+/i.test(b.title));
 
-  if (folioA && folioB && folioA === folioB) return true;
-  if (idA && idB && idA === idB) return true;
-  if (folioA && idB && folioA === idB) return true;
-  if (idA && folioB && idA === folioB) return true;
+  if (isOrderA || isOrderB) {
+    const { folio: folioA, orderId: idA } = extractOrderFolioOrId(a);
+    const { folio: folioB, orderId: idB } = extractOrderFolioOrId(b);
+
+    if (folioA && folioB && folioA === folioB) return true;
+    if (idA && idB && idA === idB) return true;
+    if (folioA && idB && folioA === idB) return true;
+    if (idA && folioB && idA === folioB) return true;
+  }
+
+  // 2. Chequeo de Cortes de Caja (por cutId o folio de corte CORTE-...)
+  const cutIdA = (a.cutId || a.shiftCutData?.id || "").toLowerCase().trim();
+  const cutIdB = (b.cutId || b.shiftCutData?.id || "").toLowerCase().trim();
+  if (cutIdA && cutIdB && cutIdA === cutIdB) return true;
+
+  const textA = `${a.id || ""} ${a.title || ""} ${a.highlightText || ""} ${a.description || ""}`.toLowerCase();
+  const textB = `${b.id || ""} ${b.title || ""} ${b.highlightText || ""} ${b.description || ""}`.toLowerCase();
+
+  const cutMatchA = textA.match(/corte[-_]?[a-z0-9_-]+/i);
+  const cutMatchB = textB.match(/corte[-_]?[a-z0-9_-]+/i);
+  if (cutMatchA && cutMatchB && cutMatchA[0].toLowerCase() === cutMatchB[0].toLowerCase()) {
+    return true;
+  }
+
+  const isCutA = a.category === "caja" && (textA.includes("cierre de turno") || textA.includes("corte de caja") || textA.includes("corte de turno") || Boolean(a.cutId));
+  const isCutB = b.category === "caja" && (textB.includes("cierre de turno") || textB.includes("corte de caja") || textB.includes("corte de turno") || Boolean(b.cutId));
+  if (isCutA && isCutB) {
+    const branchA = getCanonicalBranchCode(a.branchId || a.branchName);
+    const branchB = getCanonicalBranchCode(b.branchId || b.branchName);
+    if (!branchA || !branchB || branchA === branchB) {
+      const tsA = a.timestamp || 0;
+      const tsB = b.timestamp || 0;
+      if (tsA && tsB && Math.abs(tsA - tsB) < 30 * 60 * 1000) {
+        return true;
+      }
+    }
+  }
+
+  // 3. Chequeo de Inicio / Relevo de Turno ("ha comenzado su turno" o "ha tomado su puesto")
+  const isShiftStartA =
+    (a.id || "").toLowerCase().startsWith("notif-turno-") ||
+    (a.id || "").toLowerCase().startsWith("notif-relevo-") ||
+    textA.includes("ha comenzado su turno") ||
+    textA.includes("ha tomado su puesto") ||
+    textA.includes("tomó su puesto") ||
+    textA.includes("inicio de turno");
+
+  const isShiftStartB =
+    (b.id || "").toLowerCase().startsWith("notif-turno-") ||
+    (b.id || "").toLowerCase().startsWith("notif-relevo-") ||
+    textB.includes("ha comenzado su turno") ||
+    textB.includes("ha tomado su puesto") ||
+    textB.includes("tomó su puesto") ||
+    textB.includes("inicio de turno");
+
+  if (isShiftStartA && isShiftStartB) {
+    const branchA = getCanonicalBranchCode(a.branchId || a.branchName);
+    const branchB = getCanonicalBranchCode(b.branchId || b.branchName);
+    if (!branchA || !branchB || branchA === branchB) {
+      const nameMatchA = textA.match(/([a-záéíóúñ]+)\s+ha\s+(?:comenzado|tomado)/i);
+      const nameMatchB = textB.match(/([a-záéíóúñ]+)\s+ha\s+(?:comenzado|tomado)/i);
+      if (nameMatchA && nameMatchB && nameMatchA[1].toLowerCase() === nameMatchB[1].toLowerCase()) {
+        const tsA = a.timestamp || 0;
+        const tsB = b.timestamp || 0;
+        if (!tsA || !tsB || Math.abs(tsA - tsB) < 2 * 60 * 60 * 1000) {
+          return true;
+        }
+      }
+    }
+  }
+
+  // 4. Chequeo de título y contenido idénticos
+  if (
+    a.title && b.title &&
+    a.title.trim().toLowerCase() === b.title.trim().toLowerCase()
+  ) {
+    const highA = (a.highlightText || "").trim().toLowerCase();
+    const highB = (b.highlightText || "").trim().toLowerCase();
+    const descA = (a.description || "").trim().toLowerCase();
+    const descB = (b.description || "").trim().toLowerCase();
+    if ((highA && highA === highB) || (descA && descA === descB)) {
+      const tsA = a.timestamp || 0;
+      const tsB = b.timestamp || 0;
+      if (!tsA || !tsB || Math.abs(tsA - tsB) < 60 * 60 * 1000) {
+        return true;
+      }
+    }
+  }
 
   return false;
 }
+
+export const isSameOrderEvent = isSameNotification;
 
 export function mergeNotifications(existing: FBNotification, incoming: FBNotification): FBNotification {
   const existingTs = existing.timestamp || 0;
@@ -451,7 +542,7 @@ export function mergeNotifications(existing: FBNotification, incoming: FBNotific
   const existingStage = getNotificationIntrinsicStage(existing);
   const incomingStage = getNotificationIntrinsicStage(incoming);
 
-  // Determinar cuál notificación representa el estado más reciente del pedido
+  // Determinar cuál notificación representa el estado más reciente
   const incomingIsNewer =
     incomingTs >= existingTs ||
     stageRank[incomingStage] > stageRank[existingStage];
@@ -466,6 +557,51 @@ export function mergeNotifications(existing: FBNotification, incoming: FBNotific
   const storedOrder: CustomOrder | null = liveStoredOrder
     ? { ...(secondary.orderData || {}), ...(primary.orderData || {}), ...liveStoredOrder }
     : (primary.orderData || secondary.orderData || null);
+
+  const isOrder =
+    existing.category === "pedidos" ||
+    incoming.category === "pedidos" ||
+    Boolean(existing.orderId) ||
+    Boolean(incoming.orderId) ||
+    Boolean(liveStoredOrder) ||
+    Boolean(existing.orderData) ||
+    Boolean(incoming.orderData);
+
+  if (!isOrder) {
+    const latestTs = Math.max(existingTs, incomingTs) || Date.now();
+    const bestCutId = primary.cutId || secondary.cutId;
+    const bestShiftData = primary.shiftCutData || secondary.shiftCutData;
+    const isShiftStart =
+      (primary.id || "").toLowerCase().startsWith("notif-turno-") ||
+      (secondary.id || "").toLowerCase().startsWith("notif-turno-") ||
+      (primary.title || "").toLowerCase().includes("ha comenzado su turno") ||
+      (secondary.title || "").toLowerCase().includes("ha comenzado su turno");
+
+    return {
+      ...secondary,
+      ...primary,
+      id: primary.id || secondary.id,
+      category: "caja",
+      badgeIcon: isShiftStart ? "dinero" : (primary.badgeIcon || secondary.badgeIcon || "dinero"),
+      title: primary.title || secondary.title,
+      senderName: primary.senderName || secondary.senderName,
+      senderAvatar: primary.senderAvatar || secondary.senderAvatar,
+      highlightText: primary.highlightText || secondary.highlightText,
+      description: primary.description || secondary.description,
+      branchId: primary.branchId || secondary.branchId,
+      branchName: primary.branchName || secondary.branchName,
+      operatingBranchId: primary.operatingBranchId || secondary.operatingBranchId,
+      operatingBranchName: primary.operatingBranchName || secondary.operatingBranchName,
+      cutId: bestCutId,
+      shiftCutData: bestShiftData,
+      actionLabel: primary.actionLabel || secondary.actionLabel,
+      actionLink: primary.actionLink || secondary.actionLink,
+      timestamp: latestTs,
+      timeAgo: formatNotificationHour(latestTs),
+      group: "recientes",
+      read: incomingIsNewer ? false : existing.read,
+    };
+  }
 
   let activeStage = incomingIsNewer ? incomingStage : existingStage;
   if (storedOrder?.status === "cancelado") {
@@ -1202,6 +1338,38 @@ const NotificationContext = createContext<NotificationContextType | undefined>(u
 
 const STORAGE_NOTIFS_KEY = "brito_notifications";
 
+const recentDispatchedNotifKeys = new Map<string, number>();
+
+function recordDispatchedNotif(notif: Partial<FBNotification>) {
+  const now = Date.now();
+  if (notif.id) recentDispatchedNotifKeys.set(notif.id.toLowerCase().trim(), now);
+  if (notif.title) {
+    const key = `${notif.title}__${notif.highlightText || ""}__${notif.branchName || ""}`.toLowerCase().trim();
+    recentDispatchedNotifKeys.set(key, now);
+  }
+  if (recentDispatchedNotifKeys.size > 200) {
+    for (const [k, ts] of recentDispatchedNotifKeys.entries()) {
+      if (now - ts > 30000) recentDispatchedNotifKeys.delete(k);
+    }
+  }
+}
+
+function isRecentDispatchedNotif(notif: Partial<FBNotification>): boolean {
+  const now = Date.now();
+  if (notif.id && recentDispatchedNotifKeys.has(notif.id.toLowerCase().trim())) {
+    const ts = recentDispatchedNotifKeys.get(notif.id.toLowerCase().trim())!;
+    if (now - ts < 15000) return true;
+  }
+  if (notif.title) {
+    const key = `${notif.title}__${notif.highlightText || ""}__${notif.branchName || ""}`.toLowerCase().trim();
+    if (recentDispatchedNotifKeys.has(key)) {
+      const ts = recentDispatchedNotifKeys.get(key)!;
+      if (now - ts < 15000) return true;
+    }
+  }
+  return false;
+}
+
 export function NotificationProvider({ children }: { children: React.ReactNode }) {
   // Conectar con el usuario actual y sucursal activa
   let authContext: any = null;
@@ -1696,7 +1864,15 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         return updated;
       });
 
-      if (isSameStageEcho) {
+      const isEchoFromSelf = isRecentDispatchedNotif(remoteNotif);
+      const isExactDuplicateAlert = Boolean(
+        existingMatch &&
+        existingMatch.title.trim().toLowerCase() === remoteNotif.title.trim().toLowerCase() &&
+        (existingMatch.highlightText || "").trim().toLowerCase() === (remoteNotif.highlightText || "").trim().toLowerCase() &&
+        Math.abs(Date.now() - (existingMatch.timestamp || 0)) < 10000
+      );
+
+      if (isEchoFromSelf || isSameStageEcho || isExactDuplicateAlert) {
         return;
       }
 
@@ -2102,6 +2278,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     });
 
     // Transmitir en vivo por WebSocket a los demás celulares/computadoras del negocio
+    recordDispatchedNotif(fullNotif);
     if (realtimeHub.broadcastNotification) {
       realtimeHub.broadcastNotification(fullNotif);
     }

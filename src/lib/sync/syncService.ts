@@ -5,7 +5,7 @@ import { DEFAULT_GENERAL_CUSTOMER, getStoredCustomers, saveStoredCustomers } fro
 import { playSyncSuccessSound } from "@/lib/sound";
 import { CLEAN_SLATE_EPOCH } from "@/lib/wipeOperationalData";
 import { parseDateTimeSafe, isOrderSale } from "@/lib/utils";
-import { orderToSupabasePayload, persistOrderPaymentMovementToSupabase, broadcastOrderCreatedNotification } from "@/lib/orders";
+import { orderToSupabasePayload, persistOrderPaymentMovementToSupabase } from "@/lib/orders";
 
 export const STORAGE_SYNC_QUEUE_KEY = "brito_offline_sync_queue";
 export const STORAGE_LAST_SYNC_KEY = "brito_last_sync_time";
@@ -380,7 +380,6 @@ export async function processSyncQueue(): Promise<{
                 realtimeHub.broadcastOrder("create", orderData);
               }
             } catch {}
-            broadcastOrderCreatedNotification(orderData);
             fetch("/api/orders", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
@@ -780,7 +779,6 @@ export async function syncAllLocalDataToSupabase(): Promise<{
                   realtimeHub.broadcastOrder("create", ord);
                 }
               } catch {}
-              broadcastOrderCreatedNotification(ord);
             }
           } else {
             errors.push("Pedido " + ord.orderNumber + ": " + ordErr.message);

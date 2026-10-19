@@ -1780,14 +1780,18 @@ export default function CajaPage() {
         ? `🚨 NO CUADRÓ LA CAJA (Faltante ${formatCurrency(diff)})`
         : `⚠️ NO CUADRÓ LA CAJA (Sobrante +${formatCurrency(diff)})`;
 
+      const nowClose = new Date();
+      const closeTimeStr = `${nowClose.getHours().toString().padStart(2, "0")}:${nowClose.getMinutes().toString().padStart(2, "0")}`;
+      const withdrawnCash = Math.max(0, parsedCounted - parsedNextFund);
+
       const shiftNotif: FBNotification = {
         id: `notif-cut-${newCut.id}`,
         senderName: `🏁 Cierre de Turno (${currentShiftResponsible})`,
         senderAvatar: isSquare ? "💰" : "⚠️",
         badgeIcon: "dinero",
-        title: `Cierre de Turno: ${squareStatusTitle}`,
+        title: `Cierre a las ${closeTimeStr} hrs: ${squareStatusTitle}`,
         highlightText: `Cambio de Turno: ${currentShiftResponsible} ➔ ${recipient}`,
-        description: `Folio ${newCut.id}. Efectivo contado: ${formatCurrency(parsedCounted)} (Esperado: ${formatCurrency(expectedCashInDrawer)}). Fondo nuevo dejado en caja: ${formatCurrency(parsedNextFund)}. Saliente: ${currentShiftResponsible}.`,
+        description: `Folio ${newFolio} archivado en historial de caja. Horario de cierre: ${closeTimeStr} hrs. Efectivo en caja: ${formatCurrency(parsedCounted)} (${isSquare ? "Cuadró exacta sin faltantes" : `Diferencia: ${formatCurrency(diff)}`}). Fondo para nuevo turno: ${formatCurrency(parsedNextFund)}. Efectivo retirado/entregado: ${formatCurrency(withdrawnCash)}.`,
         category: "caja",
         actionLabel: "Ver Ticket de Corte",
         actionLink: `/caja?tab=historial&corteId=${newCut.id}`,
@@ -1795,17 +1799,13 @@ export default function CajaPage() {
         cutId: newCut.id,
         branchId: targetBranchId,
         branchName: currentBranch?.name || "Sucursal",
-        timeAgo: `${String(new Date().getHours()).padStart(2, "0")}:${String(new Date().getMinutes()).padStart(2, "0")} hrs`,
+        timeAgo: `${closeTimeStr} hrs`,
         timestamp: Date.now(),
         group: "recientes",
         read: false,
       };
 
       addNotification(shiftNotif);
-
-      if (realtimeHub?.broadcastNotification) {
-        realtimeHub.broadcastNotification(shiftNotif);
-      }
 
       window.dispatchEvent(new Event("brito_shift_cuts_updated"));
       window.dispatchEvent(new Event("brito_sales_updated"));
@@ -1824,32 +1824,6 @@ export default function CajaPage() {
         data: newCut,
       });
     } catch (e) {}
-
-    // High priority notification
-    const nowClose = new Date();
-    const closeTimeStr = `${nowClose.getHours().toString().padStart(2, "0")}:${nowClose.getMinutes().toString().padStart(2, "0")}`;
-    const isSquare = diff === 0;
-    const isShort = diff < 0;
-    const squareStatusTitle = isSquare
-      ? "✓ CAJA CUADRADA EXACTA ($0.00)"
-      : isShort
-      ? `🚨 NO CUADRÓ LA CAJA (Faltante ${formatCurrency(diff)})`
-      : `⚠️ NO CUADRÓ LA CAJA (Sobrante +${formatCurrency(diff)})`;
-    const withdrawnCash = Math.max(0, parsedCounted - parsedNextFund);
-
-    addNotification({
-      senderName: `🏁 Cierre de Turno (${currentShiftResponsible})`,
-      senderAvatar: isSquare ? "💰" : "⚠️",
-      badgeIcon: "dinero",
-      title: `Cierre a las ${closeTimeStr} hrs: ${squareStatusTitle}`,
-      highlightText: `Cambio de Turno: ${currentShiftResponsible} ➔ ${recipient}`,
-      description: `Folio ${newFolio} archivado en historial de caja. Horario de cierre: ${closeTimeStr} hrs. Efectivo en caja: ${formatCurrency(parsedCounted)} (${isSquare ? "Cuadró exacta sin faltantes" : `Diferencia: ${formatCurrency(diff)}`}). Fondo para nuevo turno: ${formatCurrency(parsedNextFund)}. Efectivo retirado/entregado: ${formatCurrency(withdrawnCash)}.`,
-      category: "caja",
-      actionLabel: "Ver Corte de Caja",
-      actionLink: `/caja?tab=historial&corteId=${newCut.id}`,
-      shiftCutData: newCut,
-      cutId: newCut.id,
-    });
 
     const recipientUser = usersList.find((u) => matchesCashier(u.name, recipient) || matchesCashier(u.username, recipient));
     const fullBranchName = currentBranch?.name || "Sucursal Matriz";
