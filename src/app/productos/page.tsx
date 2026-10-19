@@ -36,6 +36,7 @@ import { BarcodeCard } from "@/components/productos/BarcodeCard";
 import { PrintBarcodesModal } from "@/components/productos/PrintBarcodesModal";
 import { QuickPriceModal } from "@/components/productos/QuickPriceModal";
 import { ManageCategoriesModal } from "@/components/productos/ManageCategoriesModal";
+import { BarcodeScannerModal } from "@/components/productos/BarcodeScannerModal";
 import { 
   getStoredProducts, 
   createProduct, 
@@ -61,6 +62,7 @@ export default function ProductosPage() {
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [isCategoriesOpen, setIsCategoriesOpen] = useState(true);
   const [isManageCategoriesOpen, setIsManageCategoriesOpen] = useState(false);
+  const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
   const [viewMode, setViewMode] = useState<"grid" | "table">("grid");
 
@@ -209,6 +211,51 @@ export default function ProductosPage() {
       setProducts(getStoredProducts());
       showToast(`Precio de "${prod.name}" actualizado a ${formatCurrency(newPrice)}`);
     }
+  };
+
+  // Handlers para escaneo de empaque con cámara
+  const handleUseScannedCode = (scannedBarcode: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      barcode: scannedBarcode,
+      code: scannedBarcode,
+    }));
+    showToast(`Código de barras "${scannedBarcode}" asignado al formulario.`);
+  };
+
+  const handleDirectSaveFromScanner = (data: {
+    barcode: string;
+    code: string;
+    name: string;
+    price: number;
+    category: string;
+  }) => {
+    const catObj = categories.find((c) => c.id === data.category);
+    createProduct({
+      code: data.code,
+      barcode: data.barcode,
+      name: data.name,
+      price: data.price,
+      category: data.category as any,
+      unit: data.category === "materia_prima" ? "kg" : "pieza",
+      icon: catObj?.icon || (data.category === "abarrotes" ? "🥫" : "🥖"),
+      stock: 0,
+      description: "",
+      image: "",
+      hasIva: false,
+      ivaRate: 0,
+      hasIeps: false,
+      iepsRate: 0,
+      taxIncluded: true,
+    });
+
+    setProducts(getStoredProducts());
+    showToast(`¡Producto "${data.name}" agregado a la base de datos!`);
+    setIsModalOpen(false);
+  };
+
+  const handleSelectExistingFromScanner = (existingProduct: Product) => {
+    handleOpenEdit(existingProduct);
   };
 
   // Filtered products
@@ -1121,6 +1168,7 @@ export default function ProductosPage() {
                   const newBarcode = generateProductBarcode();
                   setFormData({ ...formData, barcode: newBarcode, code: newBarcode });
                 }}
+                onOpenScanner={() => setIsScannerOpen(true)}
               />
 
               {/* Categoría & Precio */}
@@ -1372,6 +1420,20 @@ export default function ProductosPage() {
           setCategories(getStoredCategories());
           setProducts(getStoredProducts());
         }}
+      />
+
+      {/* Modal de Escaneo de Códigos de Barra de Empaques con Cámara */}
+      <BarcodeScannerModal
+        isOpen={isScannerOpen}
+        onClose={() => setIsScannerOpen(false)}
+        products={products}
+        categories={categories}
+        initialName={formData.name}
+        initialPrice={formData.price}
+        initialCategory={formData.category}
+        onUseCode={handleUseScannedCode}
+        onSaveDirect={handleDirectSaveFromScanner}
+        onSelectExistingProduct={handleSelectExistingFromScanner}
       />
     </div>
   );

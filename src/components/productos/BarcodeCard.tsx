@@ -8,7 +8,8 @@ import {
   Check, 
   Printer, 
   Scan,
-  Sparkles
+  Sparkles,
+  Camera
 } from "lucide-react";
 
 // Standard EAN-13 patterns
@@ -380,6 +381,7 @@ interface BarcodeCardProps {
   productPrice?: string | number;
   onChangeBarcode: (newBarcode: string) => void;
   onRegenerate: () => void;
+  onOpenScanner?: () => void;
 }
 
 export function BarcodeCard({
@@ -388,6 +390,7 @@ export function BarcodeCard({
   productPrice,
   onChangeBarcode,
   onRegenerate,
+  onOpenScanner,
 }: BarcodeCardProps) {
   const [copied, setCopied] = useState(false);
   const [isManualEditOpen, setIsManualEditOpen] = useState(false);
@@ -510,7 +513,19 @@ export function BarcodeCard({
         </div>
 
         {/* Quick Actions */}
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1.5 flex-wrap justify-end">
+          {onOpenScanner && (
+            <button
+              type="button"
+              onClick={onOpenScanner}
+              className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-[10px] font-black rounded-lg transition-all flex items-center gap-1 cursor-pointer shadow-xs hover:scale-102"
+              title="Escanear el código de barras que trae el empaque con la cámara"
+            >
+              <Camera className="w-3 h-3 stroke-[2.5]" />
+              <span>Escanear Empaque</span>
+            </button>
+          )}
+
           <button
             type="button"
             onClick={onRegenerate}
@@ -563,15 +578,30 @@ export function BarcodeCard({
 
       {/* Expand / Collapse manual scan or edit */}
       <div className="space-y-2">
-        <div className="flex items-center justify-between text-[11px]">
-          <button
-            type="button"
-            onClick={() => setIsManualEditOpen(!isManualEditOpen)}
-            className="text-stone-600 hover:text-stone-950 font-bold flex items-center gap-1 cursor-pointer transition-colors"
-          >
-            <Scan className="w-3.5 h-3.5 text-amber-600" />
-            <span>{isManualEditOpen ? "Ocultar casilla manual" : "Escanear con pistola o editar número"}</span>
-          </button>
+        <div className="flex items-center justify-between text-[11px] gap-2 flex-wrap">
+          <div className="flex items-center gap-2.5">
+            {onOpenScanner && (
+              <button
+                type="button"
+                onClick={onOpenScanner}
+                className="text-emerald-700 hover:text-emerald-900 font-black flex items-center gap-1 cursor-pointer transition-colors"
+                title="Abrir cámara para escanear el empaque"
+              >
+                <Camera className="w-3.5 h-3.5 text-emerald-600" />
+                <span>Escanear con cámara</span>
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={() => setIsManualEditOpen(!isManualEditOpen)}
+              className="text-stone-600 hover:text-stone-950 font-bold flex items-center gap-1 cursor-pointer transition-colors"
+            >
+              <Scan className="w-3.5 h-3.5 text-amber-600" />
+              <span>{isManualEditOpen ? "Ocultar casilla manual" : "Escanear con pistola o editar número"}</span>
+            </button>
+          </div>
+
           <span className="font-mono text-[11px] font-black text-amber-950 bg-amber-100/70 border border-amber-300 px-2 py-0.5 rounded-md">
             {displayBarcode}
           </span>
