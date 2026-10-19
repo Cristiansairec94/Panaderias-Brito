@@ -5,6 +5,48 @@ import { createClient } from "@/lib/supabase/client";
 import { markRecordIdsAsSynced } from "@/lib/sync/syncService";
 
 export const STORAGE_INCOMES_KEY = "brito_cash_incomes";
+export const DELETED_INCOMES_KEY = "brito_deleted_income_ids";
+
+export function getDeletedIncomeIds(): Set<string> {
+  if (typeof window === "undefined") return new Set();
+  try {
+    const raw = localStorage.getItem(DELETED_INCOMES_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return new Set(parsed);
+    }
+  } catch {}
+  return new Set();
+}
+
+export function markIncomeIdAsDeleted(id: string): void {
+  if (typeof window === "undefined" || !id) return;
+  try {
+    const set = getDeletedIncomeIds();
+    const rawId = id.replace(/^(mov-|bmov-|ING-)+/gi, "");
+    set.add(id);
+    if (rawId) {
+      set.add(rawId);
+      set.add(`ING-${rawId}`);
+      set.add(`mov-${rawId}`);
+    }
+    localStorage.setItem(DELETED_INCOMES_KEY, JSON.stringify(Array.from(set)));
+  } catch {}
+}
+
+export function unmarkIncomeIdAsDeleted(id: string): void {
+  if (typeof window === "undefined" || !id) return;
+  try {
+    const set = getDeletedIncomeIds();
+    const rawId = id.replace(/^(mov-|bmov-|ING-)+/gi, "");
+    const changed =
+      set.delete(id) ||
+      (rawId ? set.delete(rawId) || set.delete(`ING-${rawId}`) || set.delete(`mov-${rawId}`) : false);
+    if (changed) {
+      localStorage.setItem(DELETED_INCOMES_KEY, JSON.stringify(Array.from(set)));
+    }
+  } catch {}
+}
 
 export const INITIAL_INCOMES: CashIncome[] = [];
 
@@ -14,6 +56,7 @@ export const INITIAL_INCOMES: CashIncome[] = [];
 export function cleanDuplicateIncomes(incomes: CashIncome[]): CashIncome[] {
   if (!Array.isArray(incomes)) return [];
 
+  const deletedIds = getDeletedIncomeIds();
   const seenIds = new Set<string>();
   const seenSaleIds = new Set<string>();
 
@@ -32,6 +75,9 @@ export function cleanDuplicateIncomes(incomes: CashIncome[]): CashIncome[] {
   const cleaned: CashIncome[] = [];
 
   for (const inc of incomes) {
+    if (!inc || (inc.id && deletedIds.has(inc.id))) {
+      continue;
+    }
     // A) Evitar IDs duplicados exactos
     if (inc.id && seenIds.has(inc.id)) {
       continue;
@@ -98,15 +144,21 @@ export function getStoredIncomes(): CashIncome[] {
   if (typeof window === "undefined") return INITIAL_INCOMES;
   try {
     const isInit = localStorage.getItem("brito_incomes_initialized") === "true";
+    const deletedIds = getDeletedIncomeIds();
     const raw = localStorage.getItem(STORAGE_INCOMES_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed)) {
         if (parsed.length === 0 && isInit) return [];
         if (parsed.length > 0) {
-          // Validador universal: número válido > 0 (sin tope superior)
+          // Validador universal: número válido > 0 (sin tope superior) y no eliminado
           const valid = parsed.filter(
-            (i: any) => typeof i.amount === "number" && !isNaN(i.amount) && i.amount > 0
+            (i: any) =>
+              i &&
+              (!i.id || !deletedIds.has(i.id)) &&
+              typeof i.amount === "number" &&
+              !isNaN(i.amount) &&
+              i.amount > 0
           );
           const deduplicated = cleanDuplicateIncomes(valid);
           if (deduplicated.length !== parsed.length) {
@@ -131,6 +183,7 @@ export function saveStoredIncomes(incomes: CashIncome[]): void {
   try {
     const cleaned = cleanDuplicateIncomes(incomes);
     localStorage.setItem(STORAGE_INCOMES_KEY, JSON.stringify(cleaned));
+    localStorage.setItem("brito_incomes_initialized", "true");
     window.dispatchEvent(new Event("brito_incomes_updated"));
   } catch (err) {
     console.error("[Incomes] Error guardando brito_cash_incomes:", err);
@@ -563,8 +616,93 @@ export async function fetchAndSyncIncomesFromSupabase(): Promise<{
   }
 }
 
+/**
+ * Elimina un registro de ingreso de localStorage al instante (0ms), transmite en tiempo real y borra en Supabase en segundo plano.
+ */
+export function deleteIncomeInDb(id: string): void {
+  if (typeof window === "undefined" || !id) return;
+  const rawId = id.replace(/^(mov-|bmov-|ING-)+/gi, "");
+  markIncomeIdAsDeleted(id);
+
+  const current = getStoredIncomes();
+  const filtered = current.filter(
+    (i) => i.id !== id && (!rawId || (i.id !== rawId && i.id !== `ING-${rawId}` && i.id !== `mov-${rawId}`))
+  );
+  saveStoredIncomes(filtered);
+
+  try {
+    const rawCur = localStorage.getItem("brito_pos_current_incomes");
+    if (rawCur) {
+      const parsed = JSON.parse(rawCur);
+      if (Array.isArray(parsed)) {
+        localStorage.setItem(
+          "brito_pos_current_incomes",
+          JSON.stringify(
+            parsed.filter(
+              (i: any) => i && i.id !== id && (!rawId || (i.id !== rawId && i.id !== `ING-${rawId}` && i.id !== `mov-${rawId}`))
+            )
+          )
+        );
+      }
+    }
+  } catch {}
+
+  try {
+    if (realtimeHub?.broadcastIncome) {
+      realtimeHub.broadcastIncome("delete", { id });
+    }
+  } catch {}
+
+  void (async () => {
+    try {
+      const supabase = createClient();
+      const tasks: PromiseLike<any>[] = [supabase.from("cash_movements").delete().eq("id", id)];
+      if (rawId) {
+        tasks.push(supabase.from("cash_movements").delete().eq("id", rawId));
+        tasks.push(supabase.from("cash_movements").delete().eq("id", `ING-${rawId}`));
+        tasks.push(supabase.from("cash_movements").delete().eq("id", `mov-${rawId}`));
+      }
+      await Promise.allSettled(tasks);
+    } catch (err) {
+      console.warn("[Incomes] Error deleting income from Supabase:", err);
+    }
+  })();
+}
+
 // ─── SINCRONIZACIÓN EN TIEMPO REAL MULTI-SUCURSAL (WebSocket) ───────────
 if (typeof window !== "undefined") {
+  // 0. Escuchar eventos directos de ingresos (creación, edición, eliminación)
+  if (realtimeHub?.onIncome) {
+    realtimeHub.onIncome((payload) => {
+      try {
+        if (!payload) return;
+        const { action, income, deletedId } = payload;
+        const current = getStoredIncomes();
+        if (action === "delete") {
+          const targetId = deletedId || income?.id;
+          if (!targetId) return;
+          const rawId = String(targetId).replace(/^(mov-|bmov-|ING-)+/gi, "");
+          markIncomeIdAsDeleted(String(targetId));
+          const filtered = current.filter(
+            (i) => i.id !== targetId && (!rawId || (i.id !== rawId && i.id !== `ING-${rawId}` && i.id !== `mov-${rawId}`))
+          );
+          if (filtered.length !== current.length) {
+            saveStoredIncomes(filtered);
+          }
+        } else if (action === "update" && income?.id) {
+          saveStoredIncomes(current.map((i) => (i.id === income.id ? { ...i, ...income } : i)));
+        } else if (action === "create" && income?.id) {
+          unmarkIncomeIdAsDeleted(income.id);
+          if (!current.some((i) => i.id === income.id)) {
+            saveStoredIncomes([income, ...current]);
+          }
+        }
+      } catch (err) {
+        console.error("[IncomesRealtime] Error procesando evento income:", err);
+      }
+    });
+  }
+
   // 1. Escuchar ventas remotas en tiempo real de otras sucursales
   realtimeHub.onSale((sale) => {
     try {
@@ -596,6 +734,9 @@ if (typeof window !== "undefined") {
       // Limpiar ID para evitar que se anide ING-ING-ING-...
       const rawId = (mov.id || "").replace(/^(mov-|bmov-|ING-)+/gi, "");
       const cleanIncomeId = `ING-${rawId || Date.now().toString().slice(-6)}`;
+      if (getDeletedIncomeIds().has(cleanIncomeId) || (rawId && getDeletedIncomeIds().has(rawId))) {
+        return;
+      }
 
       // Evitar registrar dos veces si ya existe
       const current = getStoredIncomes();
@@ -649,3 +790,4 @@ if (typeof window !== "undefined") {
     });
   }
 }
+

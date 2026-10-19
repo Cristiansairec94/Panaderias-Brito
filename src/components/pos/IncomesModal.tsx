@@ -87,7 +87,7 @@ export default function IncomesModal({
 
   const netCashInDrawer = Math.max(0, initialFund + cashSalesTotal + totalExtraInCash - totalExpenses);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const parsedAmount = Number(amount);
     if (!parsedAmount || parsedAmount <= 0 || !description.trim()) return;
@@ -112,59 +112,66 @@ export default function IncomesModal({
       timestamp: new Date().toISOString(),
     };
 
-    try {
-      const supabase = createClient();
-      await supabase.from("cash_movements").insert({
-        id: newIncome.id,
-        type: "entrada",
-        category: newIncome.category,
-        amount: newIncome.amount,
-        reason: `${newIncome.categoryLabel}: ${newIncome.concept} (${newIncome.customerName || "General"}) [${newIncome.paymentMethod}]`,
-        authorized_by: newIncome.cashier,
-        branch_id: effectiveBranchId,
-      });
-    } catch (err) {
-      console.log("Offline mode, saved locally", err);
-    } finally {
-      onAddIncome(newIncome);
-      setLastCreatedIncome(newIncome);
+    // 1. Actualizar interfaz y caché local en 0ms
+    onAddIncome(newIncome);
+    setLastCreatedIncome(newIncome);
 
-      // Emitir en tiempo real para el Administrador y todas las cajas
-      realtimeHub.broadcastCashMovement({
-        id: newIncome.id,
-        type: "entrada",
-        amount: newIncome.amount,
-        reason: `${newIncome.categoryLabel}: ${newIncome.concept}`,
-        branchId: effectiveBranchId,
-        branchName: branchName || "Matriz Centro",
-        cashier: newIncome.cashier,
-        timestamp: new Date().toISOString(),
-      });
-
-      // Notificación inmediata para Don Toño
-      addNotification({
-        senderName: `Entrada de Caja (${newIncome.cashier})`,
-        senderAvatar: "💰",
-        badgeIcon: "dinero",
-        title: `Nuevo Ingreso: ${formatCurrency(newIncome.amount)}`,
-        highlightText: newIncome.categoryLabel,
-        description: `Concepto: "${newIncome.concept}". Método: ${newIncome.paymentMethod.toUpperCase()}. Sucursal: ${branchName}.`,
-        category: "caja",
-        actionLabel: "Ver en Registro de Ingresos",
-        actionLink: "/ingresos",
-      });
-
-      setIsSubmitting(false);
-      setFeedbackSuccess(true);
-      setAmount("");
-      setDescription("");
-      setCustomerOrOrder("");
-      setReferenceNumber("");
-
-      setTimeout(() => {
-        setFeedbackSuccess(false);
-      }, 2000);
+    // 2. Emitir en tiempo real para el Administrador, módulo de Ingresos y todas las cajas
+    if (realtimeHub.broadcastIncome) {
+      realtimeHub.broadcastIncome("create", newIncome);
     }
+    realtimeHub.broadcastCashMovement({
+      id: newIncome.id,
+      type: "entrada",
+      amount: newIncome.amount,
+      reason: `${newIncome.categoryLabel}: ${newIncome.concept}`,
+      branchId: effectiveBranchId,
+      branchName: branchName || "Matriz Centro",
+      cashier: newIncome.cashier,
+      timestamp: new Date().toISOString(),
+    });
+
+    // 3. Notificación inmediata para Don Toño
+    addNotification({
+      senderName: `Entrada de Caja (${newIncome.cashier})`,
+      senderAvatar: "💰",
+      badgeIcon: "dinero",
+      title: `Nuevo Ingreso: ${formatCurrency(newIncome.amount)}`,
+      highlightText: newIncome.categoryLabel,
+      description: `Concepto: "${newIncome.concept}". Método: ${newIncome.paymentMethod.toUpperCase()}. Sucursal: ${branchName}.`,
+      category: "caja",
+      actionLabel: "Ver en Registro de Ingresos",
+      actionLink: "/ingresos",
+    });
+
+    setIsSubmitting(false);
+    setFeedbackSuccess(true);
+    setAmount("");
+    setDescription("");
+    setCustomerOrOrder("");
+    setReferenceNumber("");
+
+    setTimeout(() => {
+      setFeedbackSuccess(false);
+    }, 2000);
+
+    // 4. Sincronización en segundo plano con Supabase (0ms bloqueo)
+    void (async () => {
+      try {
+        const supabase = createClient();
+        await supabase.from("cash_movements").upsert({
+          id: newIncome.id,
+          type: "entrada",
+          category: newIncome.category,
+          amount: newIncome.amount,
+          reason: `${newIncome.categoryLabel}: ${newIncome.concept} (${newIncome.customerName || "General"}) [${newIncome.paymentMethod}]`,
+          authorized_by: newIncome.cashier,
+          branch_id: effectiveBranchId,
+        }, { onConflict: "id" });
+      } catch (err) {
+        console.log("Offline mode, saved locally", err);
+      }
+    })();
   };
 
   return (

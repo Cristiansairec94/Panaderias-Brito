@@ -3,7 +3,7 @@ import { CustomOrder, OrderItem, OrderPayment, CashIncome, Sale } from "@/types"
 import { formatCurrency, formatDateTimeSafe, parseDateTimeSafe, getStoredShiftStartBoundary, resolveBranchId, formatTime24 } from "@/lib/utils";
 import { realtimeHub } from "@/lib/realtime/realtimeHub";
 import { createClient } from "@/lib/supabase/client";
-import { enqueueSyncItem, markRecordIdsAsSynced } from "@/lib/sync/syncService";
+import { enqueueSyncItem, markRecordIdsAsSynced, getSyncQueue } from "@/lib/sync/syncService";
 
 export const STORAGE_ORDERS_KEY = "brito_custom_orders";
 
@@ -165,6 +165,28 @@ export function extractOrderOriginAndNotes(order?: Partial<CustomOrder> | { note
 export function enqueueOrderOffline(order: CustomOrder) {
   if (typeof window === "undefined" || !order) return;
   try {
+    const queue = getSyncQueue();
+    const existingIdx = queue.findIndex(
+      (q) =>
+        q.type === "order" &&
+        q.data &&
+        ((order.id && q.data.id === order.id) ||
+          (order.orderNumber && q.data.orderNumber === order.orderNumber))
+    );
+    if (existingIdx !== -1) {
+      queue[existingIdx] = {
+        ...queue[existingIdx],
+        title: `Pedido ${order.orderNumber} - ${order.customerName}`,
+        amount: order.deposit || order.total,
+        branchId: order.branchId,
+        data: order,
+        status: "pending",
+      };
+      localStorage.setItem("brito_offline_sync_queue", JSON.stringify(queue));
+      window.dispatchEvent(new Event("brito_sync_queue_changed"));
+      return;
+    }
+
     enqueueSyncItem({
       type: "order",
       title: `Pedido ${order.orderNumber} - ${order.customerName}`,
@@ -251,6 +273,7 @@ export async function persistOrderToSupabase(order: CustomOrder): Promise<boolea
 }
 
 export async function persistOrderPaymentMovementToSupabase(params: {
+  id?: string;
   amount: number;
   orderNumber: string;
   orderId: string;
@@ -261,23 +284,26 @@ export async function persistOrderPaymentMovementToSupabase(params: {
   paymentMethod?: "efectivo" | "tarjeta" | "transferencia";
 }): Promise<boolean> {
   if (typeof window === "undefined" || params.amount <= 0) return false;
-  const movId = `ING-${Date.now().toString().slice(-6)}-${Math.floor(1000 + Math.random() * 9000)}`;
+  const movId =
+    params.id ||
+    `ING-${params.orderNumber || params.orderId}-${params.isLiquidation ? "LIQ" : "ANT"}-${Math.round(params.amount)}`;
   const effBranch = resolveBranchId(params.branchId, params.cashier);
   const methodTag = (params.paymentMethod || "efectivo").toUpperCase();
-  try {
-    const supabase = createClient();
-    const { error } = await supabase.from("cash_movements").insert({
-      id: movId,
-      type: "entrada",
-      category: "abono_pedido",
-      category_label: params.isLiquidation ? "Liquidación de Pedido Especial" : "Anticipo de Pedido Especial",
-      amount: params.amount,
-      reason: `${params.isLiquidation ? "Liquidación final" : "Anticipo"} pedido ${params.orderNumber} - ${params.customerName} [${methodTag}]`,
-      authorized_by: params.cashier || "Cajero",
-      branch_id: effBranch,
-    });
-    if (error) {
-      console.warn("[OrdersSupabase] Error registrando movimiento de dinero en Supabase, encolando offline:", error);
+
+  const enqueuePaymentMovement = () => {
+    try {
+      const queue = getSyncQueue();
+      const alreadyQueued = queue.some(
+        (q) =>
+          q.type === "income" &&
+          q.data &&
+          (q.data.id === movId ||
+            (q.data.orderNumber === params.orderNumber &&
+              Number(q.data.amount) === Number(params.amount) &&
+              Boolean(q.data.isLiquidation) === Boolean(params.isLiquidation)))
+      );
+      if (alreadyQueued) return;
+
       enqueueSyncItem({
         type: "income",
         title: `${params.isLiquidation ? "Liquidación" : "Anticipo"} pedido ${params.orderNumber} (${params.customerName}) [${methodTag}]`,
@@ -296,8 +322,30 @@ export async function persistOrderPaymentMovementToSupabase(params: {
           branchId: effBranch,
           orderId: params.orderId,
           orderNumber: params.orderNumber,
+          isLiquidation: Boolean(params.isLiquidation),
         },
       });
+    } catch {}
+  };
+
+  try {
+    const supabase = createClient();
+    const { error } = await supabase.from("cash_movements").upsert(
+      {
+        id: movId,
+        type: "entrada",
+        category: "abono_pedido",
+        category_label: params.isLiquidation ? "Liquidación de Pedido Especial" : "Anticipo de Pedido Especial",
+        amount: params.amount,
+        reason: `${params.isLiquidation ? "Liquidación final" : "Anticipo"} pedido ${params.orderNumber} - ${params.customerName} [${methodTag}]`,
+        authorized_by: params.cashier || "Cajero",
+        branch_id: effBranch,
+      },
+      { onConflict: "id" }
+    );
+    if (error) {
+      console.warn("[OrdersSupabase] Error registrando movimiento de dinero en Supabase, encolando offline:", error);
+      enqueuePaymentMovement();
       return false;
     } else {
       markRecordIdsAsSynced([movId]);
@@ -305,27 +353,7 @@ export async function persistOrderPaymentMovementToSupabase(params: {
     }
   } catch (err) {
     console.warn("[OrdersSupabase] Excepción registrando movimiento en Supabase (Modo Offline):", err);
-    try {
-      enqueueSyncItem({
-        type: "income",
-        title: `${params.isLiquidation ? "Liquidación" : "Anticipo"} pedido ${params.orderNumber} (${params.customerName})`,
-        amount: params.amount,
-        branchId: effBranch,
-        data: {
-          id: movId,
-          type: "entrada",
-          category: "abono_pedido",
-          category_label: params.isLiquidation ? "Liquidación de Pedido Especial" : "Anticipo de Pedido Especial",
-          amount: params.amount,
-          concept: `${params.isLiquidation ? "Liquidación final" : "Anticipo"} pedido ${params.orderNumber} - ${params.customerName}`,
-          authorized_by: params.cashier || "Cajero",
-          cashier: params.cashier || "Cajero",
-          branchId: effBranch,
-          orderId: params.orderId,
-          orderNumber: params.orderNumber,
-        },
-      });
-    } catch {}
+    enqueuePaymentMovement();
     return false;
   }
 }
@@ -857,6 +885,8 @@ export function saveStoredOrders(orders: CustomOrder[]): void {
   }
 }
 
+let isSyncingOrders = false;
+
 /**
  * Sincroniza pedidos bidireccionalmente con Supabase y el servidor para que todos los perfiles
  * (administrador, cajeros como Silvia Puga, tablets) vean el 100% de los pedidos en tiempo real.
@@ -864,6 +894,14 @@ export function saveStoredOrders(orders: CustomOrder[]): void {
 export async function syncOrdersWithServer(): Promise<CustomOrder[]> {
   if (typeof window === "undefined") return INITIAL_ORDERS;
 
+  const isOffline =
+    !navigator.onLine ||
+    localStorage.getItem("brito_simulate_offline") === "true";
+  if (isOffline || isSyncingOrders) {
+    return getStoredOrders();
+  }
+
+  isSyncingOrders = true;
   try {
     const localOrders = getStoredOrders();
     let serverOrders: CustomOrder[] = [];
@@ -895,7 +933,10 @@ export async function syncOrdersWithServer(): Promise<CustomOrder[]> {
     // 2. Si Supabase no devolvió pedidos, consultar /api/orders como fallback
     if (!fetchedFromSupabase && serverOrders.length === 0) {
       try {
-        const res = await fetch("/api/orders", { method: "GET" });
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 2500);
+        const res = await fetch("/api/orders", { method: "GET", signal: controller.signal });
+        clearTimeout(timeoutId);
         if (res.ok) {
           const json = await res.json();
           if (Array.isArray(json.orders)) {
@@ -937,16 +978,18 @@ export async function syncOrdersWithServer(): Promise<CustomOrder[]> {
       if (!existing) {
         // Pedido local que aún no existe en el servidor:
         // JAMÁS debe descartarse ni borrarse del almacenamiento local.
-        // Se preserva en el mapa y se añade a la lista pendiente de subir a Supabase y al servidor.
         if (ord.id) ordersMap.set(ord.id, ord);
         if (ord.orderNumber) ordersMap.set(ord.orderNumber, ord);
-        hasLocalChangesToPush = true;
-        pendingPushList.push(ord);
+        // Solo empujar si realmente conectamos con Supabase y sabemos que falta allá
+        if (fetchedFromSupabase) {
+          hasLocalChangesToPush = true;
+          pendingPushList.push(ord);
+        }
       } else {
         const { winner, shouldPushLocal } = reconcileOrderPair(existing, ord, isLocallyMutated);
         if (winner.id) ordersMap.set(winner.id, winner);
         if (winner.orderNumber) ordersMap.set(winner.orderNumber, winner);
-        if (shouldPushLocal) {
+        if (shouldPushLocal && fetchedFromSupabase) {
           hasLocalChangesToPush = true;
           pendingPushList.push(winner);
         }
@@ -973,7 +1016,7 @@ export async function syncOrdersWithServer(): Promise<CustomOrder[]> {
     window.dispatchEvent(new Event("brito_orders_updated"));
 
     // Subir pedidos locales faltantes o actualizados a Supabase y al endpoint de respaldo
-    if (hasLocalChangesToPush && pendingPushList.length > 0) {
+    if (hasLocalChangesToPush && pendingPushList.length > 0 && fetchedFromSupabase) {
       const validPending = pendingPushList.filter((o) => {
         const ts = o.timestamp ? Number(o.timestamp) : parseDateTimeSafe(o.createdAt);
         return ts >= CLEAN_SLATE_EPOCH;
@@ -983,29 +1026,12 @@ export async function syncOrdersWithServer(): Promise<CustomOrder[]> {
         try {
           const supabase = createClient();
           const payloads = validPending.map(orderToSupabasePayload);
-          supabase.from("custom_orders").upsert(payloads, { onConflict: "id" }).then(({ error }) => {
+          supabase.from("custom_orders").upsert(payloads, { onConflict: "id" }).then(({ error }: { error: any }) => {
             if (!error) {
               markRecordIdsAsSynced(validPending.map((p) => p.id));
             }
           });
         } catch {}
-
-        for (const p of validPending) {
-          if (p.deposit > 0) {
-            persistOrderPaymentMovementToSupabase({
-              amount: p.deposit,
-              orderNumber: p.orderNumber,
-              orderId: p.id,
-              customerName: p.customerName,
-              cashier: p.cashier,
-              branchId: p.operatingBranchId || p.branchId,
-              isLiquidation: p.remainingBalance === 0,
-            });
-          }
-          if (realtimeHub?.broadcastOrder) {
-            realtimeHub.broadcastOrder("create", p);
-          }
-        }
 
         fetch("/api/orders", {
           method: "POST",
@@ -1019,6 +1045,8 @@ export async function syncOrdersWithServer(): Promise<CustomOrder[]> {
   } catch (err) {
     console.error("[OrdersSync] Error sincronizando pedidos con servidor:", err);
     return getStoredOrders();
+  } finally {
+    isSyncingOrders = false;
   }
 }
 
@@ -1056,6 +1084,7 @@ if (typeof window !== "undefined" && realtimeHub?.onOrder) {
  * Registra un ingreso de dinero en brito_cash_incomes para que impacte en caja
  */
 function recordOrderCashIncome(params: {
+  id?: string;
   amount: number;
   orderNumber: string;
   orderId: string;
@@ -1074,9 +1103,12 @@ function recordOrderCashIncome(params: {
 
     const now = new Date();
     const formattedDate = `Hoy, ${formatTime24(now)}`;
+    const deterministicId =
+      params.id ||
+      `ING-${params.orderNumber || params.orderId}-${params.isLiquidation ? "LIQ" : "ANT"}-${Math.round(params.amount)}`;
 
     const newIncome: CashIncome = {
-      id: `ING-${Date.now().toString().slice(-6)}`,
+      id: deterministicId,
       amount: params.amount,
       category: "abono_pedido",
       categoryLabel: params.isLiquidation ? "Liquidación de Pedido Especial" : "Anticipo de Pedido Especial",
@@ -1093,7 +1125,7 @@ function recordOrderCashIncome(params: {
       timestamp: now.toISOString(),
     };
 
-    const updated = [newIncome, ...currentIncomes];
+    const updated = [newIncome, ...currentIncomes.filter((i) => i.id !== newIncome.id)];
     localStorage.setItem("brito_cash_incomes", JSON.stringify(updated));
 
     try {

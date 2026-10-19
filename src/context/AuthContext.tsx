@@ -676,11 +676,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Heartbeat y verificación de estado de sesión en el servidor
   useEffect(() => {
     if (!user || !sessionToken) return;
+    let isVerifying = false;
 
     const verifyServerSession = async () => {
+      if (isVerifying) return;
+      if (
+        typeof window !== "undefined" &&
+        (localStorage.getItem("brito_simulate_offline") === "true" ||
+          (typeof navigator !== "undefined" && !navigator.onLine))
+      ) {
+        return;
+      }
+
       const currentUser = userRef.current;
       const currentToken = sessionTokenRef.current;
       if (!currentUser || !currentToken) return;
+
+      isVerifying = true;
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 2500);
 
       try {
         const myDeviceId = getDeviceId();
@@ -692,6 +706,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             sessionToken: currentToken,
             deviceId: myDeviceId,
           }),
+          signal: controller.signal,
         });
 
         if (res.ok) {
@@ -707,6 +722,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       } catch (e) {
         // Red inestable o desconexión momentánea
+      } finally {
+        clearTimeout(timeoutId);
+        isVerifying = false;
       }
     };
 
@@ -916,14 +934,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Ejecutar inmediatamente
     reconcileProfiles();
 
+    let isFetchingUsers = false;
+
     // Heartbeat cada segundo (1000ms)
     const intervalId = setInterval(() => {
       reconcileProfiles();
 
-      // Cada 8 segundos, hacer polling silencioso a la API del servidor
+      // Cada 8 segundos, hacer polling silencioso a la API del servidor (solo si hay conexión)
       scanCount++;
-      if (scanCount % 8 === 0) {
-        fetch("/api/users")
+      if (scanCount % 8 === 0 && !isFetchingUsers) {
+        if (
+          typeof window !== "undefined" &&
+          (localStorage.getItem("brito_simulate_offline") === "true" ||
+            (typeof navigator !== "undefined" && !navigator.onLine))
+        ) {
+          return;
+        }
+        isFetchingUsers = true;
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 2500);
+        fetch("/api/users", { signal: controller.signal })
           .then((res) => (res.ok ? res.json() : null))
           .then((data) => {
             if (data && Array.isArray(data.users)) {
@@ -954,7 +984,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               reconcileProfiles();
             }
           })
-          .catch(() => {});
+          .catch(() => {})
+          .finally(() => {
+            clearTimeout(timeoutId);
+            isFetchingUsers = false;
+          });
       }
     }, 1000);
 

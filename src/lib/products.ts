@@ -757,33 +757,42 @@ export function updateProduct(id: string, updates: Partial<Product>): Product | 
   saveStoredProducts(updated);
 
   if (typeof window !== "undefined" && updatedItem) {
+    const itemToSync: Product = updatedItem;
     try {
       const supabase = createClient();
-      const payload: any = {};
-      if (updates.name !== undefined) payload.name = updates.name;
-      if (updates.price !== undefined) payload.price = Number(updates.price);
-      if (updates.category !== undefined) payload.category = updates.category;
-      if (updates.code !== undefined) payload.code = updates.code;
-      if (updates.barcode !== undefined) payload.barcode = updates.barcode;
-      if (updates.stock !== undefined) payload.stock = Number(updates.stock);
-      if (updates.image !== undefined) payload.image = updates.image;
-      if (updates.icon !== undefined) payload.icon = updates.icon;
-      if (updates.description !== undefined) payload.description = updates.description;
-      if (updates.unit !== undefined) payload.unit = updates.unit;
-      if (updates.hasIva !== undefined) payload.has_iva = !!updates.hasIva;
-      if (updates.ivaRate !== undefined) payload.iva_rate = Number(updates.ivaRate);
-      if (updates.hasIeps !== undefined) payload.has_ieps = !!updates.hasIeps;
-      if (updates.iepsRate !== undefined) payload.ieps_rate = Number(updates.iepsRate);
-      if (updates.taxIncluded !== undefined) payload.tax_included = updates.taxIncluded;
+      const fullPayload: any = {
+        id: itemToSync.id,
+        name: itemToSync.name,
+        price: Number(itemToSync.price) || 0,
+        category: itemToSync.category || "pan_dulce",
+        code: itemToSync.code || `PRD-${itemToSync.id}`,
+        barcode: itemToSync.barcode || null,
+        stock: Number(itemToSync.stock) || 0,
+        image: itemToSync.image || null,
+        icon: itemToSync.icon || "🥖",
+        description: itemToSync.description || null,
+        unit: itemToSync.unit || "pieza",
+        is_active: true,
+        has_iva: !!itemToSync.hasIva,
+        iva_rate: Number(itemToSync.ivaRate) || 0,
+        has_ieps: !!itemToSync.hasIeps,
+        ieps_rate: Number(itemToSync.iepsRate) || 0,
+        tax_included: itemToSync.taxIncluded !== undefined ? itemToSync.taxIncluded : true,
+      };
 
-      if (Object.keys(payload).length > 0) {
-        supabase.from("products").update(payload).eq("id", id).then();
-      }
+      supabase
+        .from("products")
+        .upsert(fullPayload, { onConflict: "id" })
+        .then(({ error }: any) => {
+          if (error) {
+            supabase.from("products").update(fullPayload).eq("id", id).then();
+          }
+        });
     } catch {}
 
     try {
       if (realtimeHub?.broadcastProduct) {
-        realtimeHub.broadcastProduct("update", updatedItem);
+        realtimeHub.broadcastProduct("update", itemToSync);
       }
     } catch {}
   }
@@ -800,7 +809,15 @@ export function deleteProduct(id: string): void {
   if (typeof window !== "undefined") {
     try {
       const supabase = createClient();
-      supabase.from("products").update({ is_active: false }).eq("id", id).then();
+      supabase
+        .from("products")
+        .update({ is_active: false })
+        .eq("id", id)
+        .then(({ error }: any) => {
+          if (error && deletedItem?.code) {
+            supabase.from("products").update({ is_active: false }).eq("code", deletedItem.code).then();
+          }
+        });
     } catch {}
 
     try {
@@ -813,44 +830,62 @@ export function deleteProduct(id: string): void {
 
 export async function fetchProductsFromDb(): Promise<Product[]> {
   if (typeof window === "undefined") return getStoredProducts();
+  const isOffline =
+    !navigator.onLine ||
+    localStorage.getItem("brito_simulate_offline") === "true";
+  if (isOffline) return getStoredProducts();
+
   try {
     const supabase = createClient();
     const { data, error } = await supabase
       .from("products")
       .select("*")
-      .eq("is_active", true)
       .order("name");
 
     if (!error && Array.isArray(data)) {
-      const isInitialized = localStorage.getItem("brito_catalog_initialized") === "true";
-      if (data.length === 0 && isInitialized) {
-        saveStoredProducts([]);
-        return [];
+      for (const row of data) {
+        if (row && row.id && row.is_active === false) {
+          markProductIdAsDeleted(row.id);
+        }
       }
 
-      if (data.length > 0) {
-        const deletedIds = getDeletedProductIds();
-        const activeRows = data.filter((p: any) => !deletedIds.has(p.id));
-        const mapped: Product[] = activeRows.map((p: any) => ({
-          id: p.id,
-          code: p.code || `PRD-${p.id}`,
-          barcode: p.barcode,
-          name: p.name,
-          price: Number(p.price),
-          category: p.category,
-          icon: p.icon || "🥖",
-          stock: typeof p.stock === "number" ? p.stock : 0,
-          description: p.description,
-          image: p.image,
-          unit: p.unit || "pieza",
-          hasIva: !!p.has_iva,
-          ivaRate: Number(p.iva_rate) || 0,
-          hasIeps: !!p.has_ieps,
-          iepsRate: Number(p.ieps_rate) || 0,
-          taxIncluded: p.tax_included !== undefined ? p.tax_included : true,
-        }));
-        saveStoredProducts(mapped);
-        return mapped;
+      const deletedIds = getDeletedProductIds();
+      const stored = getStoredProducts();
+      const activeRows = data.filter((p: any) => p && p.id && p.is_active !== false && !deletedIds.has(p.id));
+
+      if (activeRows.length > 0 || localStorage.getItem("brito_catalog_initialized") === "true") {
+        const mapped: Product[] = activeRows.map((p: any) => {
+          const storedMatch = stored.find((s) => s.id === p.id);
+          return {
+            id: p.id,
+            code: p.code || storedMatch?.code || `PRD-${p.id}`,
+            barcode: p.barcode || storedMatch?.barcode,
+            name: p.name,
+            price: Number(p.price),
+            category: p.category || p.category_id || storedMatch?.category || "pan_dulce",
+            icon: p.icon || storedMatch?.icon || "🥖",
+            stock: typeof p.stock === "number" ? p.stock : (storedMatch?.stock ?? 0),
+            description: p.description || storedMatch?.description,
+            image: p.image || storedMatch?.image,
+            unit: p.unit || storedMatch?.unit || "pieza",
+            hasIva: !!p.has_iva,
+            ivaRate: Number(p.iva_rate) || 0,
+            hasIeps: !!p.has_ieps,
+            iepsRate: Number(p.ieps_rate) || 0,
+            taxIncluded: p.tax_included !== undefined ? p.tax_included : true,
+          };
+        });
+
+        const mergedMap = new Map<string, Product>();
+        for (const sp of stored) {
+          if (sp?.id && !deletedIds.has(sp.id)) mergedMap.set(sp.id, sp);
+        }
+        for (const mp of mapped) {
+          if (mp?.id) mergedMap.set(mp.id, mp);
+        }
+        const finalProducts = Array.from(mergedMap.values());
+        saveStoredProducts(finalProducts);
+        return finalProducts;
       }
     }
   } catch (e) {
@@ -858,4 +893,36 @@ export async function fetchProductsFromDb(): Promise<Product[]> {
   }
   return getStoredProducts();
 }
+
+// Suscripción global para mantener el catálogo sincronizado en tiempo real en cualquier módulo del ERP
+if (typeof window !== "undefined") {
+  setTimeout(() => {
+    if (realtimeHub?.onProduct) {
+      realtimeHub.onProduct((payload) => {
+        if (!payload || !payload.product) return;
+        const { action, product } = payload;
+        const current = getStoredProducts();
+        if (action === "delete") {
+          if (product.id) markProductIdAsDeleted(product.id);
+          const filtered = current.filter((p) => p.id !== product.id);
+          if (filtered.length !== current.length) {
+            saveStoredProducts(filtered);
+          }
+        } else if (action === "update") {
+          const exists = current.some((p) => p.id === product.id);
+          if (exists) {
+            saveStoredProducts(current.map((p) => (p.id === product.id ? { ...p, ...product } : p)));
+          } else if (product.id) {
+            saveStoredProducts([...current, product]);
+          }
+        } else if (action === "create") {
+          if (!current.some((p) => p.id === product.id)) {
+            saveStoredProducts([...current, product]);
+          }
+        }
+      });
+    }
+  }, 0);
+}
+
 

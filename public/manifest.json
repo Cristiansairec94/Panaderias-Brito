@@ -30,6 +30,13 @@
   ],
   "shortcuts": [
     {
+      "name": "Punto de Venta (POS)",
+      "short_name": "POS",
+      "description": "Cobrar ventas en mostrador",
+      "url": "/pos",
+      "icons": [{ "src": "/logo.png", "sizes": "192x192" }]
+    },
+    {
       "name": "Dashboard General",
       "short_name": "Dashboard",
       "description": "Métricas y ventas en tiempo real",
@@ -48,7 +55,7 @@
       "short_name": "Configuración",
       "description": "Ajustes, catálogos y roles",
       "url": "/configuracion",
-      "icons": [{ "src": "/logo.png", "sizes": "/logo.png" }]
+      "icons": [{ "src": "/logo.png", "sizes": "192x192" }]
     },
     {
       "name": "Finanzas & Caja",

@@ -884,90 +884,85 @@ export async function createCustomerInDb(customerData: {
 
   if (existingLocal) {
     const updated = addQuickCustomer(customerData);
-    if (!updated.id.startsWith("cli-")) {
-      updateCustomerInDb(updated.id, customerData).catch(() => {});
-    }
+    updateCustomerInDb(updated.id, customerData).catch(() => {});
     return updated;
   }
 
-  // 2. Registrar en local de inmediato para una experiencia de usuario instantánea
+  // 2. Registrar en local de inmediato (0ms) y transmitir por WebSocket al instante
   const localCustomer = addQuickCustomer(customerData);
 
-  try {
-    const supabase = createClient();
-
-    // Comprobar si ya existe en Supabase por nombre para evitar duplicar registros en base de datos
-    const { data: existingDb } = await supabase
-      .from("customers")
-      .select("*")
-      .ilike("name", cleanName)
-      .limit(1);
-
-    if (existingDb && existingDb.length > 0) {
-      const dbRow = existingDb[0];
-      const cur = getStoredCustomers();
-      const idx = cur.findIndex(
-        (c) => c.id === localCustomer.id || c.name.trim().toLowerCase() === cleanName.toLowerCase()
-      );
-      if (idx !== -1) {
-        cur[idx] = { ...cur[idx], id: dbRow.id };
-        saveStoredCustomers(cur);
-        return cur[idx];
+  if (typeof window !== "undefined") {
+    try {
+      localStorage.setItem("brito_customers_initialized", "true");
+    } catch {}
+    try {
+      if (realtimeHub?.broadcastCustomer) {
+        realtimeHub.broadcastCustomer("create", localCustomer);
       }
-      return { ...localCustomer, id: dbRow.id };
-    }
-
-    // Insertar nuevo registro en Supabase
-    const { data, error } = await supabase
-      .from("customers")
-      .insert({
-        name: cleanName,
-        phone: customerData.phone?.trim() || null,
-        type: customerData.type || "frecuente",
-        credit_limit: customerData.creditLimit || 0,
-        current_debt: 0,
-        total_purchases: 0,
-        notes: customerData.notes?.trim() || null,
-        address: customerData.address?.trim() || null,
-        email: customerData.email?.trim() || null,
-      })
-      .select()
-      .single();
-
-    if (typeof window !== "undefined") {
-      try {
-        localStorage.setItem("brito_customers_initialized", "true");
-      } catch {}
-    }
-
-    if (data && !error) {
-      const cur = getStoredCustomers();
-      const idx = cur.findIndex(
-        (c) => c.id === localCustomer.id || c.name.trim().toLowerCase() === cleanName.toLowerCase()
-      );
-      if (idx !== -1) {
-        cur[idx] = { ...cur[idx], id: data.id };
-        saveStoredCustomers(cur);
-        localCustomer.id = data.id;
-      }
-    }
-
-    if (typeof window !== "undefined") {
-      try {
-        if (realtimeHub?.broadcastCustomer) {
-          realtimeHub.broadcastCustomer("create", localCustomer);
-        }
-      } catch {}
-    }
-  } catch (err) {
-    console.warn("Supabase insert customer failed, saved in local cache:", err);
+    } catch {}
   }
+
+  // 3. Sincronizar en segundo plano con Supabase sin bloquear la interfaz
+  void (async () => {
+    try {
+      const supabase = createClient();
+
+      const { data: existingDb } = await supabase
+        .from("customers")
+        .select("*")
+        .ilike("name", cleanName)
+        .limit(1);
+
+      if (existingDb && existingDb.length > 0) {
+        const dbRow = existingDb[0];
+        const cur = getStoredCustomers();
+        const idx = cur.findIndex(
+          (c) => c.id === localCustomer.id || c.name.trim().toLowerCase() === cleanName.toLowerCase()
+        );
+        if (idx !== -1 && cur[idx].id !== dbRow.id) {
+          cur[idx] = { ...cur[idx], id: dbRow.id };
+          saveStoredCustomers(cur);
+        }
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from("customers")
+        .insert({
+          id: localCustomer.id,
+          name: cleanName,
+          phone: customerData.phone?.trim() || null,
+          type: customerData.type || "frecuente",
+          credit_limit: customerData.creditLimit || 0,
+          current_debt: 0,
+          total_purchases: 0,
+          notes: customerData.notes?.trim() || null,
+          address: customerData.address?.trim() || null,
+          email: customerData.email?.trim() || null,
+        })
+        .select()
+        .single();
+
+      if (data && !error && data.id && data.id !== localCustomer.id) {
+        const cur = getStoredCustomers();
+        const idx = cur.findIndex(
+          (c) => c.id === localCustomer.id || c.name.trim().toLowerCase() === cleanName.toLowerCase()
+        );
+        if (idx !== -1) {
+          cur[idx] = { ...cur[idx], id: data.id };
+          saveStoredCustomers(cur);
+        }
+      }
+    } catch (err) {
+      console.warn("Supabase insert customer failed, saved in local cache:", err);
+    }
+  })();
 
   return localCustomer;
 }
 
 /**
- * Actualiza los datos de un cliente en Supabase y localmente.
+ * Actualiza los datos de un cliente localmente al instante (0ms) y sincroniza con Supabase en segundo plano.
  */
 export async function updateCustomerInDb(
   id: string,
@@ -982,42 +977,44 @@ export async function updateCustomerInDb(
     saveStoredCustomers(current);
   }
 
-  try {
-    const supabase = createClient();
-    const dbPayload: any = {};
-    if (updates.name !== undefined) dbPayload.name = updates.name.trim();
-    if (updates.phone !== undefined) dbPayload.phone = updates.phone.trim();
-    if (updates.notes !== undefined) dbPayload.notes = updates.notes.trim();
-    if (updates.type !== undefined) dbPayload.type = updates.type;
-    if (updates.address !== undefined) dbPayload.address = updates.address.trim();
-    if (updates.email !== undefined) dbPayload.email = updates.email.trim();
-    if (updates.totalPurchases !== undefined) dbPayload.total_purchases = updates.totalPurchases;
-    if (updates.creditLimit !== undefined) dbPayload.credit_limit = updates.creditLimit;
-    if (updates.currentDebt !== undefined) dbPayload.current_debt = updates.currentDebt;
-
-    if (!id.startsWith("cli-")) {
-      await supabase.from("customers").update(dbPayload).eq("id", id);
-    } else if (updates.name) {
-      await supabase.from("customers").update(dbPayload).eq("name", updates.name);
-    }
-
-    if (typeof window !== "undefined") {
-      try {
-        if (realtimeHub?.broadcastCustomer) {
-          realtimeHub.broadcastCustomer("update", updatedCustomer || { id, ...updates });
-        }
-      } catch {}
-    }
-    return true;
-  } catch (err) {
-    console.warn("Supabase update customer failed, updated local cache:", err);
-    return false;
+  if (typeof window !== "undefined") {
+    try {
+      if (realtimeHub?.broadcastCustomer) {
+        realtimeHub.broadcastCustomer("update", updatedCustomer || { id, ...updates });
+      }
+    } catch {}
   }
+
+  void (async () => {
+    try {
+      const supabase = createClient();
+      const dbPayload: any = {};
+      if (updates.name !== undefined) dbPayload.name = updates.name.trim();
+      if (updates.phone !== undefined) dbPayload.phone = updates.phone.trim();
+      if (updates.notes !== undefined) dbPayload.notes = updates.notes.trim();
+      if (updates.type !== undefined) dbPayload.type = updates.type;
+      if (updates.address !== undefined) dbPayload.address = updates.address.trim();
+      if (updates.email !== undefined) dbPayload.email = updates.email.trim();
+      if (updates.totalPurchases !== undefined) dbPayload.total_purchases = updates.totalPurchases;
+      if (updates.creditLimit !== undefined) dbPayload.credit_limit = updates.creditLimit;
+      if (updates.currentDebt !== undefined) dbPayload.current_debt = updates.currentDebt;
+
+      if (!id.startsWith("cli-")) {
+        await supabase.from("customers").update(dbPayload).eq("id", id);
+      } else if (updatedCustomer?.name || updates.name) {
+        const targetName = (updates.name || updatedCustomer?.name || "").trim();
+        await supabase.from("customers").update(dbPayload).ilike("name", targetName);
+      }
+    } catch (err) {
+      console.warn("Supabase update customer failed, updated local cache:", err);
+    }
+  })();
+
+  return true;
 }
 
 /**
- * Elimina un cliente en Supabase y localmente.
- * Elimina tanto por ID como por nombre para purgar posibles duplicados previos.
+ * Elimina un cliente localmente al instante (0ms), transmite en tiempo real y borra en Supabase en paralelo.
  */
 export async function deleteCustomerInDb(id: string, name?: string): Promise<boolean> {
   markCustomerIdAsDeleted(id);
@@ -1041,17 +1038,57 @@ export async function deleteCustomerInDb(id: string, name?: string): Promise<boo
     } catch {}
   }
 
-  try {
-    const supabase = createClient();
-    if (!id.startsWith("cli-")) {
-      await supabase.from("customers").delete().eq("id", id);
+  void (async () => {
+    try {
+      const supabase = createClient();
+      const tasks: PromiseLike<any>[] = [];
+      tasks.push(supabase.from("customers").delete().eq("id", id));
+      if (targetName) {
+        tasks.push(supabase.from("customers").delete().ilike("name", targetName.trim()));
+      }
+      await Promise.allSettled(tasks);
+    } catch (err) {
+      console.warn("Supabase delete customer failed, removed from local cache:", err);
     }
-    if (targetName) {
-      await supabase.from("customers").delete().ilike("name", targetName.trim());
-    }
-    return true;
-  } catch (err) {
-    console.warn("Supabase delete customer failed, removed from local cache:", err);
-    return false;
-  }
+  })();
+
+  return true;
 }
+
+// Suscripción global para mantener el directorio de clientes sincronizado en tiempo real en cualquier módulo del ERP
+if (typeof window !== "undefined") {
+  setTimeout(() => {
+    if (realtimeHub?.onCustomer) {
+      realtimeHub.onCustomer((payload) => {
+        if (!payload || !payload.customer) return;
+        const { action, customer } = payload;
+        const current = getStoredCustomers();
+        if (action === "delete") {
+          if (customer.id) markCustomerIdAsDeleted(customer.id);
+          const cleanDelNorm = customer.name ? normalizeCustomerName(customer.name) : "";
+          const filtered = current.filter((c) => {
+            if (c.id === customer.id) return false;
+            if (cleanDelNorm && normalizeCustomerName(c.name) === cleanDelNorm) return false;
+            return true;
+          });
+          if (filtered.length !== current.length) {
+            saveStoredCustomers(filtered);
+          }
+        } else if (action === "update") {
+          const exists = current.some((c) => c.id === customer.id);
+          if (exists) {
+            saveStoredCustomers(current.map((c) => (c.id === customer.id ? { ...c, ...customer } : c)));
+          } else if (customer.id && customer.name) {
+            saveStoredCustomers([...current, customer]);
+          }
+        } else if (action === "create") {
+          const normName = customer.name ? normalizeCustomerName(customer.name) : "";
+          if (!current.some((c) => c.id === customer.id || (normName && normalizeCustomerName(c.name) === normName))) {
+            saveStoredCustomers([...current, customer]);
+          }
+        }
+      });
+    }
+  }, 0);
+}
+

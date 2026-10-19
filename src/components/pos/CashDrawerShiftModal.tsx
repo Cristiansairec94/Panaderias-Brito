@@ -40,6 +40,7 @@ import { useBranch } from "@/context/BranchContext";
 import { useAuth } from "@/context/AuthContext";
 import { realtimeHub } from "@/lib/realtime/realtimeHub";
 import { createClient } from "@/lib/supabase/client";
+import { enqueueSyncItem } from "@/lib/sync/syncService";
 import { CLEAN_SLATE_EPOCH } from "@/lib/wipeOperationalData";
 
 interface CashDrawerShiftModalProps {
@@ -744,41 +745,56 @@ export default function CashDrawerShiftModal({
         localStorage.setItem("brito_pos_current_incomes", JSON.stringify(remainingInc));
       } catch {}
 
-      // Persistir corte de turno y movimiento en Supabase para supervisión en vivo
-      try {
-        const supabase = createClient();
-        const shiftId = cutRecord.id || `cut-${Date.now()}`;
-        Promise.allSettled([
-          supabase.from("cash_shifts").upsert({
-            id: shiftId,
-            shift_name: nextShiftName || "Turno General",
-            cashier_name: outgoingCashier,
-            branch_id: targetBranchId,
-            opened_at: new Date(cutTs).toISOString(),
-            initial_cash: parsedNextFund,
-            cash_sales: cutRecord.cashSales,
-            card_sales: cutRecord.cardSales,
-            transfer_sales: cutRecord.transferSales,
-            total_cash_in: cutRecord.totalIncomes || 0,
-            total_cash_out: cutRecord.totalExpenses,
-            expected_cash: cutRecord.expectedCash,
-            actual_cash: cutRecord.countedCash,
-            difference: cutRecord.difference,
-            status: "cerrada",
-            notes: `Saliente: ${outgoingCashier} → Entrante: ${incomingCashier} | ${cutRecord.notes}`,
-          }),
-          supabase.from("cash_movements").upsert({
-            id: `mov-${shiftId}`,
-            type: "salida",
-            category: "corte_caja",
-            category_label: "Corte de Turno",
-            amount: parsedCountedCash,
-            reason: `Corte de turno (${cutRecord.shiftRange || "Turno"}). Saliente: ${outgoingCashier} → Entrante: ${incomingCashier}`,
-            authorized_by: outgoingCashier,
-            branch_id: targetBranchId,
-          }),
-        ]).catch(() => {});
-      } catch {}
+      // Persistir corte de turno y movimiento en Supabase para supervisión en vivo o encolar en modo offline
+      const shiftId = cutRecord.id || `cut-${Date.now()}`;
+      void (async () => {
+        try {
+          const supabase = createClient();
+          const [resShift, resMov] = await Promise.all([
+            supabase.from("cash_shifts").upsert({
+              id: shiftId,
+              shift_name: nextShiftName || "Turno General",
+              cashier_name: outgoingCashier,
+              branch_id: targetBranchId,
+              opened_at: new Date(cutTs).toISOString(),
+              initial_cash: parsedNextFund,
+              cash_sales: cutRecord.cashSales,
+              card_sales: cutRecord.cardSales,
+              transfer_sales: cutRecord.transferSales,
+              total_cash_in: cutRecord.totalIncomes || 0,
+              total_cash_out: cutRecord.totalExpenses,
+              expected_cash: cutRecord.expectedCash,
+              actual_cash: cutRecord.countedCash,
+              difference: cutRecord.difference,
+              status: "cerrada",
+              notes: `Saliente: ${outgoingCashier} → Entrante: ${incomingCashier} | ${cutRecord.notes}`,
+            }),
+            supabase.from("cash_movements").upsert({
+              id: `mov-${shiftId}`,
+              type: "salida",
+              category: "corte_caja",
+              category_label: "Corte de Turno",
+              amount: parsedCountedCash,
+              reason: `Corte de turno (${cutRecord.shiftRange || "Turno"}). Saliente: ${outgoingCashier} → Entrante: ${incomingCashier}`,
+              authorized_by: outgoingCashier,
+              branch_id: targetBranchId,
+            }),
+          ]);
+          if (resShift.error && resMov.error) {
+            throw new Error(resShift.error.message || resMov.error.message);
+          }
+        } catch {
+          try {
+            enqueueSyncItem({
+              type: "cut",
+              title: `Corte de Turno #${cutRecord.id} (${formatCurrency(cutRecord.totalSales)})`,
+              amount: cutRecord.totalSales,
+              branchId: targetBranchId,
+              data: { ...cutRecord, cutId: shiftId, branchId: targetBranchId },
+            });
+          } catch {}
+        }
+      })();
 
       // Emitir corte de caja en tiempo real para el Administrador y todas las terminales
       realtimeHub.broadcastShiftCut(cutRecord);

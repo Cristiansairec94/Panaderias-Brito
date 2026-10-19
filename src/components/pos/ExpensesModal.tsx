@@ -1850,121 +1850,133 @@ export default function ExpensesModal({
         paymentMethod: "efectivo",
       };
 
-      let savedToDb = false;
-      try {
-        const supabase = createClient();
-        const { error: expError } = await supabase
-          .from("cash_expenses")
-          .insert({
-            id: newExpense.id,
-            amount: newExpense.amount,
-            category: newExpense.category,
-            description: newExpense.description,
-            cashier: newExpense.cashier,
-            branch_id: targetBranchId,
-          });
+      // Actualizar estado local e interfaz inmediatamente (0ms) sin bloquear por red
+      if (onAddExpense) {
+        onAddExpense(newExpense);
+      } else {
+        try {
+          const raw = localStorage.getItem("brito_pos_current_expenses");
+          const cur = raw ? JSON.parse(raw) : [];
+          const filtered = Array.isArray(cur) ? cur.filter((e: any) => e.id !== newExpense.id) : [];
+          localStorage.setItem("brito_pos_current_expenses", JSON.stringify(deduplicateExpenses([newExpense, ...filtered])));
+          window.dispatchEvent(new Event("brito_shift_cuts_updated"));
+        } catch (e) {}
+      }
 
-        if (!expError) {
-          await supabase.from("cash_movements").insert({
-            id: `mov-${newExpense.id}`,
-            type: "salida",
-            category: newExpense.category,
-            amount: newExpense.amount,
-            reason: newExpense.description,
-            authorized_by: isOwnerWithdrawal ? (authorizedBy.trim() || "Don Toño Brito") : cashierName,
-            branch_id: targetBranchId,
-          });
-          savedToDb = true;
-          markRecordIdsAsSynced([newExpense.id, `mov-${newExpense.id}`]);
-        }
-      } catch (err) {
-        console.log("Offline mode, saved locally", err);
-      } finally {
-        if (!savedToDb) {
-          enqueueOfflineItem({
-            type: "expense",
-            title: `${isOwnerWithdrawal ? "👑 Retiro Dueño" : "Salida Caja"}: ${newExpense.description} (${formatCurrency(newExpense.amount)})`,
-            amount: newExpense.amount,
-            data: {
+      // Emitir en tiempo real para el Administrador y todas las cajas
+      realtimeHub.broadcastCashMovement({
+        id: `mov-${newExpense.id}`,
+        type: "salida",
+        amount: newExpense.amount,
+        reason: newExpense.description,
+        branchId: targetBranchId,
+        branchName: targetBranchName,
+        cashier: cashierName,
+        timestamp: new Date().toISOString(),
+      });
+
+      // Registrar automáticamente en el Historial Detallado de Gastos (sin duplicar Supabase)
+      const createdDetailedExp = recordCashOutflowAsExpense({
+        id: newExpense.id,
+        amount: newExpense.amount,
+        description: newExpense.description,
+        category: selectedPresetId || newExpense.category,
+        branchId: targetBranchId,
+        branchName: targetBranchName,
+        cashier: cashierName,
+        accountOrigin: "Caja Mostrador (Efectivo Turno)",
+        paymentMethod: "efectivo",
+        skipSupabaseAndBroadcast: true,
+      });
+      if (realtimeHub.broadcastExpense) {
+        realtimeHub.broadcastExpense("create", createdDetailedExp);
+      }
+
+      // Notificación para la administración y Don Toño
+      if (isOwnerWithdrawal) {
+        addNotification({
+          senderName: `👑 Retiro de Dueño (${authorizedBy.trim() || "Don Toño"})`,
+          senderAvatar: "👑",
+          badgeIcon: "dinero",
+          title: `Retiro de Efectivo: -${formatCurrency(newExpense.amount)}`,
+          highlightText: newExpense.description,
+          description: `Retiro registrado por $${newExpense.amount.toFixed(2)} MXN a cargo de ${authorizedBy || "Don Toño"}. Turno de: ${cashierName}.`,
+          category: "caja",
+          actionLabel: "Ver Caja",
+          actionLink: "/caja",
+        });
+      } else {
+        addNotification({
+          senderName: `Salida de Caja (${newExpense.cashier})`,
+          senderAvatar: "💸",
+          badgeIcon: "dinero",
+          title: `Salida de Efectivo: -${formatCurrency(newExpense.amount)}`,
+          highlightText: newExpense.description,
+          description: `Motivo registrado: "${newExpense.description}". Responsable: ${newExpense.cashier}.`,
+          category: "caja",
+          actionLabel: "Ver Flujo de Caja",
+          actionLink: "/caja",
+        });
+      }
+
+      setLastSubmittedText(
+        isOwnerWithdrawal
+          ? `Retiro de Dueño por ${formatCurrency(newExpense.amount)} guardado con éxito.`
+          : `Gasto / Salida por ${formatCurrency(newExpense.amount)} descontado de caja.`
+      );
+
+      // Sincronizar con Supabase en segundo plano o encolar en modo offline
+      const authPerson = isOwnerWithdrawal ? (authorizedBy.trim() || "Don Toño Brito") : cashierName;
+      void (async () => {
+        let savedToDb = false;
+        try {
+          const supabase = createClient();
+          const { error: expError } = await supabase
+            .from("cash_expenses")
+            .upsert({
+              id: newExpense.id,
               amount: newExpense.amount,
               category: newExpense.category,
               description: newExpense.description,
               cashier: newExpense.cashier,
               branch_id: targetBranchId,
-            },
-          });
+            }, { onConflict: "id" });
+
+          if (!expError) {
+            await supabase.from("cash_movements").upsert({
+              id: `mov-${newExpense.id}`,
+              type: "salida",
+              category: newExpense.category,
+              amount: newExpense.amount,
+              reason: newExpense.description,
+              authorized_by: authPerson,
+              branch_id: targetBranchId,
+            }, { onConflict: "id" });
+            savedToDb = true;
+            markRecordIdsAsSynced([newExpense.id, `mov-${newExpense.id}`]);
+          }
+        } catch (err) {
+          console.log("Offline mode, expense saved locally", err);
+        } finally {
+          if (!savedToDb) {
+            enqueueOfflineItem({
+              type: "expense",
+              title: `${isOwnerWithdrawal ? "👑 Retiro Dueño" : "Salida Caja"}: ${newExpense.description} (${formatCurrency(newExpense.amount)})`,
+              amount: newExpense.amount,
+              branchId: targetBranchId,
+              data: {
+                id: newExpense.id,
+                amount: newExpense.amount,
+                category: newExpense.category,
+                description: newExpense.description,
+                cashier: newExpense.cashier,
+                branchId: targetBranchId,
+                branch_id: targetBranchId,
+              },
+            });
+          }
         }
-        if (onAddExpense) {
-          onAddExpense(newExpense);
-        } else {
-          try {
-            const raw = localStorage.getItem("brito_pos_current_expenses");
-            const cur = raw ? JSON.parse(raw) : [];
-            const filtered = Array.isArray(cur) ? cur.filter((e: any) => e.id !== newExpense.id) : [];
-            localStorage.setItem("brito_pos_current_expenses", JSON.stringify(deduplicateExpenses([newExpense, ...filtered])));
-            window.dispatchEvent(new Event("brito_shift_cuts_updated"));
-          } catch (e) {}
-        }
-
-        // Emitir en tiempo real para el Administrador y todas las cajas
-        realtimeHub.broadcastCashMovement({
-          id: `mov-${newExpense.id}`,
-          type: "salida",
-          amount: newExpense.amount,
-          reason: newExpense.description,
-          branchId: targetBranchId,
-          branchName: targetBranchName,
-          cashier: cashierName,
-          timestamp: new Date().toISOString(),
-        });
-
-        // Registrar automáticamente en el Historial Detallado de Gastos (sin duplicar Supabase ni broadcast)
-        recordCashOutflowAsExpense({
-          id: newExpense.id,
-          amount: newExpense.amount,
-          description: newExpense.description,
-          category: selectedPresetId || newExpense.category,
-          branchId: targetBranchId,
-          branchName: targetBranchName,
-          cashier: cashierName,
-          accountOrigin: "Caja Mostrador (Efectivo Turno)",
-          paymentMethod: "efectivo",
-          skipSupabaseAndBroadcast: true,
-        });
-
-        // Notificación para la administración y Don Toño
-        if (isOwnerWithdrawal) {
-          addNotification({
-            senderName: `👑 Retiro de Dueño (${authorizedBy.trim() || "Don Toño"})`,
-            senderAvatar: "👑",
-            badgeIcon: "dinero",
-            title: `Retiro de Efectivo: -${formatCurrency(newExpense.amount)}`,
-            highlightText: newExpense.description,
-            description: `Retiro registrado por $${newExpense.amount.toFixed(2)} MXN a cargo de ${authorizedBy || "Don Toño"}. Turno de: ${cashierName}.`,
-            category: "caja",
-            actionLabel: "Ver Caja",
-            actionLink: "/caja",
-          });
-        } else {
-          addNotification({
-            senderName: `Salida de Caja (${newExpense.cashier})`,
-            senderAvatar: "💸",
-            badgeIcon: "dinero",
-            title: `Salida de Efectivo: -${formatCurrency(newExpense.amount)}`,
-            highlightText: newExpense.description,
-            description: `Motivo registrado: "${newExpense.description}". Responsable: ${newExpense.cashier}.`,
-            category: "caja",
-            actionLabel: "Ver Flujo de Caja",
-            actionLink: "/caja",
-          });
-        }
-
-        setLastSubmittedText(
-          isOwnerWithdrawal
-            ? `Retiro de Dueño por ${formatCurrency(newExpense.amount)} guardado con éxito.`
-            : `Gasto / Salida por ${formatCurrency(newExpense.amount)} descontado de caja.`
-        );
-      }
+      })();
     } else {
       // 2. REGISTRO DE ENTRADA (Dejaron dinero para cambio / abono)
       const isChangeInflow = selectedPresetId === "fondo_cambio";
@@ -1986,65 +1998,77 @@ export default function ExpensesModal({
         timestamp: new Date().toISOString(),
       };
 
-      let savedIncomeToDb = false;
-      try {
-        const supabase = createClient();
-        const { error: incError } = await supabase.from("cash_movements").insert({
-          id: newIncome.id,
-          type: "entrada",
-          category: newIncome.category,
-          amount: newIncome.amount,
-          reason: newIncome.concept,
-          authorized_by: cashierName,
-          branch_id: targetBranchId,
-        });
-        if (!incError) {
-          savedIncomeToDb = true;
-          markRecordIdsAsSynced([newIncome.id]);
-        }
-      } catch (err) {
-        console.log("Offline mode, saved locally", err);
-      } finally {
-        if (!savedIncomeToDb) {
-          enqueueOfflineItem({
-            type: "income",
-            title: `Entrada Caja: ${newIncome.concept} (+${formatCurrency(newIncome.amount)})`,
+      // Actualizar estado local e interfaz inmediatamente (0ms) sin bloquear por red
+      if (onAddIncome) {
+        onAddIncome(newIncome);
+      } else {
+        try {
+          const raw = localStorage.getItem("brito_pos_current_incomes");
+          const cur = raw ? JSON.parse(raw) : [];
+          const filtered = Array.isArray(cur) ? cur.filter((i: any) => i.id !== newIncome.id) : [];
+          localStorage.setItem("brito_pos_current_incomes", JSON.stringify(deduplicateIncomes([newIncome, ...filtered])));
+          window.dispatchEvent(new Event("brito_shift_cuts_updated"));
+        } catch (e) {}
+      }
+
+      // Emitir en tiempo real para el Administrador y todas las cajas
+      if (realtimeHub.broadcastIncome) {
+        realtimeHub.broadcastIncome("create", newIncome);
+      }
+      realtimeHub.broadcastCashMovement({
+        id: newIncome.id,
+        type: "entrada",
+        amount: newIncome.amount,
+        reason: `${newIncome.categoryLabel}: ${newIncome.concept}`,
+        branchId: targetBranchId,
+        branchName: targetBranchName,
+        cashier: cashierName,
+        timestamp: new Date().toISOString(),
+      });
+
+      // Sincronizar con Supabase en segundo plano o encolar en modo offline
+      void (async () => {
+        let savedIncomeToDb = false;
+        try {
+          const supabase = createClient();
+          const { error: incError } = await supabase.from("cash_movements").upsert({
+            id: newIncome.id,
+            type: "entrada",
+            category: newIncome.category,
             amount: newIncome.amount,
-            data: {
+            reason: newIncome.concept,
+            authorized_by: cashierName,
+            branch_id: targetBranchId,
+          }, { onConflict: "id" });
+          if (!incError) {
+            savedIncomeToDb = true;
+            markRecordIdsAsSynced([newIncome.id]);
+          }
+        } catch (err) {
+          console.log("Offline mode, income saved locally", err);
+        } finally {
+          if (!savedIncomeToDb) {
+            enqueueOfflineItem({
+              type: "income",
+              title: `Entrada Caja: ${newIncome.concept} (+${formatCurrency(newIncome.amount)})`,
               amount: newIncome.amount,
-              category: newIncome.category,
-              concept: newIncome.concept,
-              cashier: newIncome.cashier,
-              branch_id: targetBranchId,
-            },
-          });
+              branchId: targetBranchId,
+              data: {
+                id: newIncome.id,
+                amount: newIncome.amount,
+                category: newIncome.category,
+                concept: newIncome.concept,
+                cashier: newIncome.cashier,
+                branchId: targetBranchId,
+                branch_id: targetBranchId,
+              },
+            });
+          }
         }
-        if (onAddIncome) {
-          onAddIncome(newIncome);
-        } else {
-          try {
-            const raw = localStorage.getItem("brito_pos_current_incomes");
-            const cur = raw ? JSON.parse(raw) : [];
-            const filtered = Array.isArray(cur) ? cur.filter((i: any) => i.id !== newIncome.id) : [];
-            localStorage.setItem("brito_pos_current_incomes", JSON.stringify(deduplicateIncomes([newIncome, ...filtered])));
-            window.dispatchEvent(new Event("brito_shift_cuts_updated"));
-          } catch (e) {}
-        }
+      })();
 
-        // Emitir en tiempo real para el Administrador y todas las cajas
-        realtimeHub.broadcastCashMovement({
-          id: newIncome.id,
-          type: "entrada",
-          amount: newIncome.amount,
-          reason: `${newIncome.categoryLabel}: ${newIncome.concept}`,
-          branchId: targetBranchId,
-          branchName: targetBranchName,
-          cashier: cashierName,
-          timestamp: new Date().toISOString(),
-        });
-
-        // Notificación para la administración
-        if (isChangeInflow) {
+      // Notificación para la administración
+      if (isChangeInflow) {
           addNotification({
             senderName: `🪙 Entrada para Cambio (${cashierName})`,
             senderAvatar: "🪙",
@@ -2075,7 +2099,6 @@ export default function ExpensesModal({
             ? `Entrada para cambio de billetes por ${formatCurrency(newIncome.amount)} sumada a la caja.`
             : `Entrada de efectivo por ${formatCurrency(newIncome.amount)} sumada a la caja.`
         );
-      }
     }
 
 

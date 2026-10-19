@@ -110,6 +110,34 @@ export interface RealtimeUserPayload {
   timestamp: string;
 }
 
+export interface RealtimeExpensePayload {
+  action: "create" | "update" | "delete";
+  expense: any;
+  deletedId?: string;
+  senderDeviceId: string;
+  timestamp: string;
+}
+
+export interface RealtimeIncomePayload {
+  action: "create" | "update" | "delete";
+  income: any;
+  deletedId?: string;
+  senderDeviceId: string;
+  timestamp: string;
+}
+
+export interface RealtimeInventoryPayload {
+  action: "create" | "update" | "delete" | "movement";
+  item?: any;
+  movement?: any;
+  items?: any[];
+  movements?: any[];
+  id?: string;
+  deletedId?: string;
+  senderDeviceId: string;
+  timestamp: string;
+}
+
 export type RealtimeStatus = "connected" | "connecting" | "disconnected";
 
 type NotificationListener = (notif: FBNotification) => void;
@@ -124,6 +152,9 @@ type SessionRevokedListener = (payload: RealtimeSessionRevokedPayload) => void;
 type ProductListener = (payload: RealtimeProductPayload) => void;
 type CustomerListener = (payload: RealtimeCustomerPayload) => void;
 type UserListener = (payload: RealtimeUserPayload) => void;
+type ExpenseListener = (payload: RealtimeExpensePayload) => void;
+type IncomeListener = (payload: RealtimeIncomePayload) => void;
+type InventoryListener = (payload: RealtimeInventoryPayload) => void;
 type StatusListener = (status: RealtimeStatus) => void;
 
 const CHANNEL_NAME = "panaderia_brito_realtime";
@@ -152,6 +183,9 @@ class RealtimeHub {
   private productListeners = new Set<ProductListener>();
   private customerListeners = new Set<CustomerListener>();
   private userListeners = new Set<UserListener>();
+  private expenseListeners = new Set<ExpenseListener>();
+  private incomeListeners = new Set<IncomeListener>();
+  private inventoryListeners = new Set<InventoryListener>();
   private statusListeners = new Set<StatusListener>();
 
   constructor() {
@@ -217,12 +251,33 @@ class RealtimeHub {
 
   public dispatchLocalEvent(type: string, payload: any) {
     if (!payload) return;
-    const rawId = payload.id || (payload.cut && payload.cut.id) || (payload.order && payload.order.id) || (payload.branch && payload.branch.id) || (payload.user && payload.user.id) || payload.deletedId || null;
+    const rawId =
+      payload.id ||
+      (payload.cut && payload.cut.id) ||
+      (payload.order && payload.order.id) ||
+      (payload.branch && payload.branch.id) ||
+      (payload.user && payload.user.id) ||
+      (payload.product && payload.product.id) ||
+      (payload.customer && payload.customer.id) ||
+      (payload.expense && payload.expense.id) ||
+      (payload.income && payload.income.id) ||
+      (payload.item && payload.item.id) ||
+      (payload.movement && payload.movement.id) ||
+      payload.deletedId ||
+      null;
     if (rawId && typeof rawId === "string" && (rawId.includes("ING-ING") || rawId.includes("mov-mov-"))) {
       return;
     }
     const versionSuffix =
-      type === "notification" || type === "order" || type === "branch" || type === "user" || type === "product" || type === "customer"
+      type === "notification" ||
+      type === "order" ||
+      type === "branch" ||
+      type === "user" ||
+      type === "product" ||
+      type === "customer" ||
+      type === "expense" ||
+      type === "income" ||
+      type === "inventory"
         ? `_${payload.timestamp || payload.order?.timestamp || payload.order?.deposit || payload.order?.status || payload.title || ""}`
         : "";
     const eventId = rawId ? `${type}_${rawId}_${payload.action || ""}${versionSuffix}` : null;
@@ -260,6 +315,12 @@ class RealtimeHub {
       this.customerListeners.forEach((fn) => { try { fn(payload); } catch (err) { console.error(err); } });
     } else if (type === "user") {
       this.userListeners.forEach((fn) => { try { fn(payload); } catch (err) { console.error(err); } });
+    } else if (type === "expense") {
+      this.expenseListeners.forEach((fn) => { try { fn(payload); } catch (err) { console.error(err); } });
+    } else if (type === "income") {
+      this.incomeListeners.forEach((fn) => { try { fn(payload); } catch (err) { console.error(err); } });
+    } else if (type === "inventory") {
+      this.inventoryListeners.forEach((fn) => { try { fn(payload); } catch (err) { console.error(err); } });
     }
   }
 
@@ -326,6 +387,18 @@ class RealtimeHub {
           if (payload?.senderTabId && payload.senderTabId === this.tabId) return;
           this.dispatchLocalEvent("user", payload);
         })
+        .on("broadcast", { event: "expense" }, ({ payload }: { payload: any }) => {
+          if (payload?.senderTabId && payload.senderTabId === this.tabId) return;
+          this.dispatchLocalEvent("expense", payload);
+        })
+        .on("broadcast", { event: "income" }, ({ payload }: { payload: any }) => {
+          if (payload?.senderTabId && payload.senderTabId === this.tabId) return;
+          this.dispatchLocalEvent("income", payload);
+        })
+        .on("broadcast", { event: "inventory" }, ({ payload }: { payload: any }) => {
+          if (payload?.senderTabId && payload.senderTabId === this.tabId) return;
+          this.dispatchLocalEvent("inventory", payload);
+        })
         .subscribe((channelStatus: string) => {
           if (channelStatus === "SUBSCRIBED") {
             this.setStatus("connected");
@@ -368,10 +441,10 @@ class RealtimeHub {
       this.fetchCatchupEvents();
     });
 
-    // Heartbeat periódico cada 1 segundo para sincronización instantánea y sin demoras
+    // Heartbeat periódico cada 2.5 segundos con control de concurrencia y protección offline
     setInterval(() => {
       this.fetchCatchupEvents();
-    }, 1000);
+    }, 2500);
   }
 
   public async triggerSyncNow() {
@@ -509,7 +582,13 @@ class RealtimeHub {
       }
     }
 
-    // 2. Supabase WebSocket Broadcast hacia otros celulares y computadoras
+    // 2. Supabase WebSocket Broadcast hacia otros celulares y computadoras (solo si hay red)
+    const isOfflineMode =
+      typeof window !== "undefined" &&
+      (localStorage.getItem("brito_simulate_offline") === "true" ||
+        (typeof navigator !== "undefined" && !navigator.onLine));
+    if (isOfflineMode) return;
+
     if (!this.channel) {
       this.initChannel();
     }
@@ -528,9 +607,19 @@ class RealtimeHub {
     }
   }
 
+  private isFetchingCatchup = false;
+
   private async postToSyncEndpoint(type: string, payload: any) {
     if (typeof window === "undefined") return;
+    if (
+      localStorage.getItem("brito_simulate_offline") === "true" ||
+      (typeof navigator !== "undefined" && !navigator.onLine)
+    ) {
+      return;
+    }
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 2500);
       fetch("/api/realtime/sync", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -541,7 +630,10 @@ class RealtimeHub {
           senderTabId: this.tabId,
           timestamp: Date.now(),
         }),
-      }).catch(() => {});
+        signal: controller.signal,
+      })
+        .catch(() => {})
+        .finally(() => clearTimeout(timeoutId));
     } catch {}
   }
 
@@ -549,12 +641,26 @@ class RealtimeHub {
 
   public async fetchCatchupEvents() {
     if (typeof window === "undefined") return;
+    if (this.isFetchingCatchup) return;
+    if (
+      localStorage.getItem("brito_simulate_offline") === "true" ||
+      (typeof navigator !== "undefined" && !navigator.onLine)
+    ) {
+      return;
+    }
+
+    this.isFetchingCatchup = true;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 2500);
+
     try {
       const rawLastTs = this.lastSyncTimestamp
         ? Math.max(0, this.lastSyncTimestamp - 30000)
         : (Date.now() - 1000 * 60 * 60);
       const lastTs = Math.max(CLEAN_SLATE_EPOCH, rawLastTs);
-      const res = await fetch(`/api/realtime/sync?since=${lastTs}`);
+      const res = await fetch(`/api/realtime/sync?since=${lastTs}`, {
+        signal: controller.signal,
+      });
       if (!res.ok) return;
 
       const data = await res.json();
@@ -578,6 +684,9 @@ class RealtimeHub {
       }
     } catch {
       // Ignorar errores de red en catchup silencioso
+    } finally {
+      clearTimeout(timeoutId);
+      this.isFetchingCatchup = false;
     }
   }
 
@@ -677,7 +786,9 @@ class RealtimeHub {
       senderDeviceId: this.getDeviceId(),
       timestamp: new Date().toISOString(),
     };
+    this.dispatchLocalEvent("product", payload);
     this.sendBroadcast("product", payload);
+    this.postToSyncEndpoint("product", payload);
   }
 
   public onProduct(listener: ProductListener) {
@@ -694,7 +805,9 @@ class RealtimeHub {
       senderDeviceId: this.getDeviceId(),
       timestamp: new Date().toISOString(),
     };
+    this.dispatchLocalEvent("customer", payload);
     this.sendBroadcast("customer", payload);
+    this.postToSyncEndpoint("customer", payload);
   }
 
   public onCustomer(listener: CustomerListener) {
@@ -722,6 +835,68 @@ class RealtimeHub {
     this.userListeners.add(listener);
     return () => {
       this.userListeners.delete(listener);
+    };
+  }
+
+  public async broadcastExpense(action: "create" | "update" | "delete", expense: any) {
+    const payload: RealtimeExpensePayload = {
+      action,
+      expense,
+      deletedId: action === "delete" ? (expense?.id || expense) : undefined,
+      senderDeviceId: this.getDeviceId(),
+      timestamp: new Date().toISOString(),
+    };
+    this.dispatchLocalEvent("expense", payload);
+    this.sendBroadcast("expense", payload);
+    this.postToSyncEndpoint("expense", payload);
+  }
+
+  public onExpense(listener: ExpenseListener) {
+    this.expenseListeners.add(listener);
+    return () => {
+      this.expenseListeners.delete(listener);
+    };
+  }
+
+  public async broadcastIncome(action: "create" | "update" | "delete", income: any) {
+    const payload: RealtimeIncomePayload = {
+      action,
+      income,
+      deletedId: action === "delete" ? (income?.id || income) : undefined,
+      senderDeviceId: this.getDeviceId(),
+      timestamp: new Date().toISOString(),
+    };
+    this.dispatchLocalEvent("income", payload);
+    this.sendBroadcast("income", payload);
+    this.postToSyncEndpoint("income", payload);
+  }
+
+  public onIncome(listener: IncomeListener) {
+    this.incomeListeners.add(listener);
+    return () => {
+      this.incomeListeners.delete(listener);
+    };
+  }
+
+  public async broadcastInventory(
+    action: "create" | "update" | "delete" | "movement",
+    data: { item?: any; movement?: any; items?: any[]; movements?: any[]; id?: string; deletedId?: string }
+  ) {
+    const payload: RealtimeInventoryPayload = {
+      action,
+      ...data,
+      senderDeviceId: this.getDeviceId(),
+      timestamp: new Date().toISOString(),
+    };
+    this.dispatchLocalEvent("inventory", payload);
+    this.sendBroadcast("inventory", payload);
+    this.postToSyncEndpoint("inventory", payload);
+  }
+
+  public onInventory(listener: InventoryListener) {
+    this.inventoryListeners.add(listener);
+    return () => {
+      this.inventoryListeners.delete(listener);
     };
   }
 

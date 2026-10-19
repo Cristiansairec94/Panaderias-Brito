@@ -86,7 +86,7 @@ import CreateOrderModal from "@/components/pedidos/CreateOrderModal";
 import OrderReceiptModal from "@/components/pedidos/OrderReceiptModal";
 import OrderPaymentModal from "@/components/pedidos/OrderPaymentModal";
 import { getStoredOrders, syncOrdersWithServer, getOrderShiftCollection } from "@/lib/orders";
-import { recordPosSaleIncome, removePosSaleIncome, getStoredIncomes, cleanDuplicateIncomes } from "@/lib/incomes";
+import { recordPosSaleIncome, removePosSaleIncome, deleteIncomeInDb, getStoredIncomes, cleanDuplicateIncomes } from "@/lib/incomes";
 import { getStoredPrinterConfig, PrinterConfig } from "@/lib/printer";
 import { getShiftFinancialSummary, resolveShiftInitialFund } from "@/lib/shiftCalculations";
 
@@ -1569,12 +1569,7 @@ export default function POSPage() {
           .order("name");
 
         if (!prodErr && Array.isArray(prodData)) {
-          const isInitialized = typeof window !== "undefined" && localStorage.getItem("brito_catalog_initialized") === "true";
-          if (prodData.length === 0 && isInitialized) {
-            setProducts([]);
-            saveStoredProducts([]);
-            setIsDbConnected(true);
-          } else if (prodData.length > 0) {
+          if (prodData.length > 0) {
             const deletedIds = getDeletedProductIds();
             const activeRows = prodData.filter((p: any) => !deletedIds.has(p.id));
             const stored = getStoredProducts();
@@ -1587,7 +1582,7 @@ export default function POSPage() {
                 barcode: p.barcode || storedMatch?.barcode || fallbackMatch?.barcode,
                 name: p.name,
                 price: Number(p.price),
-                category: p.category_id || storedMatch?.category || "dulce_10",
+                category: p.category || p.category_id || storedMatch?.category || "dulce_10",
                 icon: p.icon || storedMatch?.icon || "🥐",
                 stock: typeof p.stock === "number" ? p.stock : (storedMatch?.stock || 0),
                 image: p.image || storedMatch?.image || fallbackMatch?.image,
@@ -1597,8 +1592,18 @@ export default function POSPage() {
               };
             });
 
-            setProducts(mapped);
-            saveStoredProducts(mapped);
+            const mergedMap = new Map<string, Product>();
+            for (const sp of stored) {
+              if (sp?.id && !deletedIds.has(sp.id)) mergedMap.set(sp.id, sp);
+            }
+            for (const mp of mapped) {
+              if (mp?.id) mergedMap.set(mp.id, mp);
+            }
+            const finalProducts = Array.from(mergedMap.values());
+            setProducts(finalProducts);
+            saveStoredProducts(finalProducts);
+            setIsDbConnected(true);
+          } else {
             setIsDbConnected(true);
           }
         }
@@ -2412,6 +2417,7 @@ export default function POSPage() {
       } catch (e) {}
       return updated;
     });
+    void deleteIncomeInDb(id);
   };
 
   const handleOpenIncomeReceipt = (income: CashIncome) => {
@@ -2642,17 +2648,19 @@ export default function POSPage() {
               unit_price: item.product.price,
               subtotal: item.product.price * item.quantity,
             }));
-            await supabase.from("sale_items").insert(saleItemsToInsert);
 
-            for (const item of currentItems) {
-              if (item.product.id.includes("-")) {
-                const newStock = Math.max(0, item.product.stock - item.quantity);
-                await supabase
-                  .from("products")
-                  .update({ stock: newStock })
-                  .eq("id", item.product.id);
-              }
-            }
+            await Promise.allSettled([
+              supabase.from("sale_items").insert(saleItemsToInsert),
+              ...currentItems
+                .filter((item) => item.product.id.includes("-"))
+                .map((item) => {
+                  const newStock = Math.max(0, item.product.stock - item.quantity);
+                  return supabase
+                    .from("products")
+                    .update({ stock: newStock })
+                    .eq("id", item.product.id);
+                }),
+            ]);
 
             const effBranchId = resolveBranchId(activeBranch?.id || user?.assignedBranchId, cashierName);
             const effBranchName = activeBranch?.name || (effBranchId === "branch-angeles" ? "Sucursal Los Ángeles" : effBranchId === "branch-1790889237862" ? "Sucursal San Ildefonso" : "Sucursal");
@@ -2731,20 +2739,22 @@ export default function POSPage() {
       localStorage.setItem("brito_bread_deliveries", JSON.stringify(updatedDeliveries));
     } catch (e) {}
 
-    // 3. Sincronizar en Supabase si está disponible
-    try {
-      const supabase = createClient();
-      for (const item of delivery.items) {
-        if (item.productId.includes("-")) {
-          await supabase
-            .from("products")
-            .update({ stock: item.newStock })
-            .eq("id", item.productId);
+    // 3. Sincronizar en Supabase en segundo plano sin bloquear UI
+    void (async () => {
+      try {
+        const supabase = createClient();
+        for (const item of delivery.items) {
+          if (item.productId.includes("-")) {
+            await supabase
+              .from("products")
+              .update({ stock: item.newStock })
+              .eq("id", item.productId);
+          }
         }
+      } catch (err) {
+        console.log("Offline mode or pending db sync", err);
       }
-    } catch (err) {
-      console.log("Offline mode or pending db sync", err);
-    }
+    })();
 
     // 4. Disparar notificación de pan surtido
     addNotification({
@@ -2829,26 +2839,22 @@ export default function POSPage() {
       return updated;
     });
 
-    // 2. Reintegrar stock y eliminar la venta en Supabase (ambas tablas: sale_items y sales)
+    // 2. Eliminar de la cola offline si la venta aún estaba pendiente de sincronizar
     try {
-      const supabase = createClient();
-      for (const item of sale.items) {
-        if (item.product.id.includes("-")) {
-          const currentProd = products.find((p) => p.id === item.product.id);
-          const restoredStock = (currentProd?.stock || 0) + item.quantity;
-          supabase
-            .from("products")
-            .update({ stock: restoredStock })
-            .eq("id", item.product.id)
-            .then();
+      const rawQueue = localStorage.getItem("brito_offline_sync_queue");
+      if (rawQueue) {
+        const parsedQueue = JSON.parse(rawQueue);
+        if (Array.isArray(parsedQueue)) {
+          const filteredQueue = parsedQueue.filter(
+            (q: any) => q.data?.saleId !== sale.id && q.data?.id !== sale.id && q.id !== sale.id
+          );
+          if (filteredQueue.length !== parsedQueue.length) {
+            localStorage.setItem("brito_offline_sync_queue", JSON.stringify(filteredQueue));
+            window.dispatchEvent(new Event("brito_sync_queue_changed"));
+          }
         }
       }
-
-      await supabase.from("sale_items").delete().eq("sale_id", sale.id);
-      await supabase.from("sales").delete().eq("id", sale.id);
-    } catch (e) {
-      console.error("Error al anular venta en Supabase:", e);
-    }
+    } catch {}
 
     // 3. Revertir métricas de sucursal, caja y turnos en BranchContext (multi-tienda y tiempo real)
     const effectiveBranchId = sale.branchId || activeBranch?.id || "branch-matriz";
@@ -2904,11 +2910,33 @@ export default function POSPage() {
       category: "caja",
     });
 
-    // 8. Cerrar ticket directamente y reiniciar estado de venta
+    // 8. Cerrar ticket directamente y reiniciar estado de venta al instante (0ms)
     setShowReceiptModal(false);
     setCompletedSale(null);
     setIsReprintMode(false);
     resetSale();
+
+    // 9. Reintegrar stock y eliminar la venta en Supabase en segundo plano (sin bloquear UI)
+    void (async () => {
+      try {
+        const supabase = createClient();
+        for (const item of sale.items) {
+          if (item.product.id.includes("-")) {
+            const currentProd = products.find((p) => p.id === item.product.id);
+            const restoredStock = (currentProd?.stock || 0) + item.quantity;
+            await supabase
+              .from("products")
+              .update({ stock: restoredStock })
+              .eq("id", item.product.id);
+          }
+        }
+
+        await supabase.from("sale_items").delete().eq("sale_id", sale.id);
+        await supabase.from("sales").delete().eq("id", sale.id);
+      } catch (e) {
+        console.warn("Modo offline al anular venta en Supabase (revertida localmente):", e);
+      }
+    })();
   };
 
   const catalogScrollRef = useRef<HTMLDivElement>(null);

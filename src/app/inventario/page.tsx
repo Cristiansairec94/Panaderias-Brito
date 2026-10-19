@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { 
   Package, 
   Plus, 
@@ -16,11 +16,18 @@ import {
   Boxes,
   X,
   PlusCircle,
-  FileCheck
+  FileCheck,
+  Edit3
 } from "lucide-react";
 import { InventoryItem, InventoryMovement } from "@/types";
 import { formatCurrency, onlyNumbersKeyDown, cleanDecimalNumbers, formatDateTimeSafe } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
+import { realtimeHub } from "@/lib/realtime/realtimeHub";
+import { createClient } from "@/lib/supabase/client";
+
+const INVENTORY_ITEMS_KEY = "brito_inventory_items";
+const INVENTORY_MOVEMENTS_KEY = "brito_inventory_movements";
+const INVENTORY_INIT_KEY = "brito_inventory_initialized";
 
 const INITIAL_INVENTORY: InventoryItem[] = [
   { id: "1", name: "Harina de Trigo Extra Fina", unit: "bultos", currentStock: 8, minStock: 10, costPerUnit: 520, category: "harinas" },
@@ -41,14 +48,58 @@ const INITIAL_MOVEMENTS: InventoryMovement[] = [
   { id: "mov-3", itemId: "9", itemName: "Bolsas de Papel Kraft", type: "entrada_compra", quantity: 500, unit: "piezas", cost: 425, reason: "Resurtido de empaques para mostrador", responsible: "Lupita Brito", timestamp: "2026-08-31 16:00" },
 ];
 
+function getStoredInventoryItems(): InventoryItem[] {
+  if (typeof window === "undefined") return INITIAL_INVENTORY;
+  try {
+    const isInit = localStorage.getItem(INVENTORY_INIT_KEY) === "true";
+    const raw = localStorage.getItem(INVENTORY_ITEMS_KEY);
+    if (!raw) {
+      if (isInit) return [];
+      localStorage.setItem(INVENTORY_ITEMS_KEY, JSON.stringify(INITIAL_INVENTORY));
+      localStorage.setItem(INVENTORY_INIT_KEY, "true");
+      return INITIAL_INVENTORY;
+    }
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) return parsed;
+  } catch {}
+  return INITIAL_INVENTORY;
+}
+
+function getStoredInventoryMovements(): InventoryMovement[] {
+  if (typeof window === "undefined") return INITIAL_MOVEMENTS;
+  try {
+    const isInit = localStorage.getItem(INVENTORY_INIT_KEY) === "true";
+    const raw = localStorage.getItem(INVENTORY_MOVEMENTS_KEY);
+    if (!raw) {
+      if (isInit) return [];
+      localStorage.setItem(INVENTORY_MOVEMENTS_KEY, JSON.stringify(INITIAL_MOVEMENTS));
+      localStorage.setItem(INVENTORY_INIT_KEY, "true");
+      return INITIAL_MOVEMENTS;
+    }
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) return parsed;
+  } catch {}
+  return INITIAL_MOVEMENTS;
+}
+
 export default function InventarioPage() {
-  const { hasPermission } = useAuth();
+  const { user, hasPermission } = useAuth();
   const canViewCosts = hasPermission("canViewProfitMargins");
 
-  const [items, setItems] = useState<InventoryItem[]>(INITIAL_INVENTORY);
-  const [movements, setMovements] = useState<InventoryMovement[]>(INITIAL_MOVEMENTS);
+  const [items, setItems] = useState<InventoryItem[]>(() => getStoredInventoryItems());
+  const [movements, setMovements] = useState<InventoryMovement[]>(() => getStoredInventoryMovements());
   const [activeTab, setActiveTab] = useState<"catalogo" | "entrada" | "merma" | "historial">("catalogo");
   const [search, setSearch] = useState("");
+
+  // Modal Crear / Editar Insumo
+  const [isItemModalOpen, setIsItemModalOpen] = useState(false);
+  const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
+  const [itemName, setItemName] = useState("");
+  const [itemUnit, setItemUnit] = useState<InventoryItem["unit"]>("kg");
+  const [itemCurrentStock, setItemCurrentStock] = useState("");
+  const [itemMinStock, setItemMinStock] = useState("");
+  const [itemCostPerUnit, setItemCostPerUnit] = useState("");
+  const [itemCategory, setItemCategory] = useState<InventoryItem["category"]>("harinas");
 
   // Entry Form State
   const [selectedItemForEntry, setSelectedItemForEntry] = useState(items[0]?.id || "");
@@ -62,10 +113,142 @@ export default function InventarioPage() {
   const [wasteType, setWasteType] = useState<"merma_horno" | "merma_mostrador">("merma_horno");
   const [wasteReason, setWasteReason] = useState("");
 
+  const persistAndBroadcastInventory = useCallback(
+    (
+      action: "create" | "update" | "delete" | "movement",
+      nextItems: InventoryItem[],
+      nextMovements: InventoryMovement[],
+      payloadExtra?: { item?: InventoryItem; movement?: InventoryMovement; id?: string }
+    ) => {
+      setItems(nextItems);
+      setMovements(nextMovements);
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem(INVENTORY_INIT_KEY, "true");
+          localStorage.setItem(INVENTORY_ITEMS_KEY, JSON.stringify(nextItems));
+          localStorage.setItem(INVENTORY_MOVEMENTS_KEY, JSON.stringify(nextMovements));
+          window.dispatchEvent(new Event("brito_inventory_updated"));
+        } catch {}
+      }
+      if (realtimeHub.broadcastInventory) {
+        realtimeHub.broadcastInventory(action, {
+          items: nextItems,
+          movements: nextMovements,
+          ...payloadExtra,
+        });
+      }
+    },
+    []
+  );
+
+  // Sincronización en tiempo real entre pestañas y dispositivos
+  useEffect(() => {
+    const reloadFromStorage = () => {
+      setItems(getStoredInventoryItems());
+      setMovements(getStoredInventoryMovements());
+    };
+
+    window.addEventListener("brito_inventory_updated", reloadFromStorage);
+    window.addEventListener("storage", reloadFromStorage);
+
+    const unsubInv = realtimeHub.onInventory
+      ? realtimeHub.onInventory((payload) => {
+          if (Array.isArray(payload.items)) {
+            setItems(payload.items);
+            try {
+              localStorage.setItem(INVENTORY_INIT_KEY, "true");
+              localStorage.setItem(INVENTORY_ITEMS_KEY, JSON.stringify(payload.items));
+            } catch {}
+          }
+          if (Array.isArray(payload.movements)) {
+            setMovements(payload.movements);
+            try {
+              localStorage.setItem(INVENTORY_INIT_KEY, "true");
+              localStorage.setItem(INVENTORY_MOVEMENTS_KEY, JSON.stringify(payload.movements));
+            } catch {}
+          }
+        })
+      : () => {};
+
+    return () => {
+      window.removeEventListener("brito_inventory_updated", reloadFromStorage);
+      window.removeEventListener("storage", reloadFromStorage);
+      unsubInv();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (items.length > 0) {
+      if (!selectedItemForEntry || !items.some((i) => i.id === selectedItemForEntry)) {
+        setSelectedItemForEntry(items[0].id);
+      }
+      if (!selectedItemForWaste || !items.some((i) => i.id === selectedItemForWaste)) {
+        setSelectedItemForWaste(items[0].id);
+      }
+    }
+  }, [items, selectedItemForEntry, selectedItemForWaste]);
+
   const filtered = items.filter((i) => i.name.toLowerCase().includes(search.toLowerCase()));
 
   const totalInventoryValue = items.reduce((sum, item) => sum + item.currentStock * item.costPerUnit, 0);
   const lowStockCount = items.filter((item) => item.currentStock <= item.minStock).length;
+
+  const openCreateItemModal = () => {
+    setEditingItem(null);
+    setItemName("");
+    setItemUnit("kg");
+    setItemCurrentStock("0");
+    setItemMinStock("5");
+    setItemCostPerUnit("0");
+    setItemCategory("harinas");
+    setIsItemModalOpen(true);
+  };
+
+  const openEditItemModal = (item: InventoryItem) => {
+    setEditingItem(item);
+    setItemName(item.name);
+    setItemUnit(item.unit);
+    setItemCurrentStock(String(item.currentStock));
+    setItemMinStock(String(item.minStock));
+    setItemCostPerUnit(String(item.costPerUnit));
+    setItemCategory(item.category);
+    setIsItemModalOpen(true);
+  };
+
+  const handleSaveItem = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!itemName.trim()) return;
+
+    const savedItem: InventoryItem = {
+      id: editingItem ? editingItem.id : `inv-${Date.now()}`,
+      name: itemName.trim(),
+      unit: itemUnit,
+      currentStock: Math.max(0, Number(itemCurrentStock) || 0),
+      minStock: Math.max(0, Number(itemMinStock) || 0),
+      costPerUnit: Math.max(0, Number(itemCostPerUnit) || 0),
+      category: itemCategory,
+    };
+
+    const nextItems = editingItem
+      ? items.map((i) => (i.id === editingItem.id ? savedItem : i))
+      : [savedItem, ...items];
+
+    persistAndBroadcastInventory(editingItem ? "update" : "create", nextItems, movements, { item: savedItem });
+    setIsItemModalOpen(false);
+    setEditingItem(null);
+  };
+
+  const handleDeleteItem = (id: string, name: string) => {
+    if (!confirm(`¿Confirmas eliminar el insumo "${name}" del catálogo de almacén?`)) return;
+    const nextItems = items.filter((i) => i.id !== id);
+    persistAndBroadcastInventory("delete", nextItems, movements, { id });
+  };
+
+  const handleDeleteMovement = (id: string) => {
+    if (!confirm("¿Eliminar este registro del historial de movimientos?")) return;
+    const nextMovements = movements.filter((m) => m.id !== id);
+    persistAndBroadcastInventory("delete", items, nextMovements, { id });
+  };
 
   const handleAddStock = (e: React.FormEvent) => {
     e.preventDefault();
@@ -75,10 +258,8 @@ export default function InventarioPage() {
     const qtyNumber = Number(entryQty);
     const totalCostNumber = Number(entryCost) || qtyNumber * targetItem.costPerUnit;
 
-    setItems((prev) =>
-      prev.map((i) =>
-        i.id === targetItem.id ? { ...i, currentStock: i.currentStock + qtyNumber } : i
-      )
+    const nextItems = items.map((i) =>
+      i.id === targetItem.id ? { ...i, currentStock: i.currentStock + qtyNumber } : i
     );
 
     const newMov: InventoryMovement = {
@@ -90,11 +271,13 @@ export default function InventarioPage() {
       unit: targetItem.unit,
       cost: totalCostNumber,
       reason: entrySupplier ? `Compra: ${entrySupplier}` : "Entrada directa de almacén",
-      responsible: "Don Toño Brito",
+      responsible: user?.name || "Don Toño Brito",
       timestamp: formatDateTimeSafe(),
     };
 
-    setMovements((prev) => [newMov, ...prev]);
+    const nextMovements = [newMov, ...movements];
+    persistAndBroadcastInventory("movement", nextItems, nextMovements, { movement: newMov });
+
     setEntryQty("");
     setEntryCost("");
     setEntrySupplier("");
@@ -108,10 +291,8 @@ export default function InventarioPage() {
 
     const qtyNumber = Number(wasteQty);
 
-    setItems((prev) =>
-      prev.map((i) =>
-        i.id === targetItem.id ? { ...i, currentStock: Math.max(0, i.currentStock - qtyNumber) } : i
-      )
+    const nextItems = items.map((i) =>
+      i.id === targetItem.id ? { ...i, currentStock: Math.max(0, i.currentStock - qtyNumber) } : i
     );
 
     const newMov: InventoryMovement = {
@@ -123,11 +304,13 @@ export default function InventarioPage() {
       unit: targetItem.unit,
       cost: qtyNumber * targetItem.costPerUnit,
       reason: wasteReason || (wasteType === "merma_horno" ? "Merma en horneado" : "Pan duro de mostrador"),
-      responsible: "Maestro Panadero Juan",
+      responsible: user?.name || "Maestro Panadero Juan",
       timestamp: formatDateTimeSafe(),
     };
 
-    setMovements((prev) => [newMov, ...prev]);
+    const nextMovements = [newMov, ...movements];
+    persistAndBroadcastInventory("movement", nextItems, nextMovements, { movement: newMov });
+
     setWasteQty("");
     setWasteReason("");
     setActiveTab("catalogo");
@@ -143,7 +326,13 @@ export default function InventarioPage() {
             Control de insumos, entradas por compras a proveedores, costos y mermas de panadería.
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={openCreateItemModal}
+            className="flex items-center gap-1.5 bg-stone-900 hover:bg-stone-800 text-white font-extrabold px-4 py-2.5 rounded-xl shadow-md text-xs transition-all active:scale-95"
+          >
+            <PlusCircle className="w-4 h-4" /> Nuevo Insumo
+          </button>
           <button
             onClick={() => setActiveTab("entrada")}
             className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold px-4 py-2.5 rounded-xl shadow-md text-xs transition-all active:scale-95"
@@ -280,6 +469,7 @@ export default function InventarioPage() {
                   {canViewCosts && <th className="p-4">Costo Unitario</th>}
                   {canViewCosts && <th className="p-4">Valor Total</th>}
                   <th className="p-4">Semáforo</th>
+                  <th className="p-4 text-right">Acciones</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-stone-100">
@@ -312,6 +502,24 @@ export default function InventarioPage() {
                             <CheckCircle2 className="w-3 h-3" /> Suficiente
                           </span>
                         )}
+                      </td>
+                      <td className="p-4 text-right">
+                        <div className="inline-flex items-center gap-1.5">
+                          <button
+                            onClick={() => openEditItemModal(item)}
+                            className="p-1.5 rounded-lg text-stone-500 hover:text-stone-900 hover:bg-stone-100 transition-colors"
+                            title="Editar insumo"
+                          >
+                            <Edit3 className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteItem(item.id, item.name)}
+                            className="p-1.5 rounded-lg text-rose-500 hover:text-rose-700 hover:bg-rose-50 transition-colors"
+                            title="Eliminar insumo"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -490,6 +698,7 @@ export default function InventarioPage() {
                 <th className="p-4">Costo Estimado</th>
                 <th className="p-4">Motivo / Proveedor</th>
                 <th className="p-4">Responsable</th>
+                <th className="p-4 text-right">Acciones</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-stone-100">
@@ -518,11 +727,151 @@ export default function InventarioPage() {
                     </td>
                     <td className="p-4 text-stone-600">{mov.reason}</td>
                     <td className="p-4 font-medium text-stone-500">{mov.responsible}</td>
+                    <td className="p-4 text-right">
+                      <button
+                        onClick={() => handleDeleteMovement(mov.id)}
+                        className="p-1.5 rounded-lg text-rose-500 hover:text-rose-700 hover:bg-rose-50 transition-colors"
+                        title="Eliminar movimiento"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </td>
                   </tr>
                 );
               })}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* Modal para Crear / Editar Insumo */}
+      {isItemModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full overflow-hidden border border-stone-200">
+            <div className="bg-stone-900 text-white p-5 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 bg-brito-orange-600 rounded-xl">
+                  <Package className="w-4 h-4 text-white" />
+                </div>
+                <div>
+                  <h3 className="font-black text-sm">
+                    {editingItem ? "Editar Insumo / Materia Prima" : "Nuevo Insumo en Almacén"}
+                  </h3>
+                  <p className="text-[11px] text-stone-400">Actualización en tiempo real en el sistema</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsItemModalOpen(false)}
+                className="p-1.5 rounded-lg text-stone-400 hover:text-white hover:bg-white/10"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveItem} className="p-5 space-y-4 text-xs">
+              <div className="space-y-1">
+                <label className="font-bold text-stone-700">Nombre del Insumo *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Ej. Harina de Trigo Extra Fina"
+                  value={itemName}
+                  onChange={(e) => setItemName(e.target.value)}
+                  className="w-full px-3 py-2 bg-stone-50 rounded-xl border border-stone-200 font-bold text-stone-900 focus:ring-2 focus:ring-brito-orange-500 focus:outline-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="font-bold text-stone-700">Unidad *</label>
+                  <select
+                    value={itemUnit}
+                    onChange={(e) => setItemUnit(e.target.value as InventoryItem["unit"])}
+                    className="w-full px-3 py-2 bg-stone-50 rounded-xl border border-stone-200 font-bold text-stone-900 focus:ring-2 focus:ring-brito-orange-500 focus:outline-none"
+                  >
+                    <option value="kg">Kilogramos (kg)</option>
+                    <option value="litros">Litros</option>
+                    <option value="piezas">Piezas</option>
+                    <option value="bultos">Bultos / Costales</option>
+                    <option value="cajas">Cajas</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="font-bold text-stone-700">Categoría *</label>
+                  <select
+                    value={itemCategory}
+                    onChange={(e) => setItemCategory(e.target.value as InventoryItem["category"])}
+                    className="w-full px-3 py-2 bg-stone-50 rounded-xl border border-stone-200 font-bold text-stone-900 focus:ring-2 focus:ring-brito-orange-500 focus:outline-none"
+                  >
+                    <option value="harinas">Harinas y Polvos</option>
+                    <option value="azucares">Azúcares y Endulzantes</option>
+                    <option value="grasas">Grasas y Mantequillas</option>
+                    <option value="lacteos">Lácteos y Huevo</option>
+                    <option value="esencias">Esencias y Sabores</option>
+                    <option value="empaques">Empaques y Domos</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-3">
+                <div className="space-y-1">
+                  <label className="font-bold text-stone-700">Stock Actual *</label>
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    required
+                    value={itemCurrentStock}
+                    onKeyDown={(e) => onlyNumbersKeyDown(e, true)}
+                    onChange={(e) => setItemCurrentStock(cleanDecimalNumbers(e.target.value))}
+                    className="w-full px-3 py-2 bg-stone-50 rounded-xl border border-stone-200 font-bold text-stone-900 focus:ring-2 focus:ring-brito-orange-500 focus:outline-none"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="font-bold text-stone-700">Stock Mínimo *</label>
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    required
+                    value={itemMinStock}
+                    onKeyDown={(e) => onlyNumbersKeyDown(e, true)}
+                    onChange={(e) => setItemMinStock(cleanDecimalNumbers(e.target.value))}
+                    className="w-full px-3 py-2 bg-stone-50 rounded-xl border border-stone-200 font-bold text-stone-900 focus:ring-2 focus:ring-brito-orange-500 focus:outline-none"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="font-bold text-stone-700">Costo Unit. ($)</label>
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    required
+                    value={itemCostPerUnit}
+                    onKeyDown={(e) => onlyNumbersKeyDown(e, true)}
+                    onChange={(e) => setItemCostPerUnit(cleanDecimalNumbers(e.target.value))}
+                    className="w-full px-3 py-2 bg-stone-50 rounded-xl border border-stone-200 font-bold text-stone-900 focus:ring-2 focus:ring-brito-orange-500 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsItemModalOpen(false)}
+                  className="flex-1 py-2.5 rounded-xl border border-stone-200 font-bold text-stone-600 hover:bg-stone-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-2.5 rounded-xl bg-stone-900 hover:bg-stone-800 text-white font-extrabold shadow-md"
+                >
+                  {editingItem ? "Guardar Cambios" : "Registrar Insumo"}
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
     </div>

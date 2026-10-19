@@ -48,6 +48,7 @@ import {
   saveStoredIncomes, 
   syncMissingSalesToIncomes, 
   recordCashIncome, 
+  deleteIncomeInDb,
   cleanDuplicateIncomes,
   fetchAndSyncIncomesFromSupabase,
   CANONICAL_BRANCH_NAMES,
@@ -562,6 +563,10 @@ export default function IngresosPage() {
       }, 100);
     });
 
+    const unsubIncome = realtimeHub.onIncome(() => {
+      reloadIncomesFromStorage();
+    });
+
     // Suscripción reactiva directa a Supabase Postgres Changes para la tabla cash_movements
     let supabaseChannel: any = null;
     try {
@@ -586,6 +591,7 @@ export default function IngresosPage() {
       unsubSale();
       unsubCash();
       unsubOrder();
+      unsubIncome();
       if (supabaseChannel) {
         try {
           const supabase = createClient();
@@ -917,13 +923,14 @@ export default function IngresosPage() {
     setIsNewIncomeModalOpen(true);
   };
 
-  const handleCrearIngreso = async (e: React.FormEvent) => {
+  const handleCrearIngreso = (e: React.FormEvent) => {
     e.preventDefault();
     const parsedAmount = Number(amount);
     if (!parsedAmount || parsedAmount <= 0 || !concept.trim()) return;
 
     setIsSubmitting(true);
     const catObj = getCategoryInfo(category);
+    const targetBranchId = branches.find((b) => b.name === branchName)?.id || "branch-matriz";
 
     const newIncome = recordCashIncome({
       amount: parsedAmount,
@@ -935,30 +942,14 @@ export default function IngresosPage() {
       orderNumber: orderNumber.trim() || undefined,
       referenceNumber: referenceNumber.trim() || undefined,
       cashier: user?.name || "Don Toño Brito",
+      branchId: targetBranchId,
       branchName,
     });
-
-    try {
-      const supabase = createClient();
-      const targetBranchId = branches.find((b) => b.name === newIncome.branchName)?.id || newIncome.branchId || "branch-matriz";
-      await supabase.from("cash_movements").insert({
-        id: newIncome.id,
-        type: "entrada",
-        category: newIncome.category,
-        category_label: newIncome.categoryLabel,
-        amount: newIncome.amount,
-        reason: `${newIncome.categoryLabel}: ${newIncome.concept} (${newIncome.customerName || "General"}) [${newIncome.paymentMethod}]`,
-        authorized_by: newIncome.cashier,
-        branch_id: targetBranchId,
-      });
-    } catch (err) {
-      console.log("Offline mode, saved locally", err);
-    }
 
     if (realtimeHub.broadcastCashMovement) {
       realtimeHub.broadcastCashMovement({
         id: newIncome.id,
-        branchId: branches.find((b) => b.name === newIncome.branchName)?.id || "branch-matriz",
+        branchId: targetBranchId,
         branchName: newIncome.branchName || "Matriz",
         type: "entrada",
         category: newIncome.category as any,
@@ -993,6 +984,7 @@ export default function IngresosPage() {
     if (confirm("¿Estás seguro de eliminar este registro de ingreso?")) {
       const updated = incomes.filter((i) => i.id !== id);
       saveIncomes(updated);
+      void deleteIncomeInDb(id);
     }
   };
 

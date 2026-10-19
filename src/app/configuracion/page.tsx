@@ -31,11 +31,14 @@ import {
   AlertCircle,
   UserCheck,
   Wifi,
+  WifiOff,
+  RefreshCw,
   Laptop
 } from "lucide-react";
 import { formatCurrency, onlyNumbersKeyDown, cleanDecimalNumbers, cleanOnlyNumbers, formatTime24 } from "@/lib/utils";
 import { useAuth, ROLE_PERMISSIONS, User } from "@/context/AuthContext";
 import { useBranch } from "@/context/BranchContext";
+import { useSync } from "@/context/SyncContext";
 import { UserRole, Branch } from "@/types";
 import RoleManagement from "@/components/configuracion/RoleManagement";
 import EmployeeManagement from "@/components/configuracion/EmployeeManagement";
@@ -48,6 +51,7 @@ function ConfiguracionContent() {
   const tabQuery = searchParams ? searchParams.get("tab") : null;
   const { usersList, addUser } = useAuth();
   const { branches, addBranch, updateBranch, deleteBranch } = useBranch();
+  const { isOnline, pendingCount, isSyncing } = useSync();
 
   const [activeTab, setActiveTab] = useState<"general" | "sucursales" | "roles" | "empleados" | "ticket" | "operaciones" | "offline" | "database">(
     tabQuery === "usuarios" ? "roles" : (tabQuery as any) || "roles"
@@ -320,15 +324,29 @@ function ConfiguracionContent() {
           onClick={() => handleTabChange("offline")}
           className={`px-4 py-2.5 rounded-xl transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
             activeTab === "offline"
-              ? "bg-stone-900 text-white shadow-sm ring-2 ring-emerald-400/50"
+              ? !isOnline
+                ? "bg-stone-900 text-white shadow-sm ring-2 ring-rose-400/50"
+                : "bg-stone-900 text-white shadow-sm ring-2 ring-emerald-400/50"
               : "bg-white text-stone-600 hover:bg-stone-100"
           }`}
+          title={
+            !isOnline
+              ? "Modo Sin Red (Offline) activo en esta computadora"
+              : isSyncing
+              ? "Sincronizando datos con la nube..."
+              : pendingCount > 0
+              ? `${pendingCount} transacciones pendientes de sincronizar`
+              : "Modo Offline 100% configurado y sincronizado con la nube"
+          }
         >
-          <Wifi className="w-4 h-4 text-emerald-400" />
+          {!isOnline ? (
+            <WifiOff className="w-4 h-4 text-rose-400 shrink-0 animate-pulse" />
+          ) : isSyncing ? (
+            <RefreshCw className="w-4 h-4 text-amber-400 shrink-0 animate-spin" />
+          ) : (
+            <Wifi className="w-4 h-4 text-emerald-400 shrink-0" />
+          )}
           <span>Modo Offline & PC</span>
-          <span className="px-2 py-0.5 bg-emerald-100 text-emerald-900 font-black text-[9px] rounded-full uppercase shadow-xs">
-            Sin Internet
-          </span>
         </button>
         <button
           onClick={() => handleTabChange("database")}

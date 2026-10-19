@@ -303,7 +303,7 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
     window.addEventListener("brito_sync_queue_updated", refreshQueueAndStats);
     window.addEventListener("brito_network_status_changed", handleNetworkStatusChange);
 
-    // Heartbeat cada 25 segundos para mantener estado en vivo
+    // Heartbeat cada 8 segundos para mantener estado y sincronización en vivo sin demoras
     const interval = setInterval(async () => {
       await refreshConnection();
       if (!checkSimulatedOffline()) {
@@ -313,7 +313,7 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
           syncOrdersWithServer().catch(() => {});
         }
       }
-    }, 25000);
+    }, 8000);
 
     return () => {
       window.removeEventListener("beforeinstallprompt", handleBeforeInstall);

@@ -687,92 +687,117 @@ function resolveBranchParam(param: string | null): string | null {
 
   // Load state from localStorage & Server API
   useEffect(() => {
+    let isSyncingBranches = false;
+
     // 1. Sincronización en tiempo real con el servidor y Supabase para reflejar todas las sucursales de otros perfiles
     const syncBranchesWithServer = async () => {
       syncBranchesRef.current = syncBranchesWithServer;
+      if (isSyncingBranches) return;
+      isSyncingBranches = true;
+
+      const isOfflineMode =
+        typeof window !== "undefined" &&
+        (localStorage.getItem("brito_simulate_offline") === "true" ||
+          (typeof navigator !== "undefined" && !navigator.onLine));
+
       try {
-        // A) Sincronizar desde /api/branches (persistencia central del servidor)
+        // A) Sincronizar desde /api/branches (persistencia central del servidor) solo si hay red
         let serverBranches: Branch[] = [];
-        try {
-          const res = await fetch("/api/branches");
-          if (res.ok) {
-            const data = await res.json();
-            if (Array.isArray(data.deletedIds)) {
-              data.deletedIds.forEach((delId: string) => {
-                if (typeof delId === "string" && delId.trim()) {
-                  recordDeletedBranchId(delId.trim());
-                }
-              });
+        if (!isOfflineMode) {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 2500);
+          try {
+            const res = await fetch("/api/branches", { signal: controller.signal });
+            if (res.ok) {
+              const data = await res.json();
+              if (Array.isArray(data.deletedIds)) {
+                data.deletedIds.forEach((delId: string) => {
+                  if (typeof delId === "string" && delId.trim()) {
+                    recordDeletedBranchId(delId.trim());
+                  }
+                });
+              }
+              if (data.success && Array.isArray(data.branches) && data.branches.length > 0) {
+                serverBranches = data.branches;
+              }
             }
-            if (data.success && Array.isArray(data.branches) && data.branches.length > 0) {
-              serverBranches = data.branches;
-            }
+          } catch (err) {
+            // Silencioso en desconexión
+          } finally {
+            clearTimeout(timeoutId);
           }
-        } catch (err) {
-          console.warn("[BranchContext] No se pudo consultar /api/branches:", err);
         }
 
         // B) Sincronizar directamente con Supabase las ventas, pedidos, gastos y movimientos de TODAS las sucursales
         try {
-          const supabase = createClient();
           const todayStart = new Date();
           todayStart.setHours(0, 0, 0, 0);
           const todayStartTs = todayStart.getTime();
           const cleanSlateIso = new Date(CLEAN_SLATE_EPOCH).toISOString();
 
-          const [salesRes, ordersRes, movsRes, expsRes, cutsRes, branchesRes] = await Promise.allSettled([
-            supabase
-              .from("sales")
-              .select("id, branch_id, total, payment_method, cashier, customer_name, date, created_at, sale_items(product_id, product_name, quantity, unit_price, subtotal)")
-              .gte("created_at", cleanSlateIso)
-              .order("created_at", { ascending: false }),
-            supabase
-              .from("custom_orders")
-              .select("*")
-              .gte("created_at", cleanSlateIso)
-              .order("created_at", { ascending: false })
-              .limit(200),
-            supabase
-              .from("cash_movements")
-              .select("id, branch_id, type, category, category_label, amount, reason, authorized_by, created_at")
-              .gte("created_at", cleanSlateIso)
-              .order("created_at", { ascending: false }),
-            supabase
-              .from("cash_expenses")
-              .select("id, branch_id, amount, category, description, cashier, created_at")
-              .gte("created_at", cleanSlateIso)
-              .order("created_at", { ascending: false }),
-            supabase
-              .from("cash_shifts")
-              .select("id, shift_name, cashier_name, branch_id, opened_at, initial_cash, cash_sales, card_sales, transfer_sales, total_cash_in, total_cash_out, expected_cash, actual_cash, difference, status, notes")
-              .gte("opened_at", cleanSlateIso)
-              .order("opened_at", { ascending: false }),
-            supabase
-              .from("branches")
-              .select("id, name, short_name, address, phone, is_active"),
-          ]);
+          let dbSales: any[] = [];
+          let dbOrders: any[] = [];
+          let dbMovs: any[] = [];
+          let dbExps: any[] = [];
+          let dbCuts: any[] = [];
+          let dbBranches: any[] = [];
 
-          const dbSales = salesRes.status === "fulfilled" && !salesRes.value.error
-            ? (salesRes.value.data || []).filter((s: any) => {
-                if (!s || !s.id) return false;
-                const idStr = String(s.id);
-                if (idStr.startsWith("LIQ-") || idStr.startsWith("PED-") || /^pos-\d{10,}$/.test(idStr)) return false;
-                return parseDateTimeSafe(s.created_at || s.date) >= CLEAN_SLATE_EPOCH;
-              })
-            : [];
-          const dbOrders = ordersRes.status === "fulfilled" && !ordersRes.value.error
-            ? (ordersRes.value.data || []).filter((o: any) => parseDateTimeSafe(o.created_at) >= CLEAN_SLATE_EPOCH)
-            : [];
-          const dbMovs = movsRes.status === "fulfilled" && !movsRes.value.error
-            ? (movsRes.value.data || []).filter((m: any) => parseDateTimeSafe(m.created_at) >= CLEAN_SLATE_EPOCH)
-            : [];
-          const dbExps = expsRes.status === "fulfilled" && !expsRes.value.error
-            ? (expsRes.value.data || []).filter((e: any) => parseDateTimeSafe(e.created_at) >= CLEAN_SLATE_EPOCH)
-            : [];
-          const dbCuts = cutsRes.status === "fulfilled" && !cutsRes.value.error
-            ? (cutsRes.value.data || []).filter((c: any) => parseDateTimeSafe(c.opened_at) >= CLEAN_SLATE_EPOCH)
-            : [];
-          const dbBranches = branchesRes.status === "fulfilled" && !branchesRes.value.error ? branchesRes.value.data || [] : [];
+          if (!isOfflineMode) {
+            const supabase = createClient();
+            const [salesRes, ordersRes, movsRes, expsRes, cutsRes, branchesRes] = await Promise.allSettled([
+              supabase
+                .from("sales")
+                .select("id, branch_id, total, payment_method, cashier, customer_name, date, created_at, sale_items(product_id, product_name, quantity, unit_price, subtotal)")
+                .gte("created_at", cleanSlateIso)
+                .order("created_at", { ascending: false }),
+              supabase
+                .from("custom_orders")
+                .select("*")
+                .gte("created_at", cleanSlateIso)
+                .order("created_at", { ascending: false })
+                .limit(200),
+              supabase
+                .from("cash_movements")
+                .select("id, branch_id, type, category, category_label, amount, reason, authorized_by, created_at")
+                .gte("created_at", cleanSlateIso)
+                .order("created_at", { ascending: false }),
+              supabase
+                .from("cash_expenses")
+                .select("id, branch_id, amount, category, description, cashier, created_at")
+                .gte("created_at", cleanSlateIso)
+                .order("created_at", { ascending: false }),
+              supabase
+                .from("cash_shifts")
+                .select("id, shift_name, cashier_name, branch_id, opened_at, initial_cash, cash_sales, card_sales, transfer_sales, total_cash_in, total_cash_out, expected_cash, actual_cash, difference, status, notes")
+                .gte("opened_at", cleanSlateIso)
+                .order("opened_at", { ascending: false }),
+              supabase
+                .from("branches")
+                .select("id, name, short_name, address, phone, is_active"),
+            ]);
+
+            dbSales = salesRes.status === "fulfilled" && !salesRes.value.error
+              ? (salesRes.value.data || []).filter((s: any) => {
+                  if (!s || !s.id) return false;
+                  const idStr = String(s.id);
+                  if (idStr.startsWith("LIQ-") || idStr.startsWith("PED-") || /^pos-\d{10,}$/.test(idStr)) return false;
+                  return parseDateTimeSafe(s.created_at || s.date) >= CLEAN_SLATE_EPOCH;
+                })
+              : [];
+            dbOrders = ordersRes.status === "fulfilled" && !ordersRes.value.error
+              ? (ordersRes.value.data || []).filter((o: any) => parseDateTimeSafe(o.created_at) >= CLEAN_SLATE_EPOCH)
+              : [];
+            dbMovs = movsRes.status === "fulfilled" && !movsRes.value.error
+              ? (movsRes.value.data || []).filter((m: any) => parseDateTimeSafe(m.created_at) >= CLEAN_SLATE_EPOCH)
+              : [];
+            dbExps = expsRes.status === "fulfilled" && !expsRes.value.error
+              ? (expsRes.value.data || []).filter((e: any) => parseDateTimeSafe(e.created_at) >= CLEAN_SLATE_EPOCH)
+              : [];
+            dbCuts = cutsRes.status === "fulfilled" && !cutsRes.value.error
+              ? (cutsRes.value.data || []).filter((c: any) => parseDateTimeSafe(c.opened_at) >= CLEAN_SLATE_EPOCH)
+              : [];
+            dbBranches = branchesRes.status === "fulfilled" && !branchesRes.value.error ? branchesRes.value.data || [] : [];
+          }
 
           // Sincronizar sucursales eliminadas de Supabase con los tombstones locales
           dbBranches.forEach((dbB: any) => {
@@ -1973,6 +1998,8 @@ function resolveBranchParam(param: string | null): string | null {
         } catch {}
       } catch (err) {
         console.warn("[BranchContext] No se pudo consultar /api/branches:", err);
+      } finally {
+        isSyncingBranches = false;
       }
     };
 
@@ -3277,9 +3304,10 @@ function resolveBranchParam(param: string | null): string | null {
         return next;
       });
 
-      // Si es una salida de dinero, registrar automáticamente en el Historial Detallado de Gastos
+      // Si es una salida de dinero, registrar automáticamente en el Historial Detallado de Gastos y en Supabase
       if (movement.type === "salida") {
         recordCashOutflowAsExpense({
+          id: newMovement.id,
           amount: movement.amount,
           description: movement.reason,
           category: movement.category,
@@ -3288,8 +3316,30 @@ function resolveBranchParam(param: string | null): string | null {
           cashier: movement.authorizedBy,
           accountOrigin: "Caja Mostrador (Efectivo Turno)",
           paymentMethod: "efectivo",
-          skipSupabaseAndBroadcast: true,
+          skipSupabaseAndBroadcast: false,
         });
+      } else {
+        // Persistir entrada de caja en Supabase en segundo plano (0ms bloqueo)
+        void (async () => {
+          try {
+            const supabase = createClient();
+            await supabase.from("cash_movements").upsert(
+              {
+                id: newMovement.id,
+                type: "entrada",
+                category: movement.category || "ingreso_extraordinario",
+                category_label: movement.categoryLabel || "Entrada de Caja",
+                amount: movement.amount,
+                reason: movement.reason,
+                authorized_by: movement.authorizedBy,
+                branch_id: branchId || "branch-matriz",
+              },
+              { onConflict: "id" }
+            );
+          } catch (err) {
+            console.warn("[BranchContext] Offline mode, cash movement saved locally:", err);
+          }
+        })();
       }
 
       // Update cash in drawer for that branch

@@ -1,5 +1,5 @@
 // 🥖 Panadería Brito - Service Worker para Modo Fuera de Línea (Offline)
-const CACHE_NAME = "panaderia-brito-cache-v11";
+const CACHE_NAME = "panaderia-brito-cache-v12";
 
 const PRECACHE_ASSETS = [
   "/",
@@ -8,6 +8,9 @@ const PRECACHE_ASSETS = [
   "/productos",
   "/clientes",
   "/gastos",
+  "/ingresos",
+  "/finanzas",
+  "/sucursales",
   "/inventario",
   "/pedidos",
   "/reportes",
@@ -65,38 +68,42 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // Peticiones de Navegación (HTML): Red primero con respaldo automático a la caché
+  // Peticiones de Navegación (HTML): Red primero (con límite de 3.5s) y respaldo automático a la caché
   if (req.mode === "navigate") {
     event.respondWith(
-      fetch(req)
-        .then((response) => {
+      (async () => {
+        try {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 3500);
+          const response = await fetch(req, { signal: controller.signal });
+          clearTimeout(timeoutId);
           if (response && response.status === 200) {
             const clone = response.clone();
             caches.open(CACHE_NAME).then((cache) => cache.put(req, clone));
           }
           return response;
-        })
-        .catch(async () => {
+        } catch {
           console.log("[ServiceWorker] Sin conexión. Entregando página desde caché:", req.url);
-          const cachedPage = await caches.match(req);
+          const cachedPage = await caches.match(req, { ignoreSearch: true });
           if (cachedPage) return cachedPage;
 
           // Intentar coincidencia por ruta (ej. /pos o /caja)
-          const pathnameMatch = await caches.match(url.pathname);
+          const pathnameMatch = await caches.match(url.pathname, { ignoreSearch: true });
           if (pathnameMatch) return pathnameMatch;
 
           // Si la página exacta no está en caché, servir el Punto de Venta (POS) o Inicio
-          const posFallback = await caches.match("/pos");
+          const posFallback = await caches.match("/pos", { ignoreSearch: true });
           if (posFallback) return posFallback;
 
-          const rootFallback = await caches.match("/");
+          const rootFallback = await caches.match("/", { ignoreSearch: true });
           if (rootFallback) return rootFallback;
 
           return new Response(
             "<!DOCTYPE html><html><head><title>Panadería Brito - Modo Fuera de Línea</title><meta charset='utf-8'/><meta name='viewport' content='width=device-width, initial-scale=1'/><style>body{font-family:sans-serif;text-align:center;padding:40px 20px;background:#18181b;color:#f4f4f5;}h1{color:#f59e0b;font-size:24px;}p{color:#a1a1aa;font-size:14px;line-height:1.6;}a{display:inline-block;margin-top:20px;background:#f59e0b;color:#18181b;padding:12px 24px;border-radius:12px;font-weight:bold;text-decoration:none;}</style></head><body><h1>🥖 Panaderías Brito • Modo Fuera de Línea</h1><p>El sistema está funcionando con la base de datos local en tu computadora.<br/>Puedes seguir cobrando ventas y registrando movimientos.</p><a href='/pos'>Abrir Punto de Venta (POS)</a></body></html>",
             { headers: { "Content-Type": "text/html; charset=utf-8" } }
           );
-        })
+        }
+      })()
     );
     return;
   }

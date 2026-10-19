@@ -1701,41 +1701,56 @@ export default function CajaPage() {
         localStorage.setItem("brito_pos_current_incomes", JSON.stringify(remainingInc));
       } catch {}
 
-      // Persistir corte de turno y movimiento en Supabase para supervisión en vivo
-      try {
-        const supabase = createClient();
-        const shiftId = newCut.id || `cut-${Date.now()}`;
-        Promise.allSettled([
-          supabase.from("cash_shifts").upsert({
-            id: shiftId,
-            shift_name: nextShiftName || "Turno General",
-            cashier_name: currentShiftResponsible,
-            branch_id: targetBranchId,
-            opened_at: new Date(cutTs).toISOString(),
-            initial_cash: parsedNextFund,
-            cash_sales: cashSales,
-            card_sales: cardSales,
-            transfer_sales: transferSales,
-            total_cash_in: totalEntries,
-            total_cash_out: totalExpenses,
-            expected_cash: expectedCashInDrawer,
-            actual_cash: parsedCounted,
-            difference: diff,
-            status: "cerrada",
-            notes: newCut.notes,
-          }),
-          supabase.from("cash_movements").upsert({
-            id: `mov-${shiftId}`,
-            type: "salida",
-            category: "corte_caja",
-            category_label: "Corte de Turno",
-            amount: parsedCounted,
-            reason: `Corte de turno (${newCut.shiftRange || "Turno"}). Saliente: ${currentShiftResponsible} → Entrante: ${recipient}`,
-            authorized_by: currentShiftResponsible,
-            branch_id: targetBranchId,
-          }),
-        ]).catch(() => {});
-      } catch {}
+      // Persistir corte de turno y movimiento en Supabase para supervisión en vivo o encolar en modo offline
+      const shiftId = newCut.id || `cut-${Date.now()}`;
+      void (async () => {
+        try {
+          const supabase = createClient();
+          const [resShift, resMov] = await Promise.all([
+            supabase.from("cash_shifts").upsert({
+              id: shiftId,
+              shift_name: nextShiftName || "Turno General",
+              cashier_name: currentShiftResponsible,
+              branch_id: targetBranchId,
+              opened_at: new Date(cutTs).toISOString(),
+              initial_cash: parsedNextFund,
+              cash_sales: cashSales,
+              card_sales: cardSales,
+              transfer_sales: transferSales,
+              total_cash_in: totalEntries,
+              total_cash_out: totalExpenses,
+              expected_cash: expectedCashInDrawer,
+              actual_cash: parsedCounted,
+              difference: diff,
+              status: "cerrada",
+              notes: newCut.notes,
+            }),
+            supabase.from("cash_movements").upsert({
+              id: `mov-${shiftId}`,
+              type: "salida",
+              category: "corte_caja",
+              category_label: "Corte de Turno",
+              amount: parsedCounted,
+              reason: `Corte de turno (${newCut.shiftRange || "Turno"}). Saliente: ${currentShiftResponsible} → Entrante: ${recipient}`,
+              authorized_by: currentShiftResponsible,
+              branch_id: targetBranchId,
+            }),
+          ]);
+          if (resShift.error && resMov.error) {
+            throw new Error(resShift.error.message || resMov.error.message);
+          }
+        } catch {
+          try {
+            enqueueOfflineItem({
+              type: "cut",
+              title: `Corte de Turno #${newFolio} (${formatCurrency(newCut.totalSales)})`,
+              amount: newCut.totalSales,
+              branchId: targetBranchId,
+              data: { ...newCut, cutId: shiftId, branchId: targetBranchId },
+            });
+          } catch {}
+        }
+      })();
 
       // Emitir corte en tiempo real
       realtimeHub.broadcastShiftCut(newCut);

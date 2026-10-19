@@ -47,7 +47,14 @@ import { useBranch } from "@/context/BranchContext";
 import { useNotifications } from "@/context/NotificationContext";
 import { createClient } from "@/lib/supabase/client";
 import { realtimeHub } from "@/lib/realtime/realtimeHub";
-import { saveStoredExpenses, recordCashOutflowAsExpense } from "@/lib/expenses";
+import {
+  saveStoredExpenses,
+  recordCashOutflowAsExpense,
+  updateExpenseInDb,
+  deleteExpenseInDb,
+  fetchAndSyncExpensesFromSupabase,
+  getDeletedExpenseIds,
+} from "@/lib/expenses";
 import ExpenseReceiptModal from "@/components/gastos/ExpenseReceiptModal";
 
 // ─── Helpers de Fecha ────────────────────────────────────────────────────────
@@ -536,17 +543,23 @@ export default function GastosPage() {
 
   useEffect(() => {
     reloadGastosFromStorage();
+    fetchAndSyncExpensesFromSupabase().then((merged) => {
+      if (merged && merged.length > 0) {
+        reloadGastosFromStorage();
+      }
+    });
 
     const handleGastosUpdated = (e: any) => {
       if (e?.detail && Array.isArray(e.detail)) {
-        setGastos(e.detail);
+        const deletedIds = getDeletedExpenseIds();
+        setGastos(e.detail.filter((g: any) => g && g.id && !deletedIds.has(g.id)));
       } else {
         reloadGastosFromStorage();
       }
     };
 
     const handleStorage = (e: StorageEvent) => {
-      if (!e.key || e.key === "brito_gastos_registro") {
+      if (!e.key || e.key === "brito_gastos_registro" || e.key === "brito_deleted_expense_ids") {
         reloadGastosFromStorage();
       }
     };
@@ -558,14 +571,21 @@ export default function GastosPage() {
       if (payload && payload.type === "salida") {
         setTimeout(() => {
           reloadGastosFromStorage();
-        }, 150);
+        }, 50);
       }
     });
+
+    const unsubExpense = realtimeHub.onExpense
+      ? realtimeHub.onExpense(() => {
+          reloadGastosFromStorage();
+        })
+      : undefined;
 
     return () => {
       window.removeEventListener("brito_gastos_updated", handleGastosUpdated);
       window.removeEventListener("storage", handleStorage);
       if (unsubRealtime) unsubRealtime();
+      if (unsubExpense) unsubExpense();
     };
   }, [reloadGastosFromStorage]);
 
@@ -918,27 +938,20 @@ export default function GastosPage() {
       timestamp: new Date().toISOString(),
     };
 
-    // Intentar insertar en Supabase
-    try {
-      const supabase = createClient();
-      await supabase.from("cash_movements").insert({
-        id: nuevoGasto.id,
-        type: "salida",
-        category: form.categoriaId,
-        amount: nuevoGasto.amount,
-        reason: `[${nuevoGasto.id}] ${nuevoGasto.categoryLabel}: ${nuevoGasto.description} (${nuevoGasto.branchName})`,
-        authorized_by: nuevoGasto.cashier,
-        branch_id: nuevoGasto.branchId || "branch-matriz",
-      });
-    } catch (err) {
-      console.log("Offline mode, saved locally", err);
-    }
-
+    // 1. Persistir localmente y actualizar UI al instante (0ms)
     const updated = [nuevoGasto, ...gastos];
     persistGastos(updated);
 
-    // Transmitir en tiempo real a las demás terminales
+    setIsSubmitting(false);
+    setModalNuevoOpen(false);
+    setGastoSeleccionado(nuevoGasto);
+    setModalReceiptOpen(true);
+
+    // 2. Transmitir en tiempo real a las demás terminales e insertar en Supabase en paralelo (no bloqueante)
     try {
+      if (realtimeHub?.broadcastExpense) {
+        realtimeHub.broadcastExpense("create", nuevoGasto);
+      }
       if (realtimeHub?.broadcastCashMovement) {
         realtimeHub.broadcastCashMovement({
           id: nuevoGasto.id,
@@ -957,6 +970,34 @@ export default function GastosPage() {
       console.log("Realtime broadcast error:", err);
     }
 
+    void (async () => {
+      try {
+        const supabase = createClient();
+        await Promise.allSettled([
+          supabase.from("cash_expenses").upsert({
+            id: nuevoGasto.id,
+            amount: nuevoGasto.amount,
+            category: form.categoriaId,
+            description: `[${nuevoGasto.categoryLabel}] ${nuevoGasto.description}`,
+            cashier: nuevoGasto.cashier,
+            branch_id: nuevoGasto.branchId || "branch-matriz",
+          }),
+          supabase.from("cash_movements").upsert({
+            id: nuevoGasto.id,
+            type: "salida",
+            category: form.categoriaId,
+            category_label: nuevoGasto.categoryLabel,
+            amount: nuevoGasto.amount,
+            reason: `[${nuevoGasto.id}] ${nuevoGasto.categoryLabel}: ${nuevoGasto.description} (${nuevoGasto.branchName})`,
+            authorized_by: nuevoGasto.cashier,
+            branch_id: nuevoGasto.branchId || "branch-matriz",
+          }),
+        ]);
+      } catch (err) {
+        console.log("Offline mode, saved locally", err);
+      }
+    })();
+
     // Notificación al administrador
     addNotification({
       senderName: `Gasto Registrado (${nuevoGasto.cashier})`,
@@ -969,13 +1010,6 @@ export default function GastosPage() {
       actionLabel: "Ver en Gastos",
       actionLink: "/gastos",
     });
-
-    setIsSubmitting(false);
-    setModalNuevoOpen(false);
-
-    // Abrir comprobante
-    setGastoSeleccionado(nuevoGasto);
-    setModalReceiptOpen(true);
   };
 
   const abrirEditarGasto = (g: ExpenseRecord) => {
@@ -1003,9 +1037,10 @@ export default function GastosPage() {
     const catInfo = getCategoryInfo(form.categoriaId);
     const targetBranch = branches.find((b) => b.id === form.branchId) || (branches.length > 0 ? branches[0] : { id: "branch-matriz", name: "Sucursal Matriz (Centro)" });
 
+    let editedRecord: ExpenseRecord | null = null;
     const updatedList = gastos.map((item) => {
       if (item.id !== gastoSeleccionado.id) return item;
-      return {
+      editedRecord = {
         ...item,
         date: form.fecha,
         category: form.categoriaId,
@@ -1019,9 +1054,13 @@ export default function GastosPage() {
         supplier: form.supplier.trim() || undefined,
         notes: form.notes.trim() || undefined,
       };
+      return editedRecord;
     });
 
     persistGastos(updatedList);
+    if (editedRecord) {
+      updateExpenseInDb(editedRecord);
+    }
     setModalEditarOpen(false);
     setGastoSeleccionado(null);
   };
@@ -1035,17 +1074,22 @@ export default function GastosPage() {
   const handleConfirmarAnulacion = () => {
     if (!gastoSeleccionado || !motivoAnulacion.trim()) return;
 
+    let cancelledRecord: ExpenseRecord | null = null;
     const updatedList = gastos.map((item) => {
       if (item.id !== gastoSeleccionado.id) return item;
-      return {
+      cancelledRecord = {
         ...item,
         status: "anulado" as const,
         cancelReason: motivoAnulacion.trim(),
         description: `[ANULADO: ${motivoAnulacion.trim()}] ${item.description}`,
       };
+      return cancelledRecord;
     });
 
     persistGastos(updatedList);
+    if (cancelledRecord) {
+      updateExpenseInDb(cancelledRecord);
+    }
     setModalAnularOpen(false);
     setGastoSeleccionado(null);
 
@@ -1068,7 +1112,8 @@ export default function GastosPage() {
       if (!confirmDelete) return;
     }
     const updatedList = gastos.filter((item) => item.id !== g.id);
-    persistGastos(updatedList);
+    setGastos(updatedList);
+    deleteExpenseInDb(g.id);
     setActiveDropdown(null);
   };
 

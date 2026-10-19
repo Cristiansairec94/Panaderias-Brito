@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { 
   Wifi, 
   WifiOff, 
@@ -75,6 +75,19 @@ export default function OfflineManagement() {
   const [healthDiagnostic, setHealthDiagnostic] = useState<HealthCheckResult | null>(null);
   const [isRunningDiagnostic, setIsRunningDiagnostic] = useState(false);
   const [viewingQueueItem, setViewingQueueItem] = useState<SyncItem | null>(null);
+
+  // Diagnóstico automático al cargar para mostrar el estado de salud al 100% de inmediato
+  useEffect(() => {
+    let isMounted = true;
+    runHealthCheck().then((res) => {
+      if (isMounted) {
+        setHealthDiagnostic(res);
+      }
+    }).catch(() => {});
+    return () => {
+      isMounted = false;
+    };
+  }, [runHealthCheck]);
 
   const showToast = (text: string, type: "success" | "error" | "info" = "success") => {
     setFeedbackMsg({ text, type });

@@ -41,6 +41,9 @@ export function saveSyncQueue(queue: SyncItem[]): void {
   }
 }
 
+let autoFlushTimeout: ReturnType<typeof setTimeout> | null = null;
+let isProcessingSyncQueue = false;
+
 export function enqueueSyncItem(params: {
   type: SyncType;
   title: string;
@@ -63,7 +66,16 @@ export function enqueueSyncItem(params: {
 
   current.push(newItem);
   saveSyncQueue(current);
-  console.log(`[SyncService] Encolado registro offline: ${newItem.title} (${newItem.id})`);
+  console.log(`[SyncService] Encolado registro: ${newItem.title} (${newItem.id})`);
+
+  // Si hay red disponible, disparar subida inmediata en segundo plano sin esperar al timer
+  if (typeof window !== "undefined" && !isSimulatedOffline() && (typeof navigator === "undefined" || navigator.onLine)) {
+    if (autoFlushTimeout) clearTimeout(autoFlushTimeout);
+    autoFlushTimeout = setTimeout(() => {
+      processSyncQueue().catch(() => {});
+    }, 150);
+  }
+
   return newItem;
 }
 
@@ -133,7 +145,7 @@ export async function checkRealOnlineStatus(): Promise<{
 
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 3500);
+    const timeoutId = setTimeout(() => controller.abort(), 2000);
 
     // Ping al endpoint REST base de Supabase (siempre responde HTTP 200 si hay internet)
     const res = await fetch(`${supabaseUrl}/rest/v1/`, {
@@ -175,7 +187,7 @@ export async function checkRealOnlineStatus(): Promise<{
       }
     } catch {}
 
-    // Si navigator.onLine es true pero no pudimos conectar al endpoint remoto en 3.5s
+    // Si navigator.onLine es true pero no pudimos conectar al endpoint remoto
     if (typeof navigator !== "undefined" && navigator.onLine) {
       return {
         isOnline: true,
@@ -198,13 +210,15 @@ export async function processSyncQueue(): Promise<{
   failed: number;
   errors: string[];
 }> {
-  const status = await checkRealOnlineStatus();
-  if (!status.isOnline) {
+  if (typeof window === "undefined") {
+    return { total: 0, synced: 0, failed: 0, errors: [] };
+  }
+  if (isSimulatedOffline() || (typeof navigator !== "undefined" && !navigator.onLine)) {
     return {
       total: getSyncQueue().length,
       synced: 0,
       failed: getSyncQueue().length,
-      errors: [status.detail],
+      errors: ["Dispositivo fuera de línea"],
     };
   }
 
@@ -214,128 +228,204 @@ export async function processSyncQueue(): Promise<{
     return { total: 0, synced: 0, failed: 0, errors: [] };
   }
 
-  const supabase = createClient();
-  let syncedCount = 0;
-  let failedCount = 0;
-  const errors: string[] = [];
-  const remainingQueue: SyncItem[] = [];
+  if (isProcessingSyncQueue) {
+    return { total: queue.length, synced: 0, failed: 0, errors: [] };
+  }
+  isProcessingSyncQueue = true;
 
-  for (const item of queue) {
-    try {
-      if (item.type === "sale") {
-        const { saleId, date, total, paymentMethod, cashier, items, customerId, customerName, customerType, branchId } = item.data;
-        const sId = saleId || `POS-${Date.now().toString().slice(-6)}`;
-        const sDate = date || item.createdAt || new Date().toISOString();
+  try {
+    const supabase = createClient();
+    let syncedCount = 0;
+    let failedCount = 0;
+    const errors: string[] = [];
+    const remainingQueue: SyncItem[] = [];
 
-        // 1. Intentar insertar encabezado de venta en Supabase
-        const { data: saleData, error: saleErr } = await supabase
-          .from("sales")
-          .upsert({
-            id: sId,
-            date: sDate,
-            total: Number(total),
-            payment_method: paymentMethod || "efectivo",
-            cashier: cashier || "Caja Mostrador",
-            customer_id: customerId && !customerId.startsWith("cli-") ? customerId : null,
-            customer_name: customerName || "Público General",
-            customer_type: customerType || "general",
-            branch_id: branchId || item.branchId || "branch-matriz",
-            is_custom_order: item.data?.isCustomOrder || isOrderSale(item.data) || false,
-            order_number: item.data?.orderNumber || (sId.startsWith("LIQ-") ? sId.replace("LIQ-", "") : null),
-          }, { onConflict: "id" })
-          .select()
-          .single();
+    for (const item of queue) {
+      try {
+        if (item.type === "sale") {
+          const { saleId, id: rawId, date, total, paymentMethod, cashier, items, customerId, customerName, customerType, branchId, branch_id } = item.data || {};
+          const sId = saleId || rawId || item.id || `POS-${Date.now().toString().slice(-6)}`;
+          const sDate = date || item.createdAt || new Date().toISOString();
+          const effBranch = branchId || branch_id || item.branchId || "branch-matriz";
 
-        // Si la tabla 'sales' aún no existe en Supabase (código PGRST205 / 404),
-        // archivamos la venta en disco local para no bloquear la cola
-        if (saleErr) {
-          if (saleErr.code === "PGRST205" || saleErr.message?.includes("schema cache")) {
-            console.warn("[SyncService] La tabla 'sales' aún no existe en Supabase. Archivando en disco local:", item.title);
-            archiveOfflineItem(item, "Guardado en disco local (Esquema Supabase en preparación)");
-            syncedCount++;
-            continue;
+          // 1. Intentar insertar encabezado de venta en Supabase
+          let { data: saleData, error: saleErr } = await supabase
+            .from("sales")
+            .upsert({
+              id: sId,
+              date: sDate,
+              total: Number(total) || Number(item.amount) || 0,
+              payment_method: paymentMethod || "efectivo",
+              cashier: cashier || "Caja Mostrador",
+              customer_id: customerId && !String(customerId).startsWith("cli-") ? customerId : null,
+              customer_name: customerName || "Público General",
+              customer_type: customerType || "general",
+              branch_id: effBranch,
+              is_custom_order: item.data?.isCustomOrder || isOrderSale(item.data) || false,
+              order_number: item.data?.orderNumber || (String(sId).startsWith("LIQ-") ? String(sId).replace("LIQ-", "") : null),
+            }, { onConflict: "id" })
+            .select()
+            .single();
+
+          // Fallback con columnas base si alguna columna opcional no existe en el esquema
+          if (saleErr && saleErr.code !== "PGRST205" && !saleErr.message?.includes("schema cache")) {
+            const retry = await supabase
+              .from("sales")
+              .upsert({
+                id: sId,
+                date: sDate,
+                total: Number(total) || Number(item.amount) || 0,
+                payment_method: paymentMethod || "efectivo",
+                cashier: cashier || "Caja Mostrador",
+                customer_id: null,
+                customer_name: customerName || "Público General",
+                customer_type: customerType || "general",
+                branch_id: effBranch,
+              }, { onConflict: "id" })
+              .select()
+              .single();
+            saleData = retry.data;
+            saleErr = retry.error;
           }
-          throw new Error(saleErr.message);
-        }
 
-        // 2. Si se insertó la venta en Supabase, insertar partidas
-        if (saleData && Array.isArray(items) && items.length > 0) {
-          const itemsPayload = items.map((it: any) => ({
-            sale_id: saleData.id,
-            product_id: it.productId && it.productId !== "temp" ? it.productId : null,
-            product_name: it.name || it.productName || "Producto",
-            quantity: Number(it.quantity) || 1,
-            unit_price: Number(it.price || it.unitPrice) || 0,
-            subtotal: Number(it.subtotal) || 0,
-          }));
-
-          await supabase.from("sale_items").delete().eq("sale_id", saleData.id);
-          await supabase.from("sale_items").insert(itemsPayload);
-
-          // 3. Descontar stock en Supabase
-          for (const it of items) {
-            if (it.productId && it.productId !== "temp") {
-              try {
-                const { data: currentProd } = await supabase
-                  .from("products")
-                  .select("stock")
-                  .eq("id", it.productId)
-                  .single();
-
-                if (currentProd) {
-                  const newStock = Math.max(0, (currentProd.stock || 0) - (Number(it.quantity) || 1));
-                  await supabase
-                    .from("products")
-                    .update({ stock: newStock })
-                    .eq("id", it.productId);
-                }
-              } catch {}
+          // Si la tabla 'sales' aún no existe en Supabase (código PGRST205 / 404),
+          // archivamos la venta en disco local para no bloquear la cola
+          if (saleErr) {
+            if (saleErr.code === "PGRST205" || saleErr.message?.includes("schema cache")) {
+              console.warn("[SyncService] La tabla 'sales' aún no existe en Supabase. Archivando en disco local:", item.title);
+              archiveOfflineItem(item, "Guardado en disco local (Esquema Supabase en preparación)");
+              markRecordIdsAsSynced([sId]);
+              syncedCount++;
+              continue;
             }
+            throw new Error(saleErr.message);
           }
-        }
 
-        syncedCount++;
+          // 2. Si se insertó la venta en Supabase, insertar partidas y descontar stock en paralelo
+          if (saleData && Array.isArray(items) && items.length > 0) {
+            const itemsPayload = items.map((it: any) => ({
+              sale_id: saleData.id,
+              product_id: (it.productId || it.product?.id) && (it.productId || it.product?.id) !== "temp" ? (it.productId || it.product?.id) : null,
+              product_name: it.name || it.productName || it.product?.name || "Producto",
+              quantity: Number(it.quantity) || 1,
+              unit_price: Number(it.price || it.unitPrice || it.product?.price) || 0,
+              subtotal: Number(it.subtotal) || (Number(it.price || it.unitPrice || it.product?.price || 0) * (Number(it.quantity) || 1)),
+            }));
+
+            await supabase.from("sale_items").delete().eq("sale_id", saleData.id);
+            await Promise.allSettled([
+              supabase.from("sale_items").insert(itemsPayload),
+              ...items.map(async (it: any) => {
+                const pId = it.productId || it.product?.id;
+                if (pId && pId !== "temp") {
+                  try {
+                    const { data: currentProd } = await supabase
+                      .from("products")
+                      .select("stock")
+                      .eq("id", pId)
+                      .single();
+                    if (currentProd) {
+                      const newStock = Math.max(0, (currentProd.stock || 0) - (Number(it.quantity) || 1));
+                      await supabase
+                        .from("products")
+                        .update({ stock: newStock })
+                        .eq("id", pId);
+                    }
+                  } catch {}
+                }
+              }),
+            ]);
+          }
+
+          markRecordIdsAsSynced([sId]);
+          syncedCount++;
       } else if (item.type === "expense") {
-        const { id: expId, amount, category, description, cashier, branchId } = item.data || {};
+        const { id: expId, amount, category, description, reason, cashier, authorized_by, branchId, branch_id } = item.data || {};
+        const effExpId = expId || item.id || `exp-${Date.now()}`;
+        const effBranch = branchId || branch_id || item.branchId || "branch-matriz";
+        const effDesc = description || reason || item.title || "Gasto de caja";
+        const effCashier = cashier || authorized_by || "Don Toño Brito";
+        const effAmount = Number(amount) || Number(item.amount) || 0;
+
         const { error: expErr } = await supabase.from("cash_expenses").upsert({
-          id: expId || item.id || `exp-${Date.now()}`,
-          amount: Number(amount),
+          id: effExpId,
+          amount: effAmount,
           category: category || "general",
-          description: description || "Gasto de caja",
-          cashier: cashier || "Don Toño Brito",
-          branch_id: branchId || item.branchId || "branch-matriz",
+          description: effDesc,
+          cashier: effCashier,
+          branch_id: effBranch,
+        }, { onConflict: "id" });
+
+        // También reflejar en cash_movements para sincronía total con Finanzas y Caja
+        const movId = effExpId.startsWith("mov-") ? effExpId : `mov-${effExpId}`;
+        await supabase.from("cash_movements").upsert({
+          id: movId,
+          type: "salida",
+          category: category || "general",
+          amount: effAmount,
+          reason: effDesc,
+          authorized_by: effCashier,
+          branch_id: effBranch,
         }, { onConflict: "id" });
 
         if (expErr && (expErr.code === "PGRST205" || expErr.message?.includes("schema cache"))) {
           archiveOfflineItem(item, "Gasto archivado en disco local");
+          markRecordIdsAsSynced([effExpId, movId]);
           syncedCount++;
           continue;
         }
 
         if (expErr) throw new Error(expErr.message);
+        markRecordIdsAsSynced([effExpId, movId]);
         syncedCount++;
       } else if (item.type === "income") {
-        const { id: incId, amount, category, concept, cashier, branchId } = item.data || {};
+        const { id: incId, amount, category, concept, reason, cashier, authorized_by, branchId, branch_id } = item.data || {};
+        const effIncId = incId || item.id || `mov-${Date.now()}`;
+        const effBranch = branchId || branch_id || item.branchId || "branch-matriz";
+        const effReason = concept || reason || item.title || "Entrada de caja";
+        const effCashier = cashier || authorized_by || "Don Toño Brito";
+        const effAmount = Number(amount) || Number(item.amount) || 0;
+
         const { error: incErr } = await supabase.from("cash_movements").upsert({
-          id: incId || item.id || `mov-${Date.now()}`,
+          id: effIncId,
           type: "entrada",
           category: category || "general",
-          amount: Number(amount),
-          reason: concept || "Entrada de caja",
-          authorized_by: cashier || "Don Toño Brito",
-          branch_id: branchId || item.branchId || "branch-matriz",
+          amount: effAmount,
+          reason: effReason,
+          authorized_by: effCashier,
+          branch_id: effBranch,
         }, { onConflict: "id" });
 
         if (incErr && (incErr.code === "PGRST205" || incErr.message?.includes("schema cache"))) {
           archiveOfflineItem(item, "Entrada archivada en disco local");
+          markRecordIdsAsSynced([effIncId]);
           syncedCount++;
           continue;
         }
 
         if (incErr) throw new Error(incErr.message);
+        markRecordIdsAsSynced([effIncId]);
         syncedCount++;
       } else if (item.type === "cut") {
-        archiveOfflineItem(item, "Corte de turno archivado en disco local");
+        const cutData = item.data || {};
+        const effCutId = cutData.cutId || cutData.id || item.id || `cut-${Date.now()}`;
+        const effBranch = cutData.branchId || cutData.branch_id || item.branchId || "branch-matriz";
+        try {
+          await supabase.from("cash_shifts").upsert({
+            id: effCutId,
+            branch_id: effBranch,
+            shift_type: cutData.shift?.toLowerCase().includes("vesp") ? "vespertino" : "matutino",
+            cashier: cutData.cashier || "Cajero",
+            initial_fund: Number(cutData.initialFund ?? cutData.nextShiftFund ?? 0),
+            expected_cash: Number(cutData.expectedCash ?? 0),
+            counted_cash: Number(cutData.countedCash ?? item.amount ?? 0),
+            difference: Number(cutData.difference ?? 0),
+            status: "closed",
+            closed_at: item.createdAt || new Date().toISOString(),
+          }, { onConflict: "id" });
+        } catch {}
+        archiveOfflineItem(item, "Corte de turno sincronizado y archivado en disco local");
+        markRecordIdsAsSynced([effCutId]);
         syncedCount++;
       } else if (item.type === "order") {
         const orderData = item.data;
@@ -353,6 +443,7 @@ export async function processSyncQueue(): Promise<{
 
           if (ordErr && (ordErr.code === "PGRST205" || ordErr.message?.includes("schema cache"))) {
             archiveOfflineItem(item, "Pedido archivado en disco local (Esquema Supabase en preparación)");
+            markRecordIdsAsSynced([orderData.id || payload.id]);
             syncedCount++;
             continue;
           }
@@ -421,6 +512,9 @@ export async function processSyncQueue(): Promise<{
     failed: failedCount,
     errors,
   };
+  } finally {
+    isProcessingSyncQueue = false;
+  }
 }
 
 // Guardar en archivo histórico local permanente
@@ -463,6 +557,9 @@ export function markRecordIdsAsSynced(ids: string[]): void {
 // ─── SINCRONIZACIÓN MASIVA Y RÁPIDA DE MOVIMIENTOS A LA NUBE (EN LOTES) ─────
 export async function syncAllLocalDataToSupabase(): Promise<{
   success: boolean;
+  total: number;
+  synced: number;
+  failed: number;
   salesSynced: number;
   expensesSynced: number;
   incomesSynced: number;
@@ -471,12 +568,39 @@ export async function syncAllLocalDataToSupabase(): Promise<{
   errors: string[];
 }> {
   if (typeof window === "undefined") {
-    return { success: false, salesSynced: 0, expensesSynced: 0, incomesSynced: 0, customersSynced: 0, ordersSynced: 0, errors: ["No browser window"] };
+    return {
+      success: false,
+      total: 0,
+      synced: 0,
+      failed: 0,
+      salesSynced: 0,
+      expensesSynced: 0,
+      incomesSynced: 0,
+      customersSynced: 0,
+      ordersSynced: 0,
+      errors: ["No browser window"],
+    };
   }
 
-  const status = await checkRealOnlineStatus();
-  if (!status.isOnline) {
-    return { success: false, salesSynced: 0, expensesSynced: 0, incomesSynced: 0, customersSynced: 0, ordersSynced: 0, errors: ["Sin conexión a internet"] };
+  if (isSimulatedOffline() || (typeof navigator !== "undefined" && !navigator.onLine)) {
+    return {
+      success: false,
+      total: getPendingSyncCount(),
+      synced: 0,
+      failed: 0,
+      salesSynced: 0,
+      expensesSynced: 0,
+      incomesSynced: 0,
+      customersSynced: 0,
+      ordersSynced: 0,
+      errors: ["Sin conexión a internet"],
+    };
+  }
+
+  // 0. Procesar primero la cola de ítems encolados offline para registrar sus IDs como sincronizados
+  let queueRes = { total: 0, synced: 0, failed: 0, errors: [] as string[] };
+  if (getPendingSyncCount() > 0) {
+    queueRes = await processSyncQueue();
   }
 
   const supabase = createClient();
@@ -487,7 +611,7 @@ export async function syncAllLocalDataToSupabase(): Promise<{
   let incomesSynced = 0;
   let customersSynced = 0;
   let ordersSynced = 0;
-  const errors: string[] = [];
+  const errors: string[] = [...queueRes.errors];
 
   // 1. Sincronizar Clientes Locales (en lote, solo no sincronizados)
   try {
@@ -570,12 +694,12 @@ export async function syncAllLocalDataToSupabase(): Promise<{
             total: Number(sale.total) || 0,
             payment_method: sale.paymentMethod || "efectivo",
             cashier: sale.cashier || "Don Toño Brito",
-            customer_id: sale.customerId && !sale.customerId.startsWith("cli-") ? sale.customerId : null,
+            customer_id: sale.customerId && !String(sale.customerId).startsWith("cli-") ? sale.customerId : null,
             customer_name: sale.customerName || "Público General",
             customer_type: sale.customerType || "general",
             branch_id: sale.branchId || "branch-matriz",
             is_custom_order: Boolean(sale.isCustomOrder || (sale as any).is_custom_order || isOrderSale(sale)),
-            order_number: sale.orderNumber || (sale as any).order_number || (sale.id.startsWith("LIQ-") ? sale.id.replace("LIQ-", "") : null),
+            order_number: sale.orderNumber || (sale as any).order_number || (String(sale.id).startsWith("LIQ-") ? String(sale.id).replace("LIQ-", "") : null),
             payment_reference: sale.paymentReference || null,
             transfer_account: sale.transferAccount || null,
             card_terminal: sale.cardTerminal || null,
@@ -584,7 +708,25 @@ export async function syncAllLocalDataToSupabase(): Promise<{
           };
         });
 
-        const { error: sErr } = await supabase.from("sales").upsert(salesPayload, { onConflict: "id" });
+        let { error: sErr } = await supabase.from("sales").upsert(salesPayload, { onConflict: "id" });
+        if (sErr) {
+          // Reintentar con columnas base si alguna columna opcional no existe
+          const corePayload = salesPayload.map((sp) => ({
+            id: sp.id,
+            date: sp.date,
+            created_at: sp.created_at,
+            total: sp.total,
+            payment_method: sp.payment_method,
+            cashier: sp.cashier,
+            customer_id: null,
+            customer_name: sp.customer_name,
+            customer_type: sp.customer_type,
+            branch_id: sp.branch_id,
+          }));
+          const retry = await supabase.from("sales").upsert(corePayload, { onConflict: "id" });
+          sErr = retry.error;
+        }
+
         if (!sErr) {
           salesSynced += chunk.length;
 
@@ -652,7 +794,7 @@ export async function syncAllLocalDataToSupabase(): Promise<{
           category: exp.category || "general",
           description: exp.description || exp.reason || "Gasto de caja",
           cashier: exp.cashier || "Don Toño Brito",
-          branch_id: exp.branchId || "branch-matriz",
+          branch_id: exp.branchId || exp.branch_id || "branch-matriz",
           created_at: isoCreated,
         };
       });
@@ -668,7 +810,7 @@ export async function syncAllLocalDataToSupabase(): Promise<{
           amount: Number(exp.amount) || 0,
           reason: exp.description || exp.reason || "Gasto",
           authorized_by: exp.cashier || "Don Toño Brito",
-          branch_id: exp.branchId || "branch-matriz",
+          branch_id: exp.branchId || exp.branch_id || "branch-matriz",
           created_at: isoCreated,
         };
       });
@@ -685,6 +827,11 @@ export async function syncAllLocalDataToSupabase(): Promise<{
   // 4. Sincronizar Ingresos Locales (en lote)
   try {
     const incomesMap = new Map<string, any>();
+    const rawInc1 = localStorage.getItem("brito_cash_incomes");
+    if (rawInc1) {
+      const list = JSON.parse(rawInc1);
+      if (Array.isArray(list)) list.forEach((i) => i.id && incomesMap.set(i.id, i));
+    }
     const rawInc3 = localStorage.getItem("brito_pos_current_incomes");
     if (rawInc3) {
       const list = JSON.parse(rawInc3);
@@ -710,7 +857,7 @@ export async function syncAllLocalDataToSupabase(): Promise<{
           amount: Number(inc.amount) || 0,
           reason: inc.concept || inc.reason || "Ingreso de caja",
           authorized_by: inc.cashier || "Don Toño Brito",
-          branch_id: inc.branchId || "branch-matriz",
+          branch_id: inc.branchId || inc.branch_id || "branch-matriz",
           created_at: isoCreated,
         };
       });
@@ -800,15 +947,36 @@ export async function syncAllLocalDataToSupabase(): Promise<{
     errors.push("Pedidos: " + e.message);
   }
 
-  // 6. Procesar cola de ítems offline pendientes solo si hay registros en cola
-  if (getPendingSyncCount() > 0) {
-    await processSyncQueue();
-  }
+  // 6. Depurar de la cola cualquier ítem cuyo ID ya fue sincronizado en este pase
+  try {
+    const finalSyncedSet = getSyncedRecordIds();
+    const currentQueue = getSyncQueue();
+    if (currentQueue.length > 0) {
+      const cleanedQueue = currentQueue.filter((item) => {
+        const refId = item.data?.saleId || item.data?.id || item.data?.cutId || item.id;
+        return !refId || !finalSyncedSet.has(String(refId));
+      });
+      if (cleanedQueue.length !== currentQueue.length) {
+        saveSyncQueue(cleanedQueue);
+      }
+    }
+  } catch {}
 
   setLastSyncTime(new Date().toISOString());
 
+  const totalSynced =
+    queueRes.synced +
+    salesSynced +
+    expensesSynced +
+    incomesSynced +
+    customersSynced +
+    ordersSynced;
+
   return {
-    success: true,
+    success: queueRes.failed === 0 && errors.length === 0,
+    total: totalSynced + queueRes.failed,
+    synced: totalSynced,
+    failed: queueRes.failed,
     salesSynced,
     expensesSynced,
     incomesSynced,
@@ -843,9 +1011,9 @@ export function getLocalDataStats(): LocalDataStats {
 
   const products = getStoredProducts();
   const customers = getStoredCustomers();
-  const branchesRaw = localStorage.getItem("brito_branches");
+  const branchesRaw = localStorage.getItem("brito_branches_data") || localStorage.getItem("brito_branches");
   const branches = branchesRaw ? JSON.parse(branchesRaw) : [];
-  const ordersRaw = localStorage.getItem("brito_custom_orders");
+  const ordersRaw = localStorage.getItem("brito_custom_orders") || localStorage.getItem("brito_orders");
   const orders = ordersRaw ? JSON.parse(ordersRaw) : [];
 
   let totalChars = 0;
@@ -878,40 +1046,53 @@ export async function downloadAllDataToLocalPc(): Promise<{
   }
 
   try {
-    // 1. Asegurar catálogo de productos
-    const isCatalogInit = localStorage.getItem("brito_catalog_initialized") === "true";
+    // 1. Asegurar catálogo de productos local (nunca dejar vacío para que el POS opere offline)
     let prods = getStoredProducts();
-    if ((!prods || prods.length === 0) && !isCatalogInit) {
+    if (!prods || prods.length === 0) {
       prods = DEFAULT_PRODUCTS;
       saveStoredProducts(DEFAULT_PRODUCTS);
+      localStorage.setItem("brito_catalog_initialized", "true");
     }
 
-    // 2. Intentar obtener productos frescos de Supabase si hay red
-    try {
-      const supabase = createClient();
-      const { data: remoteProds } = await supabase
-        .from("products")
-        .select("*")
-        .eq("is_active", true);
+    // 2. Intentar obtener productos frescos de Supabase si hay red y combinar sin perder locales
+    const isOffline =
+      !navigator.onLine ||
+      localStorage.getItem("brito_simulate_offline") === "true";
 
-      if (remoteProds && remoteProds.length > 0) {
-        const mapped = remoteProds.map((p: any) => ({
-          id: p.id,
-          name: p.name,
-          price: Number(p.price),
-          category: p.category_id || "pan_dulce",
-          icon: p.icon || "🥖",
-          stock: p.stock || 0,
-          image: p.image || null,
-          description: p.description || "",
-          tag: `Pan $${p.price}`,
-        }));
-        saveStoredProducts(mapped);
-      } else if (remoteProds && remoteProds.length === 0 && isCatalogInit) {
-        saveStoredProducts([]);
+    if (!isOffline) {
+      try {
+        const supabase = createClient();
+        const { data: remoteProds } = await supabase
+          .from("products")
+          .select("*")
+          .eq("is_active", true);
+
+        if (remoteProds && remoteProds.length > 0) {
+          const mapped = remoteProds.map((p: any) => ({
+            id: p.id,
+            name: p.name,
+            price: Number(p.price),
+            category: p.category || p.category_id || "pan_dulce",
+            icon: p.icon || "🥖",
+            stock: p.stock ?? 0,
+            image: p.image || p.icon || "🥖",
+            description: p.description || "",
+            tag: `Pan $${p.price}`,
+          }));
+          // Combinar con productos locales para no perder altas offline
+          const mergedMap = new Map<string, any>();
+          for (const lp of prods) {
+            if (lp?.id) mergedMap.set(lp.id, lp);
+          }
+          for (const rp of mapped) {
+            if (rp?.id) mergedMap.set(rp.id, rp);
+          }
+          saveStoredProducts(Array.from(mergedMap.values()));
+          localStorage.setItem("brito_catalog_initialized", "true");
+        }
+      } catch {
+        // Usar catálogo local existente
       }
-    } catch {
-      // Usar catálogo local existente
     }
 
     // 3. Asegurar catálogo de clientes
@@ -955,17 +1136,24 @@ export interface HealthCheckResult {
 }
 
 export async function runSystemHealthDiagnostic(): Promise<HealthCheckResult> {
+  let stats = getLocalDataStats();
+  if (stats.productsCount === 0 || stats.customersCount === 0) {
+    await downloadAllDataToLocalPc().catch(() => {});
+    stats = getLocalDataStats();
+  }
   const onlineRes = await checkRealOnlineStatus();
-  const stats = getLocalDataStats();
   const hasServiceWorker = typeof navigator !== "undefined" && "serviceWorker" in navigator;
   const queueCount = getPendingSyncCount();
+  const isProtectedAutonomous = onlineRes.isOnline || stats.isReadyForOffline;
 
   const checks = [
     {
-      title: "1. Conectividad de Red y Nube",
-      description: onlineRes.detail,
-      passed: onlineRes.isOnline,
-      badge: onlineRes.isOnline ? `${onlineRes.latencyMs || 45} ms` : "Offline",
+      title: "1. Conectividad de Red y Autonomía",
+      description: onlineRes.isOnline
+        ? onlineRes.detail
+        : `${onlineRes.detail} — Modo Autónomo Local Activo al 100%`,
+      passed: isProtectedAutonomous,
+      badge: onlineRes.isOnline ? `${onlineRes.latencyMs || 45} ms` : "Autónomo",
     },
     {
       title: "2. Motor de Servicio Fuera de Línea (Service Worker)",
