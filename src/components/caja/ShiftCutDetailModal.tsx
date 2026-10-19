@@ -173,7 +173,7 @@ export default function ShiftCutDetailModal({
     }
     .rounded-md, .rounded-xl, .rounded-2xl, .rounded-3xl { border-radius: 4px !important; }
     .border { border: 1px solid #cccccc !important; }
-    .text-emerald-800, .text-emerald-900, .text-emerald-950, .text-amber-950, .text-amber-900, .text-rose-800, .text-rose-950, .text-blue-950 {
+    .text-emerald-800, .text-emerald-900, .text-emerald-950, .text-amber-950, .text-amber-900, .text-rose-800, .text-rose-950, .text-blue-950, .text-stone-900, .text-stone-950 {
       color: #000000 !important;
     }
     .text-stone-500, .text-stone-600, .text-stone-400 {
@@ -236,9 +236,10 @@ ${(cut.totalIncomes || 0) > 0 ? `(+) Entradas Efectivo/Cambio: ${formatCurrency(
 (=) Efectivo Esperado: ${formatCurrency(cut.expectedCash)}
 (=) Efectivo Contado: ${formatCurrency(cut.countedCash)}
 Dictamen: ${cut.difference === 0 ? "Cuadrada Exacta ($0.00)" : cut.difference > 0 ? `Sobrante +${formatCurrency(cut.difference)}` : `Faltante ${formatCurrency(cut.difference)}`}
-----------------------------------------
 Fondo Dejado Siguiente Turno: ${formatCurrency(cut.nextFund ?? 0)}
 Efectivo Entregado a Don Toño: ${formatCurrency(deliveredCash)}
+💳 Ventas con Tarjeta: ${formatCurrency(cut.cardSales)}
+✈ Ventas con Transferencia: ${formatCurrency(cut.transferSales)}
 Gran Total Vendido: ${formatCurrency(totalSalesCalculated)}`;
 
     navigator.clipboard.writeText(summary);
@@ -450,18 +451,18 @@ Gran Total Vendido: ${formatCurrency(totalSalesCalculated)}`;
             </div>
 
             {/* Ventas por otros métodos */}
-            <div className="space-y-1 text-xs border-b-2 border-dashed border-stone-300 pb-3">
-              <div className="flex justify-between text-stone-600">
-                <span>Ventas con Tarjeta:</span>
-                <span className="font-bold">{formatCurrency(cut.cardSales)}</span>
+            <div className="space-y-2 pt-1.5 border-b-2 border-dashed border-stone-300 pb-3">
+              <div className="flex justify-between items-center text-xs sm:text-sm font-black text-stone-900">
+                <span className="font-black text-stone-900">Ventas con Tarjeta:</span>
+                <span className="font-black text-stone-950">{formatCurrency(cut.cardSales)}</span>
               </div>
-              <div className="flex justify-between text-stone-600">
-                <span>Ventas con Transferencia:</span>
-                <span className="font-bold">{formatCurrency(cut.transferSales)}</span>
+              <div className="flex justify-between items-center text-xs sm:text-sm font-black text-stone-900">
+                <span className="font-black text-stone-900">Ventas con Transferencia:</span>
+                <span className="font-black text-stone-950">{formatCurrency(cut.transferSales)}</span>
               </div>
-              <div className="flex justify-between font-black text-stone-950 pt-1 border-t border-dotted border-stone-300">
-                <span>Total General Vendido:</span>
-                <span className="text-amber-900 text-sm font-black">{formatCurrency(totalSalesCalculated)}</span>
+              <div className="flex justify-between items-center font-black text-stone-950 text-xs sm:text-sm pt-1.5 border-t border-dotted border-stone-300">
+                <span className="font-black">Total General Vendido:</span>
+                <span className="text-amber-950 text-sm sm:text-base font-black">{formatCurrency(totalSalesCalculated)}</span>
               </div>
             </div>
 

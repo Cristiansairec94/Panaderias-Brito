@@ -1056,18 +1056,18 @@ export default function CashDrawerShiftModal({
           </div>
 
           {/* Estadísticas de Métodos de Pago */}
-          <div className="space-y-1.5 text-[10px] text-stone-600 pt-1 border-b-2 border-dashed border-stone-300 pb-3">
-            <div className="flex justify-between">
-              <span>Ventas con Tarjeta:</span>
-              <span className="font-bold">{formatCurrency(cut.cardSales)}</span>
+          <div className="space-y-2 pt-1.5 border-b-2 border-dashed border-stone-300 pb-3">
+            <div className="flex justify-between items-center text-xs sm:text-sm font-black text-stone-900">
+              <span className="font-black text-stone-900">Ventas con Tarjeta:</span>
+              <span className="font-black text-stone-950">{formatCurrency(cut.cardSales)}</span>
             </div>
-            <div className="flex justify-between">
-              <span>Ventas con Transferencia:</span>
-              <span className="font-bold">{formatCurrency(cut.transferSales)}</span>
+            <div className="flex justify-between items-center text-xs sm:text-sm font-black text-stone-900">
+              <span className="font-black text-stone-900">Ventas con Transferencia:</span>
+              <span className="font-black text-stone-950">{formatCurrency(cut.transferSales)}</span>
             </div>
-            <div className="flex justify-between font-black text-stone-900 text-xs pt-1 border-t border-dotted border-stone-300">
-              <span>Gran Total Vendido:</span>
-              <span className="text-amber-900 text-sm font-black">{formatCurrency(totalSalesCalculated)}</span>
+            <div className="flex justify-between items-center font-black text-stone-900 text-xs sm:text-sm pt-1.5 border-t border-dotted border-stone-300">
+              <span className="font-black">Gran Total Vendido:</span>
+              <span className="text-amber-950 text-sm sm:text-base font-black">{formatCurrency(totalSalesCalculated)}</span>
             </div>
           </div>
 
