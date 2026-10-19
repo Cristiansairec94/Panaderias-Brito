@@ -545,29 +545,27 @@ export default function RoleManagement() {
   useEffect(() => {
     let isMounted = true;
 
+    const getDeletedRoleIds = (): string[] => {
+      try {
+        const raw = localStorage.getItem("brito_deleted_role_ids");
+        return raw ? JSON.parse(raw) : [];
+      } catch {
+        return [];
+      }
+    };
+
     // 1. Cargar desde localStorage para despliegue instantáneo
     try {
+      const deletedIds = getDeletedRoleIds();
       const saved = localStorage.getItem("brito_custom_system_roles");
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          const merged = DEFAULT_SYSTEM_ROLES.map((def) => {
-            const override = parsed.find((p: RoleConfig) => p.id === def.id);
-            if (override) {
-              return {
-                ...def,
-                icon: def.id === "admin" ? def.icon : override.icon || def.icon,
-                defaultTitle: def.id === "admin" ? def.defaultTitle : override.defaultTitle || def.defaultTitle,
-              };
-            }
-            return def;
-          });
-          parsed.forEach((customRole: RoleConfig) => {
-            if (!merged.some((r) => r.id === customRole.id)) {
-              merged.push(customRole);
-            }
-          });
-          setRolesList(merged);
+          const activeRoles = parsed.filter((r: RoleConfig) => !deletedIds.includes(r.id));
+          if (!activeRoles.some((r: RoleConfig) => r.id === "admin")) {
+            activeRoles.unshift(DEFAULT_SYSTEM_ROLES[0]);
+          }
+          setRolesList(activeRoles);
         }
       }
     } catch (e) {
@@ -580,28 +578,25 @@ export default function RoleManagement() {
         const res = await fetch("/api/roles");
         if (res.ok) {
           const data = await res.json();
-          if (data && Array.isArray(data.roles) && data.roles.length > 0 && isMounted) {
-            const serverRoles: RoleConfig[] = data.roles;
-            const merged = DEFAULT_SYSTEM_ROLES.map((def) => {
-              const override = serverRoles.find((p: RoleConfig) => p.id === def.id);
-              if (override) {
-                return {
-                  ...def,
-                  icon: def.id === "admin" ? def.icon : override.icon || def.icon,
-                  defaultTitle: def.id === "admin" ? def.defaultTitle : override.defaultTitle || def.defaultTitle,
-                };
-              }
-              return def;
-            });
-            serverRoles.forEach((customRole: RoleConfig) => {
-              if (!merged.some((r) => r.id === customRole.id)) {
-                merged.push(customRole);
-              }
-            });
-            setRolesList(merged);
+          if (data && isMounted) {
+            const serverDeleted: string[] = Array.isArray(data.deletedRoleIds) ? data.deletedRoleIds : [];
+            const localDeleted = getDeletedRoleIds();
+            const allDeleted = Array.from(new Set([...localDeleted, ...serverDeleted]));
             try {
-              localStorage.setItem("brito_custom_system_roles", JSON.stringify(merged));
+              localStorage.setItem("brito_deleted_role_ids", JSON.stringify(allDeleted));
             } catch (e) {}
+
+            if (Array.isArray(data.roles) && data.roles.length > 0) {
+              const serverRoles: RoleConfig[] = data.roles;
+              const activeRoles = serverRoles.filter((r) => !allDeleted.includes(r.id));
+              if (!activeRoles.some((r) => r.id === "admin")) {
+                activeRoles.unshift(DEFAULT_SYSTEM_ROLES[0]);
+              }
+              setRolesList(activeRoles);
+              try {
+                localStorage.setItem("brito_custom_system_roles", JSON.stringify(activeRoles));
+              } catch (e) {}
+            }
           }
         }
       } catch (err) {
@@ -616,7 +611,7 @@ export default function RoleManagement() {
   }, []);
 
   // Save custom roles and icon customizations to localStorage and server
-  const persistRolesList = (newList: RoleConfig[]) => {
+  const persistRolesList = (newList: RoleConfig[], deletedIds?: string[]) => {
     setRolesList(newList);
     try {
       localStorage.setItem("brito_custom_system_roles", JSON.stringify(newList));
@@ -624,11 +619,20 @@ export default function RoleManagement() {
       console.error("Error persisting custom roles:", e);
     }
 
-    // Persistir lista de roles en el servidor
+    const currentDeleted = deletedIds || (() => {
+      try {
+        const raw = localStorage.getItem("brito_deleted_role_ids");
+        return raw ? JSON.parse(raw) : [];
+      } catch {
+        return [];
+      }
+    })();
+
+    // Persistir lista de roles en el servidor incluyendo roles eliminados
     fetch("/api/roles", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ roles: newList }),
+      body: JSON.stringify({ roles: newList, deletedRoleIds: currentDeleted }),
     }).catch((err) => console.warn("[RoleManagement] Error guardando roles en servidor:", err));
   };
 
@@ -878,30 +882,57 @@ export default function RoleManagement() {
     const deletingId = roleToDelete.id;
     const deletingName = roleToDelete.name;
 
-    // Reassign affected employees to "cajero"
+    // 1. Reasignar colaboradores afectados (a cajero, o admin si se elimina cajero)
+    const fallbackRoleId: UserRole = deletingId === "cajero" ? "admin" : "cajero";
+    const fallbackRoleLabel = fallbackRoleId === "admin" ? "Administrador" : "Cajeros o Auxiliares de Tienda";
     assignedUsersForRoleToDelete.forEach((u) => {
       updateUser(u.id, {
-        role: "cajero",
-        roleLabel: "Cajeros o Auxiliares de Tienda",
+        role: fallbackRoleId,
+        roleLabel: fallbackRoleLabel,
       });
     });
 
-    // Remove from rolesList and localStorage
-    const updatedRoles = rolesList.filter((r) => r.id !== deletingId);
-    persistRolesList(updatedRoles);
+    // 2. Registrar id eliminado en lista persistente de eliminados
+    const currentDeleted = (() => {
+      try {
+        const raw = localStorage.getItem("brito_deleted_role_ids");
+        return raw ? JSON.parse(raw) : [];
+      } catch {
+        return [];
+      }
+    })();
+    const nextDeleted = Array.from(new Set([...currentDeleted, deletingId]));
+    try {
+      localStorage.setItem("brito_deleted_role_ids", JSON.stringify(nextDeleted));
+    } catch (e) {}
 
-    // Clean up permissions in AuthContext
+    // 3. Eliminar de rolesList y persistir localmente y en servidor
+    const updatedRoles = rolesList.filter((r) => r.id !== deletingId);
+    persistRolesList(updatedRoles, nextDeleted);
+
+    // 4. Limpiar permisos en AuthContext
     removeRolePermissions(deletingId);
 
-    // Reset selection to admin
+    // 5. Notificar explícitamente al endpoint del servidor
+    fetch("/api/roles", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        deleteRole: deletingId,
+        roles: updatedRoles,
+        deletedRoleIds: nextDeleted,
+      }),
+    }).catch(() => {});
+
+    // 6. Resetear selección a admin
     setSelectedRole("admin");
     setRoleToDelete(null);
     setDeleteConfirmText("");
 
     const reassignMsg = assignedUsersForRoleToDelete.length > 0 
-      ? ` y ${assignedUsersForRoleToDelete.length} colaborador(es) fueron reasignados a Cajero.`
+      ? ` y ${assignedUsersForRoleToDelete.length} colaborador(es) fueron reasignados a ${fallbackRoleLabel}.`
       : ".";
-    showToast(`Rol "${deletingName}" eliminado correctamente${reassignMsg}`);
+    showToast(`Rol "${deletingName}" eliminado permanentemente${reassignMsg}`);
   };
 
   // Total available permissions across all 10 system modules

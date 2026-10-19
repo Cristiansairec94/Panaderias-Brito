@@ -9,6 +9,7 @@ const ROLES_FILE = path.join(DATA_DIR, "roles.json");
 interface StoredRolesData {
   roles: any[];
   permissions: Record<string, RolePermissions>;
+  deletedRoleIds?: string[];
 }
 
 const DEFAULT_ROLES_DATA: StoredRolesData = {
@@ -186,13 +187,23 @@ function readStoredRoles(): StoredRolesData {
       const content = fs.readFileSync(ROLES_FILE, "utf-8");
       const parsed = JSON.parse(content);
       if (parsed && (parsed.permissions || parsed.roles)) {
+        const deletedRoleIds: string[] = Array.isArray(parsed.deletedRoleIds) ? parsed.deletedRoleIds : [];
+        const rawRoles = Array.isArray(parsed.roles) ? parsed.roles : DEFAULT_ROLES_DATA.roles;
+        const filteredRoles = rawRoles.filter((r: any) => !deletedRoleIds.includes(r.id));
+
         inMemoryRolesCache = {
-          roles: Array.isArray(parsed.roles) ? parsed.roles : DEFAULT_ROLES_DATA.roles,
+          roles: filteredRoles,
           permissions: {
             ...DEFAULT_ROLES_DATA.permissions,
             ...(parsed.permissions || {}),
           },
+          deletedRoleIds,
         };
+
+        deletedRoleIds.forEach((delId) => {
+          delete inMemoryRolesCache!.permissions[delId];
+        });
+
         return inMemoryRolesCache;
       }
     }
@@ -200,7 +211,7 @@ function readStoredRoles(): StoredRolesData {
     console.warn("[API Roles] Error leyendo roles.json:", err);
   }
 
-  return DEFAULT_ROLES_DATA;
+  return { ...DEFAULT_ROLES_DATA, deletedRoleIds: [] };
 }
 
 function writeStoredRoles(data: StoredRolesData): boolean {
@@ -223,6 +234,7 @@ export async function GET() {
       success: true,
       roles: data.roles,
       permissions: data.permissions,
+      deletedRoleIds: data.deletedRoleIds || [],
       timestamp: Date.now(),
     });
   } catch (err: any) {
@@ -238,6 +250,41 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const current = readStoredRoles();
+
+    // Caso 1: Eliminación explícita de un rol
+    if (body.deleteRole) {
+      const deletingId = body.deleteRole as string;
+      const deletedRoleIds = Array.from(
+        new Set([
+          ...(current.deletedRoleIds || []),
+          ...(Array.isArray(body.deletedRoleIds) ? body.deletedRoleIds : []),
+          deletingId,
+        ])
+      );
+
+      const updatedRoles = (Array.isArray(body.roles) ? body.roles : current.roles).filter(
+        (r: any) => r.id !== deletingId && !deletedRoleIds.includes(r.id)
+      );
+
+      const updatedPermissions = { ...current.permissions };
+      delete updatedPermissions[deletingId];
+      deletedRoleIds.forEach((id) => delete updatedPermissions[id]);
+
+      const nextData: StoredRolesData = {
+        roles: updatedRoles,
+        permissions: updatedPermissions,
+        deletedRoleIds,
+      };
+
+      writeStoredRoles(nextData);
+
+      return NextResponse.json({
+        success: true,
+        roles: nextData.roles,
+        permissions: nextData.permissions,
+        deletedRoleIds: nextData.deletedRoleIds,
+      });
+    }
 
     // Caso A: Actualizar un rol específico
     if (body.role && body.permissions) {
@@ -265,6 +312,7 @@ export async function POST(req: NextRequest) {
       const nextData: StoredRolesData = {
         roles: updatedRoles,
         permissions: updatedPermissions,
+        deletedRoleIds: current.deletedRoleIds || [],
       };
 
       writeStoredRoles(nextData);
@@ -273,20 +321,29 @@ export async function POST(req: NextRequest) {
         success: true,
         roles: nextData.roles,
         permissions: nextData.permissions,
+        deletedRoleIds: nextData.deletedRoleIds,
       });
     }
 
     // Caso B: Actualizar toda la lista de roles
     if (Array.isArray(body.roles)) {
+      const incomingDeleted = Array.isArray(body.deletedRoleIds) ? body.deletedRoleIds : [];
+      const deletedRoleIds = Array.from(new Set([...(current.deletedRoleIds || []), ...incomingDeleted]));
+      const filteredRoles = body.roles.filter((r: any) => !deletedRoleIds.includes(r.id));
+      const nextPermissions = { ...(body.permissions || current.permissions) };
+      deletedRoleIds.forEach((id) => delete nextPermissions[id]);
+
       const nextData: StoredRolesData = {
-        roles: body.roles,
-        permissions: body.permissions || current.permissions,
+        roles: filteredRoles,
+        permissions: nextPermissions,
+        deletedRoleIds,
       };
       writeStoredRoles(nextData);
       return NextResponse.json({
         success: true,
         roles: nextData.roles,
         permissions: nextData.permissions,
+        deletedRoleIds: nextData.deletedRoleIds,
       });
     }
 

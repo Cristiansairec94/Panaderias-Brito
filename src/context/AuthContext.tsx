@@ -1096,6 +1096,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 merged[key].canAccessDashboard = true;
               }
             });
+            if (Array.isArray(rolesData.deletedRoleIds)) {
+              rolesData.deletedRoleIds.forEach((delId: string) => {
+                delete merged[delId];
+              });
+            }
             setRolePermissionsMap(merged);
             try {
               localStorage.setItem("brito_role_permissions", JSON.stringify(merged));
@@ -2108,8 +2113,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        role,
-        permissions: {},
+        deleteRole: role,
       }),
     }).catch(() => {});
   }, []);
