@@ -12,226 +12,12 @@ export const DEFAULT_GENERAL_CUSTOMER: Customer = {
   type: "general",
   creditLimit: 0,
   currentDebt: 0,
-  totalPurchases: 45800,
+  totalPurchases: 0,
   notes: "Venta de mostrador al contado para público en general.",
   registeredAt: "2026-01-01",
 };
 
-export const INITIAL_CUSTOMERS: Customer[] = [
-  {
-    id: "cli-1",
-    name: "Abarrotes 'La Guadalupana' (Don Pepe)",
-    phone: "55 4433 2211",
-    email: "laguadalupana@gmail.com",
-    address: "Av. Hidalgo #124, Col. Centro",
-    type: "mayoreo",
-    creditLimit: 3000,
-    currentDebt: 850,
-    totalPurchases: 18500,
-    favoriteProduct: "Bolillo Caliente y Telera",
-    purchaseCounts: {
-      "Bolillo Caliente": 450,
-      "Telera Tradicional": 240,
-      "Pan Dulce Surtido": 45,
-    },
-    purchaseHistory: [
-      {
-        id: "comp-101",
-        date: "04/09/2026, 07:15",
-        total: 730,
-        branchName: "Sucursal Matriz (Centro)",
-        cashier: "Don Toño Brito",
-        paymentMethod: "efectivo",
-        items: [
-          { name: "Bolillo Caliente", quantity: 150, unitPrice: 3, subtotal: 450 },
-          { name: "Telera Tradicional", quantity: 80, unitPrice: 3.5, subtotal: 280 },
-        ],
-      },
-      {
-        id: "comp-102",
-        date: "03/09/2026, 07:20",
-        total: 730,
-        branchName: "Sucursal Matriz (Centro)",
-        cashier: "Don Toño Brito",
-        paymentMethod: "efectivo",
-        items: [
-          { name: "Bolillo Caliente", quantity: 150, unitPrice: 3, subtotal: 450 },
-          { name: "Telera Tradicional", quantity: 80, unitPrice: 3.5, subtotal: 280 },
-        ],
-      },
-      {
-        id: "comp-103",
-        date: "02/09/2026, 07:10",
-        total: 775,
-        branchName: "Sucursal Matriz (Centro)",
-        cashier: "Lupita Brito",
-        paymentMethod: "transferencia",
-        items: [
-          { name: "Bolillo Caliente", quantity: 150, unitPrice: 3, subtotal: 450 },
-          { name: "Telera Tradicional", quantity: 80, unitPrice: 3.5, subtotal: 280 },
-          { name: "Pan Dulce Surtido", quantity: 5, unitPrice: 9, subtotal: 45 },
-        ],
-      },
-    ],
-    notes: "Compra 150 bolillos y 80 teleras diario. Pago semanal los viernes.",
-    registeredAt: "2026-03-15",
-  },
-  {
-    id: "cli-2",
-    name: "Taquería 'El Pastorcito Dorado'",
-    phone: "55 9988 1122",
-    address: "Calle Juárez #45",
-    type: "mayoreo",
-    creditLimit: 2000,
-    currentDebt: 0,
-    totalPurchases: 12400,
-    favoriteProduct: "Telera Tradicional (Tortas)",
-    purchaseCounts: {
-      "Telera Tradicional": 360,
-      "Bolillo Caliente": 60,
-    },
-    purchaseHistory: [
-      {
-        id: "comp-201",
-        date: "04/09/2026, 11:30",
-        total: 420,
-        branchName: "Sucursal San Juan",
-        cashier: "Cajero San Juan",
-        paymentMethod: "efectivo",
-        items: [
-          { name: "Telera Tradicional", quantity: 120, unitPrice: 3.5, subtotal: 420 },
-        ],
-      },
-      {
-        id: "comp-202",
-        date: "02/09/2026, 11:00",
-        total: 420,
-        branchName: "Sucursal San Juan",
-        cashier: "Cajero San Juan",
-        paymentMethod: "efectivo",
-        items: [
-          { name: "Telera Tradicional", quantity: 120, unitPrice: 3.5, subtotal: 420 },
-        ],
-      },
-      {
-        id: "comp-203",
-        date: "31/08/2026, 10:45",
-        total: 510,
-        branchName: "Sucursal San Juan",
-        cashier: "Cajero San Juan",
-        paymentMethod: "efectivo",
-        items: [
-          { name: "Telera Tradicional", quantity: 120, unitPrice: 3.5, subtotal: 420 },
-          { name: "Bolillo Caliente", quantity: 30, unitPrice: 3, subtotal: 90 },
-        ],
-      },
-    ],
-    notes: "Compra 120 teleras para tortas cada 2 días.",
-    registeredAt: "2026-04-10",
-  },
-  {
-    id: "cli-3",
-    name: "Sra. María González",
-    phone: "55 1234 5678",
-    email: "maria.gonzalez@hotmail.com",
-    address: "Privada de los Pinos #12",
-    type: "evento",
-    creditLimit: 0,
-    currentDebt: 450,
-    totalPurchases: 3200,
-    favoriteProduct: "Pastel Tres Leches y Repostería",
-    purchaseCounts: {
-      "Pastel Tres Leches Especial": 2,
-      "Pay de Queso con Zarzamora": 6,
-      "Concha de Vainilla": 15,
-    },
-    purchaseHistory: [
-      {
-        id: "comp-301",
-        date: "20/08/2026, 17:40",
-        total: 1450,
-        branchName: "Sucursal Las Flores (Plaza)",
-        cashier: "Elena Brito",
-        paymentMethod: "tarjeta",
-        items: [
-          { name: "Pastel Tres Leches Especial", quantity: 1, unitPrice: 1200, subtotal: 1200 },
-          { name: "Pay de Queso con Zarzamora", quantity: 2, unitPrice: 125, subtotal: 250 },
-        ],
-      },
-      {
-        id: "comp-302",
-        date: "15/08/2026, 18:15",
-        total: 150,
-        branchName: "Sucursal Matriz (Centro)",
-        cashier: "Lupita Brito",
-        paymentMethod: "efectivo",
-        items: [
-          { name: "Concha de Vainilla", quantity: 15, unitPrice: 10, subtotal: 150 },
-        ],
-      },
-    ],
-    notes: "Pastel XV años pedido PED-101 (Flores lilas). Anticipo pagado.",
-    registeredAt: "2026-08-20",
-  },
-  {
-    id: "cli-4",
-    name: "Familia Ramírez (Vecinos)",
-    phone: "55 7766 5544",
-    type: "frecuente",
-    creditLimit: 500,
-    currentDebt: 0,
-    totalPurchases: 4800,
-    favoriteProduct: "Pan Dulce (Conchas y Donas)",
-    purchaseCounts: {
-      "Concha de Chocolate": 38,
-      "Concha de Vainilla": 32,
-      "Dona de Azúcar": 22,
-      "Bolillo Caliente": 18,
-    },
-    purchaseHistory: [
-      {
-        id: "comp-401",
-        date: "03/09/2026, 20:30",
-        total: 68,
-        branchName: "Sucursal Matriz (Centro)",
-        cashier: "Don Toño Brito",
-        paymentMethod: "efectivo",
-        items: [
-          { name: "Concha de Chocolate", quantity: 4, unitPrice: 10, subtotal: 40 },
-          { name: "Dona de Azúcar", quantity: 2, unitPrice: 10, subtotal: 20 },
-          { name: "Bolillo Caliente", quantity: 4, unitPrice: 2, subtotal: 8 },
-        ],
-      },
-      {
-        id: "comp-402",
-        date: "02/09/2026, 20:45",
-        total: 60,
-        branchName: "Sucursal Matriz (Centro)",
-        cashier: "Lupita Brito",
-        paymentMethod: "efectivo",
-        items: [
-          { name: "Concha de Vainilla", quantity: 3, unitPrice: 10, subtotal: 30 },
-          { name: "Concha de Chocolate", quantity: 3, unitPrice: 10, subtotal: 30 },
-        ],
-      },
-      {
-        id: "comp-403",
-        date: "01/09/2026, 20:15",
-        total: 76,
-        branchName: "Sucursal Matriz (Centro)",
-        cashier: "Don Toño Brito",
-        paymentMethod: "efectivo",
-        items: [
-          { name: "Concha de Chocolate", quantity: 5, unitPrice: 10, subtotal: 50 },
-          { name: "Dona de Azúcar", quantity: 2, unitPrice: 10, subtotal: 20 },
-          { name: "Bolillo Caliente", quantity: 3, unitPrice: 2, subtotal: 6 },
-        ],
-      },
-    ],
-    notes: "Cliente fiel, compra pan dulce todas las noches.",
-    registeredAt: "2026-02-01",
-  },
-];
+export const INITIAL_CUSTOMERS: Customer[] = [];
 
 /**
  * Normaliza nombres de clientes para comparaciones infalibles:
@@ -309,15 +95,25 @@ export function purgeDuplicateCustomers(): { totalBefore: number; totalAfter: nu
 }
 
 const DELETED_CUSTOMERS_KEY = "brito_deleted_customer_ids";
+const RETIRED_DEMO_CUSTOMER_IDS = ["cli-1", "cli-2", "cli-3", "cli-4"];
+const RETIRED_DEMO_CUSTOMER_NAMES = new Set([
+  "abarrotes 'la guadalupana' (don pepe)",
+  "taqueria 'el pastorcito dorado'",
+  "sra. maria gonzalez",
+  "familia ramirez (vecinos)",
+]);
 
 export function getDeletedCustomerIds(): Set<string> {
-  if (typeof window === "undefined") return new Set();
+  const set = new Set<string>(RETIRED_DEMO_CUSTOMER_IDS);
+  if (typeof window === "undefined") return set;
   try {
     const raw = localStorage.getItem(DELETED_CUSTOMERS_KEY);
-    return raw ? new Set(JSON.parse(raw)) : new Set();
-  } catch {
-    return new Set();
-  }
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) parsed.forEach((id: string) => set.add(id));
+    }
+  } catch {}
+  return set;
 }
 
 export function markCustomerIdAsDeleted(id: string): void {
@@ -330,30 +126,23 @@ export function markCustomerIdAsDeleted(id: string): void {
 }
 
 export function getStoredCustomers(): Customer[] {
-  if (typeof window === "undefined") return INITIAL_CUSTOMERS;
+  if (typeof window === "undefined") return [];
   try {
-    const isCustomersInit = localStorage.getItem("brito_customers_initialized") === "true";
     const raw = localStorage.getItem(STORAGE_CUSTOMERS_KEY);
-    if (!raw) {
-      if (isCustomersInit) return [];
-      localStorage.setItem(STORAGE_CUSTOMERS_KEY, JSON.stringify(INITIAL_CUSTOMERS));
-      return INITIAL_CUSTOMERS;
-    }
+    if (!raw) return [];
     const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) {
-      if (isCustomersInit) return [];
-      localStorage.setItem(STORAGE_CUSTOMERS_KEY, JSON.stringify(INITIAL_CUSTOMERS));
-      return INITIAL_CUSTOMERS;
-    }
-    if (parsed.length === 0) {
-      if (isCustomersInit) return [];
-      localStorage.setItem(STORAGE_CUSTOMERS_KEY, JSON.stringify(INITIAL_CUSTOMERS));
-      return INITIAL_CUSTOMERS;
-    }
+    if (!Array.isArray(parsed) || parsed.length === 0) return [];
 
     const deletedIds = getDeletedCustomerIds();
-    // Depurar y eliminar cualquier cliente virtual de mostrador (cli-0 / general) y clientes eliminados
-    const cleaned = parsed.filter((c: Customer) => c && c.id !== "cli-0" && c.type !== "general" && !deletedIds.has(c.id));
+    // Depurar y eliminar cualquier cliente virtual de mostrador (cli-0 / general), clientes demo retirados y clientes eliminados
+    const cleaned = parsed.filter(
+      (c: Customer) =>
+        c &&
+        c.id !== "cli-0" &&
+        c.type !== "general" &&
+        !deletedIds.has(c.id) &&
+        !RETIRED_DEMO_CUSTOMER_NAMES.has(normalizeCustomerName(c.name))
+    );
 
     // Desduplicar clientes existentes por nombre normalizado (sin acentos, minúsculas, espacios colapsados)
     const seenNames = new Map<string, Customer>();
@@ -392,32 +181,12 @@ export function getStoredCustomers(): Customer[] {
       }
     }
 
-    // Retrocompatibilidad: Asignar producto habitual (moda) e historial a los clientes por defecto si les falta
-    let updatedNeeded = false;
-    deduplicated.forEach((c: Customer) => {
-      const defaultMatch = INITIAL_CUSTOMERS.find((init) => init.id === c.id || normalizeCustomerName(init.name) === normalizeCustomerName(c.name));
-      if (defaultMatch) {
-        if (!c.favoriteProduct) {
-          c.favoriteProduct = defaultMatch.favoriteProduct;
-          updatedNeeded = true;
-        }
-        if (!c.purchaseCounts || Object.keys(c.purchaseCounts).length === 0) {
-          c.purchaseCounts = defaultMatch.purchaseCounts;
-          updatedNeeded = true;
-        }
-        if (!c.purchaseHistory || c.purchaseHistory.length === 0) {
-          c.purchaseHistory = defaultMatch.purchaseHistory;
-          updatedNeeded = true;
-        }
-      }
-    });
-
-    if (deduplicated.length !== parsed.length || updatedNeeded) {
+    if (deduplicated.length !== parsed.length) {
       localStorage.setItem(STORAGE_CUSTOMERS_KEY, JSON.stringify(deduplicated));
     }
     return deduplicated;
   } catch {
-    return INITIAL_CUSTOMERS;
+    return [];
   }
 }
 

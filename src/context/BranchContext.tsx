@@ -68,6 +68,61 @@ export function removeDeletedBranchId(id: string): void {
   } catch {}
 }
 
+const RETIRED_CASHIER_NAMES = new Set([
+  "lupita brito",
+  "lupita",
+  "carlos bueno",
+  "carlos.bueno",
+  "carlos mendoza",
+  "luisa",
+  "jorge",
+  "noe velasquez",
+  "noe",
+  "maría",
+  "maria",
+  "sofía morales",
+  "sofia morales",
+  "sofia",
+  "elena brito",
+  "elena",
+  "sebastián brito",
+  "sebastian brito",
+  "sebastian",
+  "silvia puga",
+  "silvia",
+  "enrique",
+  "andres sanchez",
+  "andres",
+  "cajero los ángeles",
+  "cajero los angeles",
+  "angeles",
+]);
+
+function isRetiredDemoCashier(nameOrId?: string | null): boolean {
+  if (!nameOrId) return false;
+  const clean = nameOrId.trim().toLowerCase();
+  if (RETIRED_CASHIER_NAMES.has(clean)) return true;
+  if (
+    clean === "usr-lupita" ||
+    clean === "usr-carlos-b" ||
+    clean === "usr-5" ||
+    clean === "usr-luisa" ||
+    clean === "usr-jorge" ||
+    clean === "usr-noe" ||
+    clean === "usr-maria" ||
+    clean === "usr-sofia" ||
+    clean === "usr-elena" ||
+    clean === "usr-sebastian" ||
+    clean === "usr-silvia" ||
+    clean === "usr-enrique" ||
+    clean === "usr-andres" ||
+    clean === "usr-angeles"
+  ) {
+    return true;
+  }
+  return false;
+}
+
 const DEFAULT_BRANCHES: Branch[] = [
   {
     id: "branch-matriz",
@@ -77,27 +132,24 @@ const DEFAULT_BRANCHES: Branch[] = [
     address: "Av. Principal #450, Centro Histórico",
     phone: "55 1234 5678",
     manager: "Don Toño Brito",
-    assignedUserId: "usr-lupita",
-    assignedUserName: "Lupita Brito",
-    assignedUserEmail: "lupita@panaderiabrito.com",
     status: "abierta",
     dailyGoal: 10000,
     todaySales: 0,
     todayTickets: 0,
-    cashInDrawer: 1000,
+    cashInDrawer: 0,
     color: "orange",
     topProduct: {
-      name: "Bolillo Tradicional",
+      name: "Sin ventas",
       piecesSold: 0,
-      category: "Pan Salado",
+      category: "Panadería",
       icon: "🥖",
     },
     currentShift: {
       id: "shift-mat-101",
       name: "Turno Matutino (06:00 - 14:00)",
-      cashier: "Lupita Brito",
+      cashier: "Don Toño Brito",
       openedAt: "06:00 AM",
-      initialFund: 1000,
+      initialFund: 0,
       cashSales: 0,
       cardSales: 0,
       transferSales: 0,
@@ -113,28 +165,25 @@ const DEFAULT_BRANCHES: Branch[] = [
     code: "BEN-02",
     address: "Calle Hidalgo #120, Col. San Benito",
     phone: "55 8765 4321",
-    manager: "Luisa",
-    assignedUserId: "usr-luisa",
-    assignedUserName: "Luisa",
-    assignedUserEmail: "luisa@panaderiabrito.com",
+    manager: "Don Toño Brito",
     status: "abierta",
     dailyGoal: 8000,
     todaySales: 0,
     todayTickets: 0,
-    cashInDrawer: 1000,
+    cashInDrawer: 0,
     color: "rose",
     topProduct: {
-      name: "Bolillo de Sal",
+      name: "Sin ventas",
       piecesSold: 0,
-      category: "Pan Salado",
+      category: "Panadería",
       icon: "🥖",
     },
     currentShift: {
       id: "shift-ben-201",
       name: "Turno Matutino (06:00 - 14:00)",
-      cashier: "Luisa",
+      cashier: "Don Toño Brito",
       openedAt: "06:00 AM",
-      initialFund: 1000,
+      initialFund: 0,
       cashSales: 0,
       cardSales: 0,
       transferSales: 0,
@@ -150,29 +199,26 @@ const DEFAULT_BRANCHES: Branch[] = [
     code: "SJU-02",
     address: "Calle Morelos #45, Col. San Juan",
     phone: "55 8765 4321",
-    manager: "noe velasquez",
-    assignedUserId: "usr-noe",
-    assignedUserName: "noe velasquez",
-    assignedUserEmail: "sanjuan@panaderiabrito.com",
+    manager: "Don Toño Brito",
     status: "abierta",
     dailyGoal: 8500,
     todaySales: 0,
     todayDeskSales: 0,
     todayTickets: 0,
-    cashInDrawer: 1000,
+    cashInDrawer: 0,
     color: "rose",
     topProduct: {
-      name: "Bolillo Tradicional",
+      name: "Sin ventas",
       piecesSold: 0,
-      category: "Pan Salado",
+      category: "Panadería",
       icon: "🥖",
     },
     currentShift: {
       id: "shift-sju-201",
       name: "Turno Matutino (06:00 - 14:00)",
-      cashier: "noe velasquez",
+      cashier: "Don Toño Brito",
       openedAt: "06:00 AM",
-      initialFund: 1000,
+      initialFund: 0,
       cashSales: 0,
       cardSales: 0,
       transferSales: 0,
@@ -188,28 +234,25 @@ const DEFAULT_BRANCHES: Branch[] = [
     code: "FLO-03",
     address: "Calzada Oriente #88, Plaza Las Flores",
     phone: "55 9988 7766",
-    manager: "Sofía Morales",
-    assignedUserId: "usr-sofia",
-    assignedUserName: "Sofía Morales",
-    assignedUserEmail: "sofia@panaderiabrito.com",
+    manager: "Don Toño Brito",
     status: "abierta",
     dailyGoal: 9500,
     todaySales: 0,
     todayTickets: 0,
-    cashInDrawer: 1000,
+    cashInDrawer: 0,
     color: "amber",
     topProduct: {
-      name: "Cuerno de Mantequilla",
+      name: "Sin ventas",
       piecesSold: 0,
-      category: "Hojaldre",
+      category: "Panadería",
       icon: "🥐",
     },
     currentShift: {
       id: "shift-flo-301",
       name: "Turno Matutino (06:00 - 14:00)",
-      cashier: "Sofía Morales",
+      cashier: "Don Toño Brito",
       openedAt: "06:00 AM",
-      initialFund: 1000,
+      initialFund: 0,
       cashSales: 0,
       cardSales: 0,
       transferSales: 0,
@@ -225,28 +268,25 @@ const DEFAULT_BRANCHES: Branch[] = [
     code: "ILF-04",
     address: "Av. San Benito #123, Col. Centro Histórico",
     phone: "55 8361 7480",
-    manager: "Sebastián Brito",
-    assignedUserId: "usr-sebastian",
-    assignedUserName: "Sebastián Brito",
-    assignedUserEmail: "sebastian@panaderiabrito.com",
+    manager: "Don Toño Brito",
     status: "abierta",
     dailyGoal: 6000,
     todaySales: 0,
     todayTickets: 0,
-    cashInDrawer: 1000,
+    cashInDrawer: 0,
     color: "emerald",
     topProduct: {
-      name: "Bolillo Tradicional",
+      name: "Sin ventas",
       piecesSold: 0,
-      category: "Pan Salado",
+      category: "Panadería",
       icon: "🥖",
     },
     currentShift: {
       id: "shift-ilf-401",
       name: "Turno Matutino (06:00 - 14:00)",
-      cashier: "Sebastián Brito",
+      cashier: "Don Toño Brito",
       openedAt: "06:00 AM",
-      initialFund: 1000,
+      initialFund: 0,
       cashSales: 0,
       cardSales: 0,
       transferSales: 0,
@@ -262,28 +302,25 @@ const DEFAULT_BRANCHES: Branch[] = [
     code: "SUC-LES",
     address: "Calz. Guadalupe #890, Los Ángeles",
     phone: "55 4321 8765",
-    manager: "andres sanchez",
-    assignedUserId: "usr-andres",
-    assignedUserName: "andres sanchez",
-    assignedUserEmail: "andres@panaderiabrito.com",
+    manager: "Don Toño Brito",
     status: "abierta",
     dailyGoal: 7000,
     todaySales: 0,
     todayTickets: 0,
-    cashInDrawer: 1000,
+    cashInDrawer: 0,
     color: "blue",
     topProduct: {
-      name: "Bolillo Tradicional",
+      name: "Sin ventas",
       piecesSold: 0,
-      category: "Pan Salado",
+      category: "Panadería",
       icon: "🥖",
     },
     currentShift: {
       id: "shift-ang-301",
       name: "Turno Matutino (06:00 - 14:00)",
-      cashier: "andres sanchez",
+      cashier: "Don Toño Brito",
       openedAt: "06:00 AM",
-      initialFund: 1000,
+      initialFund: 0,
       cashSales: 0,
       cardSales: 0,
       transferSales: 0,
@@ -294,18 +331,7 @@ const DEFAULT_BRANCHES: Branch[] = [
   },
 ];
 
-const SAMPLE_PRODUCTS = [
-  { name: "Concha de Vainilla", price: 14 },
-  { name: "Concha de Chocolate", price: 14 },
-  { name: "Cuerno de Mantequilla", price: 18 },
-  { name: "Bolillo Artesanal", price: 6 },
-  { name: "Telera para Torta", price: 7 },
-  { name: "Oreja Caramelizada", price: 16 },
-  { name: "Dona Glaseada", price: 15 },
-  { name: "Rebanada Pastel 3 Leches", price: 48 },
-  { name: "Pay de Queso con Zarzamora", price: 45 },
-  { name: "Café de Olla Caliente", price: 28 },
-];
+const SAMPLE_PRODUCTS: { name: string; price: number }[] = [];
 
 const DEFAULT_CASH_MOVEMENTS: BranchCashMovement[] = [];
 
@@ -370,33 +396,37 @@ interface BranchContextType {
 export function syncBranchWithUsers(branch: Branch, users: any[]): Branch {
   if (!branch || !branch.id) return branch;
 
+  const cleanAssignedId = isRetiredDemoCashier(branch.assignedUserId) ? undefined : branch.assignedUserId;
+  const cleanAssignedName = isRetiredDemoCashier(branch.assignedUserName) ? undefined : branch.assignedUserName;
+  const cleanManager = isRetiredDemoCashier(branch.manager) ? "Don Toño Brito" : (branch.manager || "Don Toño Brito");
+
   // 1. Buscar usuario asignado explícitamente por ID que esté activo y NO sea administrador
-  let assignedUser = branch.assignedUserId 
-    ? (users || []).find((u: any) => u.id === branch.assignedUserId && u.status !== "inactivo" && !isAdminCashier(u.name) && u.role !== "admin" && u.id !== "usr-1" && u.id !== "usr-2") 
+  let assignedUser = cleanAssignedId
+    ? (users || []).find((u: any) => u.id === cleanAssignedId && u.status !== "inactivo" && !isAdminCashier(u.name) && u.role !== "admin" && u.id !== "usr-1" && u.id !== "usr-2")
     : undefined;
 
   // 2. Si no se encuentra, o está inactivo, o el usuario asignado pertenece a otra sucursal,
   // buscar los empleados activos asignados a esta sucursal (excluyendo administradores)
   if (!assignedUser || (assignedUser.assignedBranchId && assignedUser.assignedBranchId !== branch.id)) {
-    const branchUsers = (users || []).filter((u: any) => 
-      u.status !== "inactivo" && 
-      !isAdminCashier(u.name) && 
-      u.role !== "admin" && 
-      u.id !== "usr-1" && 
+    const branchUsers = (users || []).filter((u: any) =>
+      u.status !== "inactivo" &&
+      !isAdminCashier(u.name) &&
+      u.role !== "admin" &&
+      u.id !== "usr-1" &&
       u.id !== "usr-2" &&
       (u.assignedBranchId === branch.id || resolveBranchId(u.assignedBranchId, u.name) === branch.id)
     );
     assignedUser = branchUsers.find((u: any) => !isAfternoonShift("", "", u)) ||
-                   branchUsers.find((u: any) => u.role === "cajero") || 
-                   branchUsers[0] || 
+                   branchUsers.find((u: any) => u.role === "cajero") ||
+                   branchUsers[0] ||
                    assignedUser;
   }
 
   // 3. Si aún no se encuentra, buscar por coincidencia en el nombre o usuario previo (no admin)
-  if (!assignedUser) {
-    const assLower = (branch.assignedUserName || "").toLowerCase().trim();
+  if (!assignedUser && cleanAssignedName) {
+    const assLower = cleanAssignedName.toLowerCase().trim();
     if (assLower && !isAdminCashier(assLower)) {
-      assignedUser = (users || []).find((u: any) => 
+      assignedUser = (users || []).find((u: any) =>
         u.status !== "inactivo" && !isAdminCashier(u.name) && u.role !== "admin" && (
           (u.name && assLower === u.name.toLowerCase()) ||
           (u.username && assLower === u.username.toLowerCase())
@@ -405,23 +435,25 @@ export function syncBranchWithUsers(branch: Branch, users: any[]): Branch {
     }
   }
 
-  const canonicalOperator = getOriginalBranchOperator(branch, branch.currentShift?.name, users);
   const candidateCashier = branch.currentShift?.cashier || branch.lastCut?.incomingCashier;
   const isCandidateValid = Boolean(
-    candidateCashier && 
-    !isAdminCashier(candidateCashier) && 
+    candidateCashier &&
+    !isRetiredDemoCashier(candidateCashier) &&
+    !isAdminCashier(candidateCashier) &&
     !candidateCashier.includes("Cajera 2") &&
     (users || []).some((u: any) => u.status !== "inactivo" && (matchesCashier(u.name, candidateCashier) || matchesCashier(u.username, candidateCashier)))
   );
 
-  const effectiveCashier = isCandidateValid ? candidateCashier! : (assignedUser ? assignedUser.name : canonicalOperator);
+  const effectiveCashier = isCandidateValid
+    ? candidateCashier!
+    : (assignedUser ? assignedUser.name : cleanManager);
 
   return {
     ...branch,
-    assignedUserId: assignedUser?.id || branch.assignedUserId,
-    assignedUserName: assignedUser?.name || (branch.assignedUserName && !isAdminCashier(branch.assignedUserName) ? branch.assignedUserName : effectiveCashier),
-    assignedUserEmail: assignedUser?.email || branch.assignedUserEmail,
-    manager: branch.id === "branch-matriz" ? (branch.manager || "Don Toño Brito") : (effectiveCashier || branch.manager),
+    assignedUserId: assignedUser?.id || undefined,
+    assignedUserName: assignedUser?.name || undefined,
+    assignedUserEmail: assignedUser?.email || undefined,
+    manager: assignedUser?.name || cleanManager,
     currentShift: branch.currentShift ? {
       ...branch.currentShift,
       cashier: effectiveCashier,
@@ -430,7 +462,7 @@ export function syncBranchWithUsers(branch: Branch, users: any[]): Branch {
       name: "Turno Matutino (06:00 - 14:00)",
       cashier: effectiveCashier,
       openedAt: "06:00 AM",
-      initialFund: 1000,
+      initialFund: 0,
       cashSales: 0,
       cardSales: 0,
       transferSales: 0,
@@ -1679,9 +1711,9 @@ function resolveBranchParam(param: string | null): string | null {
 
               return {
                 ...b,
-                manager: b.id === "branch-matriz" ? (b.manager || "Don Toño Brito") : (activeCashier || b.manager),
-                assignedUserName: assignedEmployee?.name || (b.assignedUserName && !isAdminCashier(b.assignedUserName) ? b.assignedUserName : "") || activeCashier || getOriginalBranchOperator(b, undefined, usersList),
-                assignedUserId: assignedEmployee?.id || b.assignedUserId,
+                manager: b.id === "branch-matriz" ? (!isRetiredDemoCashier(b.manager) && b.manager ? b.manager : "Don Toño Brito") : (activeCashier || (!isRetiredDemoCashier(b.manager) && b.manager ? b.manager : "Don Toño Brito")),
+                assignedUserName: assignedEmployee?.name || (b.assignedUserName && !isAdminCashier(b.assignedUserName) && !isRetiredDemoCashier(b.assignedUserName) ? b.assignedUserName : undefined),
+                assignedUserId: assignedEmployee?.id || (!isRetiredDemoCashier(b.assignedUserId) ? b.assignedUserId : undefined),
                 todaySales: totalCobrado,
                 todayTickets: totalTickets,
                 todayPieces: totalPieces,

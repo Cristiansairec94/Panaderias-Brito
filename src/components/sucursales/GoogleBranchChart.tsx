@@ -75,14 +75,14 @@ export default function GoogleBranchChart({
 
   // Generate data points based on period and real-time branch sales
   const dataPoints: DataPoint[] = useMemo(() => {
-    // Current live totals to ground the synthetic historical points
-    const liveMatriz = branches.find((b) => b.code.includes("MAT") || b.id === "branch-matriz")?.todaySales || 5480;
-    const liveBenito = branches.find((b) => b.code.includes("SJU") || b.code.includes("BEN") || b.id === "branch-sanjuan" || b.id === "branch-benito")?.todaySales || 4120;
-    const liveFlores = branches.find((b) => b.code.includes("FLO") || b.id === "branch-flores")?.todaySales || 4890;
+    // Current live totals (100% reales)
+    const liveMatriz = branches.find((b) => b.code.includes("MAT") || b.id === "branch-matriz")?.todaySales || 0;
+    const liveBenito = branches.find((b) => b.code.includes("SJU") || b.code.includes("BEN") || b.id === "branch-sanjuan" || b.id === "branch-benito")?.todaySales || 0;
+    const liveFlores = branches.find((b) => b.code.includes("FLO") || b.id === "branch-flores")?.todaySales || 0;
 
     // Average price per piece of bakery bread ~ $16.5 MXN
     const calcPieces = (amount: number) => Math.round(amount / 16.5);
-    const calcTickets = (amount: number) => Math.max(1, Math.round(amount / 95));
+    const calcTickets = (amount: number) => (amount > 0 ? Math.max(1, Math.round(amount / 95)) : 0);
 
     if (selectedPeriod === "hoy") {
       // 12 points representing operating hours: 06:00 to 21:00

@@ -121,9 +121,7 @@ export function getFriendlyName(fullName?: string): string {
   if (!fullName) return "Usuario";
   const lower = fullName.toLowerCase();
   if (lower.includes("toño") || lower.includes("tono")) return "Toño";
-  if (lower.includes("lupita")) return "Lupita";
-  if (lower.includes("juan")) return "Juan";
-  if (lower.includes("carlos")) return "Carlos";
+  if (lower.includes("paulina")) return "Paulina";
   return fullName.split(" ")[0] || fullName;
 }
 
@@ -170,300 +168,6 @@ export const DEMO_USERS: User[] = [
     shiftStartTime: "06:00",
     shiftEndTime: "14:00",
   },
-  {
-    id: "usr-lupita",
-    name: "Lupita Brito",
-    username: "lupita",
-    email: "lupita@panaderiabrito.com",
-    password: "1234",
-    role: "cajero",
-    roleLabel: "Cajero(a) Turno Mañana",
-    jobTitle: "Cajera Turno Matutino",
-    avatar: "👩‍💼",
-    phone: "55 1234 5678",
-    status: "activo",
-    hasSystemAccess: true,
-    assignedBranchId: "branch-matriz",
-    assignedBranchName: "Sucursal Matriz (Centro)",
-    createdAt: "01 ene 2024",
-    shift: "matutino",
-    shiftName: "Turno Mañana",
-    shiftStartTime: "06:00",
-    shiftEndTime: "14:00",
-  },
-  {
-    id: "usr-carlos-b",
-    name: "carlos bueno",
-    username: "carlos.bueno",
-    email: "carlos.bueno@panaderiabrito.com",
-    password: "1234",
-    role: "cajero",
-    roleLabel: "Cajero(a) Turno Tarde",
-    jobTitle: "Cajero Turno Vespertino",
-    avatar: "👨‍🍳",
-    phone: "55 4433 2211",
-    status: "activo",
-    hasSystemAccess: true,
-    assignedBranchId: "branch-matriz",
-    assignedBranchName: "Sucursal Matriz (Centro)",
-    createdAt: "2 oct 2026",
-    shift: "vespertino",
-    shiftName: "Turno Tarde",
-    shiftStartTime: "14:00",
-    shiftEndTime: "22:00",
-  },
-  {
-    id: "usr-5",
-    name: "Carlos Mendoza",
-    username: "carlos",
-    email: "supervisor@panaderiabrito.com",
-    password: "super",
-    role: "cajero",
-    roleLabel: "Cajero(a) Turno Mañana",
-    jobTitle: "Cajero Turno Matutino",
-    avatar: "📋",
-    phone: "55 3344 5566",
-    status: "inactivo",
-    hasSystemAccess: false,
-    assignedBranchId: "branch-benito",
-    assignedBranchName: "Sucursal San Benito (Mercado)",
-    createdAt: "10 feb 2024",
-    shift: "matutino",
-    shiftName: "Turno Mañana",
-    shiftStartTime: "06:00",
-    shiftEndTime: "14:00",
-  },
-  {
-    id: "usr-luisa",
-    name: "Luisa",
-    username: "luisa",
-    email: "luisa@panaderiabrito.com",
-    password: "1234",
-    role: "cajero",
-    roleLabel: "Cajero(a) Turno Mañana",
-    jobTitle: "Cajera Turno Matutino",
-    avatar: "👩‍💼",
-    phone: "55 2233 4455",
-    status: "activo",
-    hasSystemAccess: true,
-    assignedBranchId: "branch-benito",
-    assignedBranchName: "Sucursal San Benito (Mercado)",
-    createdAt: "15 oct 2026",
-    shift: "matutino",
-    shiftName: "Turno Mañana",
-    shiftStartTime: "06:00",
-    shiftEndTime: "14:00",
-  },
-  {
-    id: "usr-jorge",
-    name: "Jorge",
-    username: "jorge",
-    email: "jorge@panaderiabrito.com",
-    password: "1234",
-    role: "cajero",
-    roleLabel: "Cajero(a) Turno Tarde",
-    jobTitle: "Cajero Turno Vespertino",
-    avatar: "👨‍🍳",
-    phone: "55 9988 7766",
-    status: "activo",
-    hasSystemAccess: true,
-    assignedBranchId: "branch-benito",
-    assignedBranchName: "Sucursal San Benito (Mercado)",
-    createdAt: "15 oct 2026",
-    shift: "vespertino",
-    shiftName: "Turno Tarde",
-    shiftStartTime: "14:00",
-    shiftEndTime: "22:00",
-  },
-  {
-    id: "usr-noe",
-    name: "noe velasquez",
-    username: "noe",
-    email: "noe@panaderiabrito.com",
-    password: "1234",
-    role: "cajero",
-    roleLabel: "Cajero(a) Turno Mañana",
-    jobTitle: "Cajero Turno Matutino",
-    avatar: "👨‍🍳",
-    phone: "11 2233 4455",
-    status: "activo",
-    hasSystemAccess: true,
-    assignedBranchId: "branch-sanjuan",
-    assignedBranchName: "Sucursal San Juan",
-    createdAt: "2 oct 2026",
-    shift: "matutino",
-    shiftName: "Turno Mañana",
-    shiftStartTime: "06:00",
-    shiftEndTime: "14:00",
-  },
-  {
-    id: "usr-maria",
-    name: "María",
-    username: "maria",
-    email: "maria@panaderiabrito.com",
-    password: "1234",
-    role: "cajero",
-    roleLabel: "Cajero(a) Turno Tarde",
-    jobTitle: "Cajera Turno Vespertino",
-    avatar: "👩‍💼",
-    phone: "55 8765 4321",
-    status: "activo",
-    hasSystemAccess: true,
-    assignedBranchId: "branch-sanjuan",
-    assignedBranchName: "Sucursal San Juan",
-    createdAt: "05 oct 2026",
-    shift: "vespertino",
-    shiftName: "Turno Tarde",
-    shiftStartTime: "14:00",
-    shiftEndTime: "22:00",
-  },
-  {
-    id: "usr-sofia",
-    name: "Sofía Morales",
-    username: "sofia",
-    email: "sofia@panaderiabrito.com",
-    password: "1234",
-    role: "cajero",
-    roleLabel: "Cajero(a) Turno Mañana",
-    jobTitle: "Cajera Turno Matutino",
-    avatar: "👩‍💼",
-    phone: "55 9988 7766",
-    status: "activo",
-    hasSystemAccess: true,
-    assignedBranchId: "branch-flores",
-    assignedBranchName: "Sucursal Las Flores (Plaza)",
-    createdAt: "01 feb 2024",
-    shift: "matutino",
-    shiftName: "Turno Mañana",
-    shiftStartTime: "06:00",
-    shiftEndTime: "14:00",
-  },
-  {
-    id: "usr-elena",
-    name: "Elena Brito",
-    username: "elena",
-    email: "elena@panaderiabrito.com",
-    password: "1234",
-    role: "cajero",
-    roleLabel: "Cajero(a) Turno Tarde",
-    jobTitle: "Cajera Turno Vespertino",
-    avatar: "👩‍🍳",
-    phone: "55 9988 7766",
-    status: "activo",
-    hasSystemAccess: true,
-    assignedBranchId: "branch-flores",
-    assignedBranchName: "Sucursal Las Flores (Plaza)",
-    createdAt: "01 feb 2024",
-    shift: "vespertino",
-    shiftName: "Turno Tarde",
-    shiftStartTime: "14:00",
-    shiftEndTime: "22:00",
-  },
-  {
-    id: "usr-sebastian",
-    name: "Sebastián Brito",
-    username: "sebastian",
-    email: "sebastian@panaderiabrito.com",
-    password: "1234",
-    role: "cajero",
-    roleLabel: "Cajero(a) Turno Mañana",
-    jobTitle: "Cajero Turno Matutino",
-    avatar: "👨‍💼",
-    phone: "55 8361 7480",
-    status: "activo",
-    hasSystemAccess: true,
-    assignedBranchId: "branch-1790889237862",
-    assignedBranchName: "Sucursal San Ildefonso",
-    createdAt: "05 oct 2026",
-    shift: "matutino",
-    shiftName: "Turno Mañana",
-    shiftStartTime: "06:00",
-    shiftEndTime: "14:00",
-  },
-  {
-    id: "usr-silvia",
-    name: "silvia puga",
-    username: "silvia",
-    email: "silvia@panaderiabrito.com",
-    password: "1234",
-    role: "cajero",
-    roleLabel: "Cajero(a) Turno Mañana",
-    jobTitle: "Cajera Turno Matutino",
-    avatar: "👩‍💼",
-    phone: "22 1345 6778",
-    status: "inactivo",
-    hasSystemAccess: false,
-    assignedBranchId: "branch-1790889237862",
-    assignedBranchName: "Sucursal San Ildefonso",
-    createdAt: "2 oct 2026",
-    shift: "matutino",
-    shiftName: "Turno Mañana",
-    shiftStartTime: "06:00",
-    shiftEndTime: "14:00",
-  },
-  {
-    id: "usr-enrique",
-    name: "Enrique",
-    username: "enrique",
-    email: "enrique@panaderiabrito.com",
-    password: "1234",
-    role: "cajero",
-    roleLabel: "Cajero(a) Turno Tarde",
-    jobTitle: "Cajero Turno Vespertino",
-    avatar: "👨‍🍳",
-    phone: "55 8361 7480",
-    status: "activo",
-    hasSystemAccess: true,
-    assignedBranchId: "branch-1790889237862",
-    assignedBranchName: "Sucursal San Ildefonso",
-    createdAt: "05 oct 2026",
-    shift: "vespertino",
-    shiftName: "Turno Tarde",
-    shiftStartTime: "14:00",
-    shiftEndTime: "22:00",
-  },
-  {
-    id: "usr-andres",
-    name: "andres sanchez",
-    username: "andres",
-    email: "andres@panaderiabrito.com",
-    password: "1234",
-    role: "cajero",
-    roleLabel: "Cajero(a) Turno Mañana",
-    jobTitle: "Cajero Turno Matutino",
-    avatar: "👨‍💼",
-    phone: "77 3110 7898",
-    status: "activo",
-    hasSystemAccess: true,
-    assignedBranchId: "branch-angeles",
-    assignedBranchName: "Sucursal Los Ángeles",
-    createdAt: "1 oct 2026",
-    shift: "matutino",
-    shiftName: "Turno Mañana",
-    shiftStartTime: "06:00",
-    shiftEndTime: "14:00",
-  },
-  {
-    id: "usr-angeles",
-    name: "Cajero Los Ángeles",
-    username: "angeles",
-    email: "angeles@panaderiabrito.com",
-    password: "1234",
-    role: "cajero",
-    roleLabel: "Cajero(a) Turno Tarde",
-    jobTitle: "Cajero Turno Vespertino",
-    avatar: "👨‍🍳",
-    phone: "55 4321 8765",
-    status: "activo",
-    hasSystemAccess: true,
-    assignedBranchId: "branch-angeles",
-    assignedBranchName: "Sucursal Los Ángeles",
-    createdAt: "05 oct 2026",
-    shift: "vespertino",
-    shiftName: "Turno Tarde",
-    shiftStartTime: "14:00",
-    shiftEndTime: "22:00",
-  },
 ];
 
 interface AuthContextType {
@@ -489,18 +193,40 @@ interface AuthContextType {
   isLoading: boolean;
 }
 
+export const RETIRED_DEMO_USER_IDS = [
+  "usr-3",
+  "usr-4",
+  "usr-5",
+  "usr-lupita",
+  "usr-carlos-b",
+  "usr-luisa",
+  "usr-jorge",
+  "usr-noe",
+  "usr-maria",
+  "usr-sofia",
+  "usr-elena",
+  "usr-sebastian",
+  "usr-silvia",
+  "usr-enrique",
+  "usr-andres",
+  "usr-angeles",
+];
+
 // Helpers para persistencia de lista negra de empleados eliminados (Tombstones)
 // Evita que perfiles eliminados resuciten al refrescar la página o reconectar con el servidor
 export const getDeletedUserIds = (): Set<string> => {
-  if (typeof window === "undefined") return new Set();
+  const set = new Set<string>(RETIRED_DEMO_USER_IDS);
+  if (typeof window === "undefined") return set;
   try {
     const raw = localStorage.getItem("brito_deleted_user_ids");
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) return new Set(parsed);
+      if (Array.isArray(parsed)) {
+        parsed.forEach((id: string) => set.add(id));
+      }
     }
   } catch {}
-  return new Set();
+  return set;
 };
 
 export const addDeletedUserId = (id: string) => {
@@ -1444,47 +1170,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (saved) {
         try {
           const parsedUser = JSON.parse(saved);
-          if (parsedUser && (parsedUser.id === "usr-sebastian" || parsedUser.username === "sebastian" || parsedUser.name?.toLowerCase().includes("sebastian"))) {
-            if (parsedUser.assignedBranchId !== "branch-1790889237862") {
-              parsedUser.assignedBranchId = "branch-1790889237862";
-              parsedUser.assignedBranchName = "Sucursal San Ildefonso";
-              sessionStorage.setItem("brito_user", JSON.stringify(parsedUser));
-            }
-          }
-          if (parsedUser && (parsedUser.id === "usr-enrique" || parsedUser.username === "enrique" || parsedUser.name?.toLowerCase().includes("enrique"))) {
-            if (parsedUser.assignedBranchId !== "branch-1790889237862") {
-              parsedUser.assignedBranchId = "branch-1790889237862";
-              parsedUser.assignedBranchName = "Sucursal San Ildefonso";
-              sessionStorage.setItem("brito_user", JSON.stringify(parsedUser));
-            }
-          }
-          if (parsedUser && (parsedUser.id === "usr-silvia" || parsedUser.username === "silvia")) {
-            if (parsedUser.assignedBranchId !== "branch-1790889237862") {
-              parsedUser.assignedBranchId = "branch-1790889237862";
-              parsedUser.assignedBranchName = "Sucursal San Ildefonso";
-              sessionStorage.setItem("brito_user", JSON.stringify(parsedUser));
-            }
-          }
-          if (parsedUser && (parsedUser.id === "usr-andres" || parsedUser.username === "andres")) {
-            if (parsedUser.assignedBranchId !== "branch-angeles") {
-              parsedUser.assignedBranchId = "branch-angeles";
-              parsedUser.assignedBranchName = "Sucursal Los Ángeles";
-              sessionStorage.setItem("brito_user", JSON.stringify(parsedUser));
-            }
-          }
-          if (parsedUser && (parsedUser.id === "usr-angeles" || parsedUser.username === "angeles")) {
-            if (parsedUser.assignedBranchId !== "branch-angeles") {
-              parsedUser.assignedBranchId = "branch-angeles";
-              parsedUser.assignedBranchName = "Sucursal Los Ángeles";
-              sessionStorage.setItem("brito_user", JSON.stringify(parsedUser));
-            }
-          }
-          if (parsedUser && (parsedUser.id === "usr-5" || parsedUser.username === "carlos")) {
-            if (parsedUser.assignedBranchId !== "branch-benito") {
-              parsedUser.assignedBranchId = "branch-benito";
-              parsedUser.assignedBranchName = "Sucursal San Benito (Mercado)";
-              sessionStorage.setItem("brito_user", JSON.stringify(parsedUser));
-            }
+          const deletedIds = getDeletedUserIds();
+          if (parsedUser && (deletedIds.has(parsedUser.id) || deletedIds.has(parsedUser.username || ""))) {
+            sessionStorage.removeItem("brito_user");
+            setUser(null);
+            setIsLoading(false);
+            return;
           }
           if (parsedUser && (parsedUser.id === "usr-2" || parsedUser.username === "paulina")) {
             if (parsedUser.role !== "admin") {
@@ -1700,31 +1391,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       // Friendly alias checks
       if ((cleanNorm === "tono" || cleanNorm === "admin") && (email.includes("admin") || name.includes("tono"))) return true;
-      if ((cleanNorm === "paulina" || cleanNorm === "lupita" || cleanNorm === "caja") && (email.includes("caja") || email.includes("paulina") || name.includes("paulina") || name.includes("lupita"))) return true;
-      if (cleanNorm === "sebastian") {
-        if (username.includes("sebastian") || name.includes("sebastian") || email.includes("sebastian")) return true;
-      }
-      if (cleanNorm === "enrique") {
-        if (username.includes("enrique") || name.includes("enrique") || email.includes("enrique")) return true;
-      }
-      if (cleanNorm === "ildefonso" || cleanNorm === "san ildefonso") {
-        if (u.assignedBranchId === "branch-1790889237862" && u.status !== "inactivo") return true;
-        if (username.includes("ildefonso") || username.includes("sebastian") || name.includes("sebastian") || username.includes("enrique") || name.includes("enrique")) return true;
-      }
-      if (cleanNorm === "silvia" || cleanNorm === "puga") {
-        if (email.includes("silvia") || name.includes("silvia") || name.includes("puga") || username.includes("silvia")) return true;
-      }
-      if (cleanNorm === "noe" || cleanNorm === "velasquez" || cleanNorm === "sanjuan" || cleanNorm === "maria") {
-        if (email.includes("noe") || name.includes("noe") || username.includes("noe") || email.includes("maria") || name.includes("maria") || username.includes("maria") || (u.assignedBranchId === "branch-sanjuan" && u.status !== "inactivo")) return true;
-      }
-      if (cleanNorm === "angeles" || cleanNorm === "los angeles" || cleanNorm === "sucursal angeles") {
-        if (username === "angeles" || u.id === "usr-angeles" || email.includes("angeles") || name.includes("angeles") || u.assignedBranchId === "branch-angeles") return true;
-      }
-      if (cleanNorm === "andres" || cleanNorm === "sanchez") {
-        if (username === "andres" || u.id === "usr-andres" || email.includes("andres") || name.includes("andres")) return true;
-      }
-      if ((cleanNorm === "juan" || cleanNorm === "panadero" || cleanNorm === "horno") && (email.includes("panadero") || name.includes("juan"))) return true;
-      if ((cleanNorm === "carlos" || cleanNorm === "supervisor" || cleanNorm === "super") && (email.includes("supervisor") || name.includes("carlos"))) return true;
+      if (cleanNorm === "paulina" && (email.includes("paulina") || name.includes("paulina"))) return true;
 
       return false;
     });
@@ -1797,31 +1464,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       // Friendly alias checks
       if ((cleanNorm === "tono" || cleanNorm === "admin") && (email.includes("admin") || name.includes("tono"))) return true;
-      if ((cleanNorm === "paulina" || cleanNorm === "lupita" || cleanNorm === "caja") && (email.includes("caja") || email.includes("paulina") || name.includes("paulina") || name.includes("lupita"))) return true;
-      if (cleanNorm === "sebastian") {
-        if (username.includes("sebastian") || name.includes("sebastian") || email.includes("sebastian")) return true;
-      }
-      if (cleanNorm === "enrique") {
-        if (username.includes("enrique") || name.includes("enrique") || email.includes("enrique")) return true;
-      }
-      if (cleanNorm === "ildefonso" || cleanNorm === "san ildefonso") {
-        if (u.assignedBranchId === "branch-1790889237862" && u.status !== "inactivo") return true;
-        if (username.includes("ildefonso") || username.includes("sebastian") || name.includes("sebastian") || username.includes("enrique") || name.includes("enrique")) return true;
-      }
-      if (cleanNorm === "silvia" || cleanNorm === "puga") {
-        if (email.includes("silvia") || name.includes("silvia") || name.includes("puga") || username.includes("silvia")) return true;
-      }
-      if (cleanNorm === "noe" || cleanNorm === "velasquez" || cleanNorm === "sanjuan" || cleanNorm === "maria") {
-        if (email.includes("noe") || name.includes("noe") || username.includes("noe") || email.includes("maria") || name.includes("maria") || username.includes("maria") || (u.assignedBranchId === "branch-sanjuan" && u.status !== "inactivo")) return true;
-      }
-      if (cleanNorm === "angeles" || cleanNorm === "los angeles" || cleanNorm === "sucursal angeles") {
-        if (username === "angeles" || u.id === "usr-angeles" || email.includes("angeles") || name.includes("angeles") || u.assignedBranchId === "branch-angeles") return true;
-      }
-      if (cleanNorm === "andres" || cleanNorm === "sanchez") {
-        if (username === "andres" || u.id === "usr-andres" || email.includes("andres") || name.includes("andres")) return true;
-      }
-      if ((cleanNorm === "juan" || cleanNorm === "panadero" || cleanNorm === "horno") && (email.includes("panadero") || name.includes("juan"))) return true;
-      if ((cleanNorm === "carlos" || cleanNorm === "supervisor" || cleanNorm === "super") && (email.includes("supervisor") || name.includes("carlos"))) return true;
+      if (cleanNorm === "paulina" && (email.includes("paulina") || name.includes("paulina"))) return true;
 
       return false;
     });

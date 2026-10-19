@@ -14,262 +14,7 @@ export function calculateEan13CheckDigit(digits12: string): number {
   return (10 - (sum % 10)) % 10;
 }
 
-export const DEFAULT_PRODUCTS: Product[] = [
-  {
-    id: "prod-1",
-    code: "PAN-001",
-    barcode: "7501000100019",
-    name: "Concha de Vainilla",
-    price: 12,
-    category: "pan_dulce",
-    icon: "🥖",
-    stock: 50,
-    tag: "Tradicional",
-    description: "Esponjosa y suave con costra crujiente de azúcar y vainilla natural.",
-    image: "https://images.unsplash.com/photo-1586985289688-ca3cf47d3e6e?w=800&auto=format&fit=crop&q=80",
-    hasIva: false,
-    ivaRate: 0,
-    hasIeps: true,
-    iepsRate: 8,
-    taxIncluded: true
-  },
-  {
-    id: "prod-2",
-    code: "PAN-002",
-    barcode: "7501000100026",
-    name: "Concha de Chocolate",
-    price: 12,
-    category: "pan_dulce",
-    icon: "🍫",
-    stock: 40,
-    tag: "Favorito",
-    description: "Masa fina aromatizada con cacao selecto y cubierta crujiente chocolatosa.",
-    image: "https://images.unsplash.com/photo-1608198093002-ad4e005484ec?w=800&auto=format&fit=crop&q=80",
-    hasIva: false,
-    ivaRate: 0,
-    hasIeps: true,
-    iepsRate: 8,
-    taxIncluded: true
-  },
-  {
-    id: "prod-3",
-    code: "PAN-003",
-    barcode: "7501000100033",
-    name: "Cuerno de Mantequilla",
-    price: 15,
-    category: "pan_dulce",
-    icon: "🥐",
-    stock: 30,
-    tag: "Artesanal",
-    description: "Hojaldre 100% mantequilla pura de vaca, dorado y crujiente por capas.",
-    image: "https://images.unsplash.com/photo-1555507036-ab1f4038808a?w=800&auto=format&fit=crop&q=80",
-    hasIva: false,
-    ivaRate: 0,
-    hasIeps: true,
-    iepsRate: 8,
-    taxIncluded: true
-  },
-  {
-    id: "prod-4",
-    code: "BLA-001",
-    barcode: "7501000100040",
-    name: "Bolillo Tradicional",
-    price: 5,
-    category: "pan_blanco",
-    icon: "🍞",
-    stock: 150,
-    tag: "Recién Salido",
-    description: "Corteza dorada crujiente y migajón esponjoso, horneado en piso de piedra.",
-    image: "https://images.unsplash.com/photo-1589367920969-ab8e050bbb04?w=800&auto=format&fit=crop&q=80",
-    hasIva: false,
-    ivaRate: 0,
-    hasIeps: false,
-    iepsRate: 0,
-    taxIncluded: true
-  },
-  {
-    id: "prod-5",
-    code: "BLA-002",
-    barcode: "7501000100057",
-    name: "Telera para Torta",
-    price: 6,
-    category: "pan_blanco",
-    icon: "🥪",
-    stock: 100,
-    tag: "De la Casa",
-    description: "Pan suave y dorado en tres secciones, el clásico para tortas mexicanas.",
-    image: "https://images.unsplash.com/photo-1549931319-a545dcf3bc73?w=800&auto=format&fit=crop&q=80",
-    hasIva: false,
-    ivaRate: 0,
-    hasIeps: false,
-    iepsRate: 0,
-    taxIncluded: true
-  },
-  {
-    id: "prod-6",
-    code: "PAN-004",
-    barcode: "7501000100064",
-    name: "Oreja Hojaldrada",
-    price: 14,
-    category: "pan_dulce",
-    icon: "🥨",
-    stock: 35,
-    tag: "Crujiente",
-    description: "Hojaldre finamente caramelizado al horno con mantequilla y azúcar.",
-    image: "https://images.unsplash.com/photo-1509440159596-0249088772ff?w=800&auto=format&fit=crop&q=80",
-    hasIva: false,
-    ivaRate: 0,
-    hasIeps: true,
-    iepsRate: 8,
-    taxIncluded: true
-  },
-  {
-    id: "prod-7",
-    code: "PAN-005",
-    barcode: "7501000100071",
-    name: "Dona Glaseada",
-    price: 13,
-    category: "pan_dulce",
-    icon: "🍩",
-    stock: 30,
-    tag: "Más Vendido",
-    description: "Masa esponjada frita a punto exacto con glaseado clásico brillante.",
-    image: "https://images.unsplash.com/photo-1527515637462-cff94eecc1ac?w=800&auto=format&fit=crop&q=80",
-    hasIva: false,
-    ivaRate: 0,
-    hasIeps: true,
-    iepsRate: 8,
-    taxIncluded: true
-  },
-  {
-    id: "prod-8",
-    code: "PAS-001",
-    barcode: "7501000100088",
-    name: "Rebanada Pastel 3 Leches",
-    price: 45,
-    category: "pasteleria",
-    icon: "🍰",
-    stock: 20,
-    tag: "Gourmet",
-    description: "Bizcocho húmedo bañado en infusión de tres leches y fresa fresca.",
-    image: "https://images.unsplash.com/photo-1578985545062-69928b1d9587?w=800&auto=format&fit=crop&q=80",
-    hasIva: false,
-    ivaRate: 0,
-    hasIeps: true,
-    iepsRate: 8,
-    taxIncluded: true
-  },
-  {
-    id: "prod-9",
-    code: "PAS-002",
-    barcode: "7501000100095",
-    name: "Pay de Queso con Zarzamora",
-    price: 40,
-    category: "pasteleria",
-    icon: "🥧",
-    stock: 15,
-    tag: "Especialidad",
-    description: "Base crujiente de galleta con suave crema de queso y zarzamora silvestre.",
-    image: "https://images.unsplash.com/photo-1533134242443-d4fd215305ad?w=800&auto=format&fit=crop&q=80",
-    hasIva: false,
-    ivaRate: 0,
-    hasIeps: true,
-    iepsRate: 8,
-    taxIncluded: true
-  },
-  {
-    id: "prod-10",
-    code: "BEB-001",
-    barcode: "7501000100101",
-    name: "Café de Olla Caliente",
-    price: 25,
-    category: "bebidas",
-    icon: "☕",
-    stock: 60,
-    tag: "Calientito",
-    description: "Café de grano selecto colado con canela criolla y toque de piloncillo.",
-    image: "https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?w=800&auto=format&fit=crop&q=80",
-    hasIva: true,
-    ivaRate: 16,
-    hasIeps: false,
-    iepsRate: 0,
-    taxIncluded: true
-  },
-  {
-    id: "prod-11",
-    code: "BEB-002",
-    barcode: "7501000100118",
-    name: "Chocolate Caliente con Leche",
-    price: 30,
-    category: "bebidas",
-    icon: "🍫",
-    stock: 40,
-    tag: "Tradición",
-    description: "Tablelilla artesanal espumada en jarra con leche entera caliente.",
-    image: "https://images.unsplash.com/photo-1542990253-0d0f5be5f0ed?w=800&auto=format&fit=crop&q=80",
-    hasIva: true,
-    ivaRate: 16,
-    hasIeps: false,
-    iepsRate: 0,
-    taxIncluded: true
-  },
-  {
-    id: "prod-12",
-    code: "TEM-001",
-    barcode: "7501000100125",
-    name: "Empanada de Calabaza",
-    price: 18,
-    category: "temporada",
-    icon: "🥟",
-    stock: 25,
-    tag: "Rellena",
-    description: "Horneada al punto con relleno artesanal de dulce de calabaza y canela.",
-    image: "https://images.unsplash.com/photo-1509440159596-0249088772ff?w=800&auto=format&fit=crop&q=80",
-    hasIva: false,
-    ivaRate: 0,
-    hasIeps: true,
-    iepsRate: 8,
-    taxIncluded: true
-  },
-  {
-    id: "prod-13",
-    code: "AB-001",
-    barcode: "7501000100132",
-    name: "Leche Entera 1L",
-    price: 28,
-    category: "abarrotes",
-    icon: "🥛",
-    stock: 40,
-    unit: "pieza",
-    tag: "Abarrote",
-    description: "Leche pasteurizada entera fresca de primera calidad.",
-    image: "https://images.unsplash.com/photo-1563636619-e9143da7973b?w=800&auto=format&fit=crop&q=80",
-    hasIva: false,
-    ivaRate: 0,
-    hasIeps: false,
-    iepsRate: 0,
-    taxIncluded: true
-  },
-  {
-    id: "prod-14",
-    code: "MP-001",
-    barcode: "7501000100149",
-    name: "Harina de Trigo San Antonio 1kg",
-    price: 22,
-    category: "materia_prima",
-    icon: "🌾",
-    stock: 80,
-    unit: "kg",
-    tag: "Insumo",
-    description: "Harina de trigo de alta fuerza ideal para panificación tradicional.",
-    image: "https://images.unsplash.com/photo-1509440159596-0249088772ff?w=800&auto=format&fit=crop&q=80",
-    hasIva: false,
-    ivaRate: 0,
-    hasIeps: false,
-    iepsRate: 0,
-    taxIncluded: true
-  }
-];
+export const DEFAULT_PRODUCTS: Product[] = [];
 
 export interface ProductCategory {
   id: string;
@@ -553,15 +298,34 @@ export function calculateProductTaxes(
 }
 
 const DELETED_PRODUCTS_KEY = "brito_deleted_product_ids";
+const RETIRED_DEMO_PRODUCT_IDS = [
+  "prod-1",
+  "prod-2",
+  "prod-3",
+  "prod-4",
+  "prod-5",
+  "prod-6",
+  "prod-7",
+  "prod-8",
+  "prod-9",
+  "prod-10",
+  "prod-11",
+  "prod-12",
+  "prod-13",
+  "prod-14",
+];
 
 export function getDeletedProductIds(): Set<string> {
-  if (typeof window === "undefined") return new Set();
+  const set = new Set<string>(RETIRED_DEMO_PRODUCT_IDS);
+  if (typeof window === "undefined") return set;
   try {
     const raw = localStorage.getItem(DELETED_PRODUCTS_KEY);
-    return raw ? new Set(JSON.parse(raw)) : new Set();
-  } catch {
-    return new Set();
-  }
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) parsed.forEach((id: string) => set.add(id));
+    }
+  } catch {}
+  return set;
 }
 
 export function markProductIdAsDeleted(id: string): void {
@@ -575,32 +339,23 @@ export function markProductIdAsDeleted(id: string): void {
 
 export function getStoredProducts(): Product[] {
   if (typeof window === "undefined") {
-    return DEFAULT_PRODUCTS;
+    return [];
   }
 
   try {
-    const isInitialized = localStorage.getItem("brito_catalog_initialized") === "true";
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) {
-      if (isInitialized) return [];
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(DEFAULT_PRODUCTS));
-      return DEFAULT_PRODUCTS;
-    }
+    if (!raw) return [];
     const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) {
-      if (isInitialized) return [];
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(DEFAULT_PRODUCTS));
-      return DEFAULT_PRODUCTS;
-    }
-    if (parsed.length === 0) {
-      // Si el catálogo fue vaciado para empezar desde cero, respetar arreglo vacío
-      if (isInitialized) return [];
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(DEFAULT_PRODUCTS));
-      return DEFAULT_PRODUCTS;
-    }
+    if (!Array.isArray(parsed) || parsed.length === 0) return [];
 
     const deletedIds = getDeletedProductIds();
     const activeProducts = parsed.filter((p: Product) => p && p.id && !deletedIds.has(p.id));
+    if (activeProducts.length !== parsed.length) {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(activeProducts));
+      } catch {}
+    }
+    if (activeProducts.length === 0) return [];
 
     let needsResave = false;
     const normalized = activeProducts.map((p: Product, idx: number) => {

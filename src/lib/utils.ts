@@ -909,13 +909,13 @@ export function resolveBranchId(rawBranchId: string | null | undefined, cashierN
       } catch {}
     }
 
-    // 3. Reconocimiento de palabras clave y nombres canónicos con normalización estricta
-    if (cNorm.includes("angeles") || cNorm.includes("lazaro") || cNorm.includes("andres")) return "branch-angeles";
-    if (cNorm.includes("benito") || cNorm.includes("mendoza") || cNorm.includes("jorge") || cNorm.includes("luisa") || cNorm === "ana" || cNorm.startsWith("ana ")) return "branch-benito";
-    if (cNorm.includes("ildefonso") || cNorm.includes("sebastian") || cNorm.includes("silvia") || cNorm.includes("puga") || cNorm.includes("enrique")) return "branch-1790889237862";
-    if (cNorm.includes("sanjuan") || cNorm.includes("san juan") || cNorm.includes("noe") || cNorm.includes("velasquez") || cNorm.includes("maria")) return "branch-sanjuan";
-    if (cNorm.includes("flores") || cNorm.includes("sofia") || cNorm.includes("elena") || cNorm.includes("carmen")) return "branch-flores";
-    if (cNorm.includes("matriz") || cNorm.includes("centro") || cNorm.includes("tono") || cNorm.includes("lupita") || cNorm.includes("bueno")) return "branch-matriz";
+    // 3. Reconocimiento de palabras clave de sucursal
+    if (cNorm.includes("angeles")) return "branch-angeles";
+    if (cNorm.includes("benito")) return "branch-benito";
+    if (cNorm.includes("ildefonso")) return "branch-1790889237862";
+    if (cNorm.includes("sanjuan") || cNorm.includes("san juan")) return "branch-sanjuan";
+    if (cNorm.includes("flores")) return "branch-flores";
+    if (cNorm.includes("matriz") || cNorm.includes("centro")) return "branch-matriz";
   }
 
   return rawBranchId || "branch-matriz";
@@ -957,9 +957,6 @@ export function isOrderSale(sale: any): boolean {
 export function isAfternoonShift(shiftName?: string | null, cashierName?: string | null, userObj?: any): boolean {
   const combined = `${shiftName || ""} ${cashierName || ""} ${userObj?.name || ""} ${userObj?.jobTitle || ""} ${userObj?.roleLabel || ""} ${userObj?.shift || ""} ${userObj?.shiftName || ""}`.toLowerCase();
   if (combined.includes("vespertino") || combined.includes("tarde") || combined.includes("vesp")) {
-    return true;
-  }
-  if (combined.includes("enrique") || combined.includes("bueno") || combined.includes("elena") || combined.includes("jorge") || combined.includes("maria")) {
     return true;
   }
   if (cashierName && typeof window !== "undefined") {
@@ -1068,21 +1065,5 @@ export function getOriginalBranchOperator(
     }
   }
 
-  // Operadores canónicos oficiales por sucursal
-  switch (bId) {
-    case "branch-matriz":
-      return isAfternoon ? "carlos bueno" : "Lupita Brito";
-    case "branch-benito":
-      return isAfternoon ? "Jorge" : "Luisa";
-    case "branch-sanjuan":
-      return isAfternoon ? "María" : "noe velasquez";
-    case "branch-flores":
-      return isAfternoon ? "Elena Brito" : "Sofía Morales";
-    case "branch-1790889237862":
-      return isAfternoon ? "Enrique" : "Sebastián Brito";
-    case "branch-angeles":
-      return isAfternoon ? "Cajero Los Ángeles" : "andres sanchez";
-    default:
-      return "Lupita Brito";
-  }
+  return branchObj?.manager || "Don Toño Brito";
 }

@@ -2,9 +2,51 @@
 
 import { createClient } from "@/lib/supabase/client";
 
-// Epoch timestamp for clean slate: all operational data (notifications, orders, sales, expenses) before this epoch is discarded
-export const CLEAN_SLATE_EPOCH = 1792088600000; // 2026-10-15T18:23:20.000Z
+// Epoch timestamp for clean slate: all operational data and fictitious demo records before this epoch are discarded
+export const CLEAN_SLATE_EPOCH = 1792447800000; // 2026-10-19T22:10:00.000Z
 export const WIPE_VERSION_KEY = `brito_clean_slate_epoch_${CLEAN_SLATE_EPOCH}`;
+
+const PRESERVED_ADMIN_USER_IDS = new Set(["usr-1", "usr-2"]);
+
+function sanitizeStoredUsersToAdminsOnly() {
+  if (typeof window === "undefined") return;
+  try {
+    const cleanList = (raw: string | null) => {
+      if (!raw) return null;
+      try {
+        const parsed = JSON.parse(raw);
+        if (!Array.isArray(parsed)) return null;
+        return parsed.filter((u: any) => u && PRESERVED_ADMIN_USER_IDS.has(String(u.id)));
+      } catch {
+        return null;
+      }
+    };
+
+    const cleanedCustom = cleanList(localStorage.getItem("brito_custom_users"));
+    if (cleanedCustom) {
+      localStorage.setItem("brito_custom_users", JSON.stringify(cleanedCustom));
+    } else {
+      localStorage.removeItem("brito_custom_users");
+    }
+
+    const cleanedUsersList = cleanList(localStorage.getItem("brito_users_list"));
+    if (cleanedUsersList) {
+      localStorage.setItem("brito_users_list", JSON.stringify(cleanedUsersList));
+    } else {
+      localStorage.removeItem("brito_users_list");
+    }
+
+    const rawAuth = localStorage.getItem("brito_auth_user");
+    if (rawAuth) {
+      try {
+        const authUser = JSON.parse(rawAuth);
+        if (authUser && !PRESERVED_ADMIN_USER_IDS.has(String(authUser.id))) {
+          localStorage.removeItem("brito_auth_user");
+        }
+      } catch {}
+    }
+  } catch {}
+}
 
 // Ejecución sincrónica en el cliente en cuanto el módulo se carga en el navegador
 if (typeof window !== "undefined") {
@@ -34,6 +76,11 @@ if (typeof window !== "undefined") {
         "brito_pos_current_incomes",
         "brito_branch_cash_movements",
         "brito_bread_deliveries",
+        "brito_inventory_items",
+        "brito_inventory_movements",
+        "brito_products",
+        "brito_products_v6",
+        "brito_customers",
         "brito_current_shift_start_timestamp",
       ];
       keysToEmpty.forEach((k) => {
@@ -41,9 +88,11 @@ if (typeof window !== "undefined") {
           localStorage.setItem(k, "[]");
         } catch (e) {}
       });
+      sanitizeStoredUsersToAdminsOnly();
       localStorage.setItem("brito_orders_initialized", "true");
       localStorage.setItem("brito_incomes_initialized", "true");
       localStorage.setItem("brito_gastos_initialized", "true");
+      localStorage.setItem("brito_inventory_initialized", "true");
       localStorage.removeItem("brito_branches_data");
       localStorage.removeItem("brito_branches");
       localStorage.removeItem("brito_current_shift_start_timestamp");
@@ -56,6 +105,8 @@ if (typeof window !== "undefined") {
           k &&
           (k.startsWith("brito_shift_start_") ||
             k.startsWith("brito_pos_initial_fund") ||
+            k.startsWith("brito_current_shift_cashier_") ||
+            k.startsWith("brito_current_shift_name_") ||
             k.startsWith("brito_dismissed_terminal_orders_") ||
             k.startsWith("brito_read_notifs_") ||
             k.startsWith("brito_active_tab_") ||
@@ -72,6 +123,10 @@ if (typeof window !== "undefined") {
       window.dispatchEvent(new Event("brito_sales_updated"));
       window.dispatchEvent(new Event("brito_incomes_updated"));
       window.dispatchEvent(new Event("brito_gastos_updated"));
+      window.dispatchEvent(new Event("brito_products_updated"));
+      window.dispatchEvent(new Event("brito_customers_updated"));
+      window.dispatchEvent(new Event("brito_inventory_updated"));
+      window.dispatchEvent(new Event("brito_users_updated"));
       window.dispatchEvent(new Event("brito_branches_updated"));
       window.dispatchEvent(new Event("brito_branches_data_updated"));
     }
@@ -79,25 +134,16 @@ if (typeof window !== "undefined") {
 }
 
 /**
- * Realiza un vaciado total y definitivo de datos operativos:
- * - Historial de ventas y tickets (en ceros para todas las sucursales)
- * - Todos los pedidos (pendientes, en horno, listos, entregados, cancelados / dados de baja)
- * - Cache y barra de notificaciones (en 0 total)
- * - Gastos y movimientos de caja
- * - Cortes de caja anteriores
- *
- * PRESERVA:
- * - Usuarios y roles (Silvia, Ángeles, Don Toño, etc.)
- * - Sucursales y configuraciones de local
- * - Catálogo de productos y precios
- * - Clientes registrados
+ * Realiza un vaciado total y definitivo de datos operativos y ficticios:
+ * - Conserva únicamente a los 2 administradores principales (Don Toño Brito y PAULINA BRITO)
+ * - Limpia productos, clientes, inventario, ventas, pedidos, gastos, ingresos, cortes y notificaciones
  */
 export async function executeCompleteOperationalWipe(options: { wipeSupabase?: boolean } = {}) {
   if (typeof window === "undefined") return;
 
   const { wipeSupabase = true } = options;
 
-  console.log("[WipeOperationalData] Ejecutando vaciado definitivo de historial, pedidos y notificaciones...");
+  console.log("[WipeOperationalData] Ejecutando vaciado definitivo de datos ficticios y operativos...");
 
   const keysToEmpty = [
     "brito_notifications",
@@ -122,6 +168,11 @@ export async function executeCompleteOperationalWipe(options: { wipeSupabase?: b
     "brito_pos_current_incomes",
     "brito_branch_cash_movements",
     "brito_bread_deliveries",
+    "brito_inventory_items",
+    "brito_inventory_movements",
+    "brito_products",
+    "brito_products_v6",
+    "brito_customers",
     "brito_current_shift_start_timestamp",
   ];
 
@@ -132,6 +183,8 @@ export async function executeCompleteOperationalWipe(options: { wipeSupabase?: b
       console.warn("[WipeOperationalData] Error setting empty array for:", key, e);
     }
   });
+
+  sanitizeStoredUsersToAdminsOnly();
 
   // Limpiar llaves dinámicas como brito_shift_start_*
   try {
@@ -145,6 +198,8 @@ export async function executeCompleteOperationalWipe(options: { wipeSupabase?: b
         k &&
         (k.startsWith("brito_shift_start_") ||
           k.startsWith("brito_pos_initial_fund") ||
+          k.startsWith("brito_current_shift_cashier_") ||
+          k.startsWith("brito_current_shift_name_") ||
           k.startsWith("brito_dismissed_terminal_orders_") ||
           k.startsWith("brito_read_notifs_") ||
           k.startsWith("brito_active_tab_") ||
@@ -168,6 +223,7 @@ export async function executeCompleteOperationalWipe(options: { wipeSupabase?: b
     localStorage.setItem("brito_orders_initialized", "true");
     localStorage.setItem("brito_incomes_initialized", "true");
     localStorage.setItem("brito_gastos_initialized", "true");
+    localStorage.setItem("brito_inventory_initialized", "true");
     localStorage.setItem(WIPE_VERSION_KEY, "true");
   } catch (e) {}
 
@@ -181,6 +237,8 @@ export async function executeCompleteOperationalWipe(options: { wipeSupabase?: b
       await supabase.from("cash_expenses").delete().neq("id", "none");
       await supabase.from("cash_movements").delete().neq("id", "none");
       await supabase.from("cash_shifts").delete().neq("id", "none");
+      await supabase.from("products").delete().neq("id", "none");
+      await supabase.from("customers").delete().neq("id", "cli-general");
       console.log("[WipeOperationalData] Tablas de Supabase en 0.");
     } catch (err) {
       console.warn("[WipeOperationalData] Nota al limpiar Supabase:", err);
@@ -193,6 +251,10 @@ export async function executeCompleteOperationalWipe(options: { wipeSupabase?: b
     window.dispatchEvent(new Event("brito_sales_updated"));
     window.dispatchEvent(new Event("brito_incomes_updated"));
     window.dispatchEvent(new Event("brito_gastos_updated"));
+    window.dispatchEvent(new Event("brito_products_updated"));
+    window.dispatchEvent(new Event("brito_customers_updated"));
+    window.dispatchEvent(new Event("brito_inventory_updated"));
+    window.dispatchEvent(new Event("brito_users_updated"));
     window.dispatchEvent(new Event("brito_notifications_cleared"));
     window.dispatchEvent(new Event("brito_branches_updated"));
     window.dispatchEvent(new Event("brito_branches_data_updated"));

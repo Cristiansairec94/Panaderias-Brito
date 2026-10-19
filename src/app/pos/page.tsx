@@ -92,39 +92,7 @@ import { getShiftFinancialSummary, resolveShiftInitialFund } from "@/lib/shiftCa
 
 const INITIAL_EXPENSES: CashExpense[] = [];
 
-const INITIAL_BREAD_DELIVERIES: BreadDeliveryRecord[] = [
-  {
-    id: "CAM-49201",
-    source: "Camioneta 1 (Ruta Poniente)",
-    driver: "Manuel Sánchez",
-    cashier: "Cajera 1 - Turno Matutino",
-    date: new Date().toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" }),
-    timestamp: `${new Date().toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" })} • 07:30`,
-    items: [
-      { productId: "p-bolillo", productName: "Bolillo Tradicional Caliente", quantity: 200, unitPrice: 3, previousStock: 20, newStock: 220 },
-      { productId: "p-telera", productName: "Telera para Torta", quantity: 120, unitPrice: 3.5, previousStock: 15, newStock: 135 },
-      { productId: "p-concha", productName: "Concha de Vainilla", quantity: 50, unitPrice: 10, previousStock: 10, newStock: 60 },
-    ],
-    totalPieces: 370,
-    totalEstimatedValue: 1520,
-    notes: "Primera descarga de la mañana recién salido del horno",
-  },
-  {
-    id: "CAM-49202",
-    source: "Camioneta 2 (Ruta Centro)",
-    driver: "Pedro Ramírez",
-    cashier: "Cajera 2 - Turno Vespertino",
-    date: new Date().toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" }),
-    timestamp: `${new Date().toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" })} • 14:45`,
-    items: [
-      { productId: "p-cuerno", productName: "Cuerno de Mantequilla", quantity: 60, unitPrice: 10, previousStock: 8, newStock: 68 },
-      { productId: "p-dona", productName: "Dona de Azúcar", quantity: 50, unitPrice: 10, previousStock: 5, newStock: 55 },
-    ],
-    totalPieces: 110,
-    totalEstimatedValue: 1100,
-    notes: "Surtido de media tarde para merienda",
-  },
-];
+const INITIAL_BREAD_DELIVERIES: BreadDeliveryRecord[] = [];
 
 const POS_CATEGORIES = [
   { id: "all", label: "Todo el Pan", priceTag: "", icon: "🧺" },
@@ -197,7 +165,7 @@ const DEFAULT_TRANSFER_ACCOUNTS: TransferAccount[] = [
   },
   {
     id: "cta-2",
-    name: "Lupita Brito",
+    name: "Paulina Brito",
     bank: "Banorte",
     clabe: "072 180 00847291104 8",
     accountNumber: "084 729 1104",
@@ -756,7 +724,9 @@ export default function POSPage() {
         const saved = localStorage.getItem("brito_bread_deliveries");
         if (saved) {
           const parsed = JSON.parse(saved);
-          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+          if (Array.isArray(parsed)) {
+            return parsed.filter((d: any) => d && d.id !== "CAM-49201" && d.id !== "CAM-49202");
+          }
         }
       } catch (e) {}
     }

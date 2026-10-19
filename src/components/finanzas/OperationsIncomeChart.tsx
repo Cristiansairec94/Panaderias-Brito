@@ -148,10 +148,10 @@ export default function OperationsIncomeChart({
       avgLabel = "por turno";
       svgWidth = 720;
 
-      // Base diaria estimada
+      // Base diaria real
       const dayTotal = summary.period === "hoy"
         ? pl.grossSales
-        : Math.round(pl.grossSales / (summary.period === "anio" ? 318 : summary.period === "mes" ? 26.5 : 6.2)) || 14500;
+        : Math.round(pl.grossSales / (summary.period === "anio" ? 318 : summary.period === "mes" ? 26.5 : 6.2));
 
       const hourlyRatios = [
         { day: "06:00 - 08:30", shortDay: "06:00 - 08:30", ratio: 0.15, isPeak: false, note: "Apertura y primera salida de bolillo caliente y conchas", rushDetail: "06:30 - 08:00" },
@@ -177,10 +177,10 @@ export default function OperationsIncomeChart({
       avgLabel = "al mes";
       svgWidth = 840;
 
-      // Base anual estimada
+      // Base anual real
       const yearTotal = summary.period === "anio"
         ? pl.grossSales
-        : Math.round(pl.grossSales * (summary.period === "mes" ? 12 : summary.period === "hoy" ? 318 : 52)) || 4600000;
+        : Math.round(pl.grossSales * (summary.period === "mes" ? 12 : summary.period === "hoy" ? 318 : 52));
 
       const monthRatios = [
         { day: "Enero", shortDay: "Ene", ratio: 0.082, isPeak: false, note: "Rosca de Reyes y arranque de año", rushDetail: "5 y 6 de Enero" },

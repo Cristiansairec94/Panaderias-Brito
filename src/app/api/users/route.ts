@@ -15,6 +15,20 @@ let lastFileMtime = 0;
 const RETIRED_USER_IDS = [
   "usr-3",
   "usr-4",
+  "usr-5",
+  "usr-lupita",
+  "usr-carlos-b",
+  "usr-luisa",
+  "usr-jorge",
+  "usr-noe",
+  "usr-maria",
+  "usr-sofia",
+  "usr-elena",
+  "usr-sebastian",
+  "usr-silvia",
+  "usr-enrique",
+  "usr-andres",
+  "usr-angeles",
 ];
 
 const deletedUserIdsSet = new Set<string>(RETIRED_USER_IDS);

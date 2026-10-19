@@ -29,57 +29,58 @@ const INVENTORY_ITEMS_KEY = "brito_inventory_items";
 const INVENTORY_MOVEMENTS_KEY = "brito_inventory_movements";
 const INVENTORY_INIT_KEY = "brito_inventory_initialized";
 
-const INITIAL_INVENTORY: InventoryItem[] = [
-  { id: "1", name: "Harina de Trigo Extra Fina", unit: "bultos", currentStock: 8, minStock: 10, costPerUnit: 520, category: "harinas" },
-  { id: "2", name: "Azúcar Estándar", unit: "bultos", currentStock: 14, minStock: 5, costPerUnit: 850, category: "azucares" },
-  { id: "3", name: "Mantequilla Pura de Vaca", unit: "kg", currentStock: 4, minStock: 12, costPerUnit: 140, category: "grasas" },
-  { id: "4", name: "Levadura Fresca", unit: "kg", currentStock: 15, minStock: 6, costPerUnit: 65, category: "harinas" },
-  { id: "5", name: "Huevo Limpio", unit: "kg", currentStock: 45, minStock: 20, costPerUnit: 38, category: "lacteos" },
-  { id: "6", name: "Manteca Vegetal Inca", unit: "kg", currentStock: 25, minStock: 10, costPerUnit: 55, category: "grasas" },
-  { id: "7", name: "Leche Entera", unit: "litros", currentStock: 30, minStock: 15, costPerUnit: 24, category: "lacteos" },
-  { id: "8", name: "Esencia de Vainilla", unit: "litros", currentStock: 5, minStock: 2, costPerUnit: 90, category: "esencias" },
-  { id: "9", name: "Bolsas de Papel Kraft (Pan)", unit: "piezas", currentStock: 850, minStock: 300, costPerUnit: 0.85, category: "empaques" },
-  { id: "10", name: "Domo para Pastel Grande", unit: "piezas", currentStock: 18, minStock: 25, costPerUnit: 18.00, category: "empaques" },
-];
+const INITIAL_INVENTORY: InventoryItem[] = [];
 
-const INITIAL_MOVEMENTS: InventoryMovement[] = [
-  { id: "mov-1", itemId: "1", itemName: "Harina de Trigo Extra Fina", type: "entrada_compra", quantity: 10, unit: "bultos", cost: 5200, reason: "Compra semanal a Harinera La Espiga", responsible: "Don Toño Brito", timestamp: "2026-09-01 10:30" },
-  { id: "mov-2", itemId: "3", itemName: "Mantequilla Pura de Vaca", type: "merma_horno", quantity: 1.5, unit: "kg", cost: 210, reason: "Lote de cuernos pasado de horneado", responsible: "Maestro Juan", timestamp: "2026-09-01 13:15" },
-  { id: "mov-3", itemId: "9", itemName: "Bolsas de Papel Kraft", type: "entrada_compra", quantity: 500, unit: "piezas", cost: 425, reason: "Resurtido de empaques para mostrador", responsible: "Lupita Brito", timestamp: "2026-08-31 16:00" },
-];
+const INITIAL_MOVEMENTS: InventoryMovement[] = [];
+
+const RETIRED_DEMO_INVENTORY_IDS = new Set([
+  "1", "2", "3", "4", "5", "6", "7", "8", "9", "10"
+]);
+
+const RETIRED_DEMO_MOVEMENT_IDS = new Set([
+  "mov-1", "mov-2", "mov-3"
+]);
 
 function getStoredInventoryItems(): InventoryItem[] {
-  if (typeof window === "undefined") return INITIAL_INVENTORY;
+  if (typeof window === "undefined") return [];
   try {
-    const isInit = localStorage.getItem(INVENTORY_INIT_KEY) === "true";
     const raw = localStorage.getItem(INVENTORY_ITEMS_KEY);
     if (!raw) {
-      if (isInit) return [];
-      localStorage.setItem(INVENTORY_ITEMS_KEY, JSON.stringify(INITIAL_INVENTORY));
+      localStorage.setItem(INVENTORY_ITEMS_KEY, "[]");
       localStorage.setItem(INVENTORY_INIT_KEY, "true");
-      return INITIAL_INVENTORY;
+      return [];
     }
     const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed)) return parsed;
+    if (Array.isArray(parsed)) {
+      const cleaned = parsed.filter((i: any) => i && !RETIRED_DEMO_INVENTORY_IDS.has(String(i.id)));
+      if (cleaned.length !== parsed.length) {
+        localStorage.setItem(INVENTORY_ITEMS_KEY, JSON.stringify(cleaned));
+      }
+      return cleaned;
+    }
   } catch {}
-  return INITIAL_INVENTORY;
+  return [];
 }
 
 function getStoredInventoryMovements(): InventoryMovement[] {
-  if (typeof window === "undefined") return INITIAL_MOVEMENTS;
+  if (typeof window === "undefined") return [];
   try {
-    const isInit = localStorage.getItem(INVENTORY_INIT_KEY) === "true";
     const raw = localStorage.getItem(INVENTORY_MOVEMENTS_KEY);
     if (!raw) {
-      if (isInit) return [];
-      localStorage.setItem(INVENTORY_MOVEMENTS_KEY, JSON.stringify(INITIAL_MOVEMENTS));
+      localStorage.setItem(INVENTORY_MOVEMENTS_KEY, "[]");
       localStorage.setItem(INVENTORY_INIT_KEY, "true");
-      return INITIAL_MOVEMENTS;
+      return [];
     }
     const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed)) return parsed;
+    if (Array.isArray(parsed)) {
+      const cleaned = parsed.filter((m: any) => m && !RETIRED_DEMO_MOVEMENT_IDS.has(String(m.id)));
+      if (cleaned.length !== parsed.length) {
+        localStorage.setItem(INVENTORY_MOVEMENTS_KEY, JSON.stringify(cleaned));
+      }
+      return cleaned;
+    }
   } catch {}
-  return INITIAL_MOVEMENTS;
+  return [];
 }
 
 export default function InventarioPage() {

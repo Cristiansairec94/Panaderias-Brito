@@ -47,16 +47,7 @@ interface TopProductItem {
   tag: string;
 }
 
-const ALL_TOP_BAKERY_PRODUCTS: TopProductItem[] = [
-  { id: "1", name: "Concha de Vainilla Artesanal", category: "pan_dulce", categoryLabel: "Pan Dulce", icon: "🥖", price: 14, piecesSold: 342, revenue: 4788, share: 24, trend: "+15%", tag: "Más Vendido" },
-  { id: "2", name: "Bolillo Tradicional de Horno", category: "pan_salado", categoryLabel: "Pan Salado", icon: "🥖", price: 6, piecesSold: 580, revenue: 3480, share: 18, trend: "+22%", tag: "Alta Rotación" },
-  { id: "3", name: "Cuerno de Mantequilla Francés", category: "hojaldre", categoryLabel: "Hojaldre", icon: "🥐", price: 18, piecesSold: 165, revenue: 2970, share: 15, trend: "+8%", tag: "Favorito" },
-  { id: "4", name: "Telera Dorada de Piso", category: "pan_salado", categoryLabel: "Pan Salado", icon: "🥖", price: 7, piecesSold: 410, revenue: 2870, share: 14, trend: "+12%", tag: "Mayoreo Loncherías" },
-  { id: "5", name: "Dona Glaseada de Azúcar", category: "pan_dulce", categoryLabel: "Pan Dulce", icon: "🍩", price: 15, piecesSold: 180, revenue: 2700, share: 14, trend: "+6%", tag: "Popular" },
-  { id: "6", name: "Rebanada Pastel Tres Leches", category: "pasteleria", categoryLabel: "Pastelería", icon: "🍰", price: 48, piecesSold: 46, revenue: 2208, share: 11, trend: "+18%", tag: "Gourmet" },
-  { id: "7", name: "Oreja Caramelizada de Hojaldre", category: "hojaldre", categoryLabel: "Hojaldre", icon: "🥐", price: 16, piecesSold: 135, revenue: 2160, share: 10, trend: "+10%", tag: "Crujiente" },
-  { id: "8", name: "Pay de Queso con Zarzamora", category: "pasteleria", categoryLabel: "Pastelería", icon: "🥧", price: 45, piecesSold: 38, revenue: 1710, share: 8, trend: "+14%", tag: "Especialidad" },
-];
+const ALL_TOP_BAKERY_PRODUCTS: TopProductItem[] = [];
 
 export default function Home() {
   const { user, permissions } = useAuth();
@@ -73,14 +64,84 @@ export default function Home() {
 
   // Orders state (Pedidos de mostrador levantados por cajeros)
   const [orders, setOrders] = useState<CustomOrder[]>([]);
+  const [realTopProducts, setRealTopProducts] = useState<TopProductItem[]>([]);
 
   useEffect(() => {
-    setOrders(getStoredOrders());
-    const handleStorageChange = () => {
+    const refreshRealData = () => {
       setOrders(getStoredOrders());
+      try {
+        const rawSales = localStorage.getItem("brito_pos_master_sales");
+        const sales = rawSales ? JSON.parse(rawSales) : [];
+        if (!Array.isArray(sales) || sales.length === 0) {
+          setRealTopProducts([]);
+          return;
+        }
+        const agg = new Map<string, { name: string; price: number; pieces: number; revenue: number; category: TopProductItem["category"] }>();
+        for (const s of sales) {
+          if (!s || !Array.isArray(s.items)) continue;
+          for (const item of s.items) {
+            const prod = item.product || item;
+            const id = String(prod.id || prod.name || "item");
+            const name = String(prod.name || "Producto");
+            const qty = Number(item.quantity) || 1;
+            const price = Number(prod.price) || 0;
+            const rev = Number(item.subtotal) || qty * price;
+            const rawCat = String(prod.category || "").toLowerCase();
+            const cat: TopProductItem["category"] =
+              rawCat.includes("salado") || rawCat.includes("blanco") || name.toLowerCase().includes("bolillo") || name.toLowerCase().includes("telera")
+                ? "pan_salado"
+                : rawCat.includes("pastel") || rawCat.includes("pay")
+                ? "pasteleria"
+                : rawCat.includes("hojaldre") || name.toLowerCase().includes("cuerno") || name.toLowerCase().includes("oreja")
+                ? "hojaldre"
+                : "pan_dulce";
+            const prev = agg.get(id);
+            if (prev) {
+              prev.pieces += qty;
+              prev.revenue += rev;
+            } else {
+              agg.set(id, { name, price, pieces: qty, revenue: rev, category: cat });
+            }
+          }
+        }
+        const totalRev = Array.from(agg.values()).reduce((sum, x) => sum + x.revenue, 0) || 1;
+        const list: TopProductItem[] = Array.from(agg.entries())
+          .sort((a, b) => b[1].revenue - a[1].revenue)
+          .slice(0, 8)
+          .map(([id, v]) => ({
+            id,
+            name: v.name,
+            category: v.category,
+            categoryLabel:
+              v.category === "pan_salado"
+                ? "Pan Salado"
+                : v.category === "pasteleria"
+                ? "Pastelería"
+                : v.category === "hojaldre"
+                ? "Hojaldre"
+                : "Pan Dulce",
+            icon: v.category === "pasteleria" ? "🍰" : v.category === "hojaldre" ? "🥐" : "🥖",
+            price: v.price,
+            piecesSold: v.pieces,
+            revenue: v.revenue,
+            share: Math.round((v.revenue / totalRev) * 100),
+            trend: "Real",
+            tag: "En Vivo",
+          }));
+        setRealTopProducts(list);
+      } catch {
+        setRealTopProducts([]);
+      }
     };
-    window.addEventListener("storage", handleStorageChange);
-    return () => window.removeEventListener("storage", handleStorageChange);
+    refreshRealData();
+    window.addEventListener("storage", refreshRealData);
+    window.addEventListener("brito_sales_updated", refreshRealData);
+    window.addEventListener("brito_orders_updated", refreshRealData);
+    return () => {
+      window.removeEventListener("storage", refreshRealData);
+      window.removeEventListener("brito_sales_updated", refreshRealData);
+      window.removeEventListener("brito_orders_updated", refreshRealData);
+    };
   }, []);
 
   // Filters state
@@ -112,9 +173,6 @@ export default function Home() {
     return () => clearInterval(interval);
   }, []);
 
-  // Multiplicador por período seleccionado
-  const periodMultiplier = selectedPeriod === "hoy" ? 1 : selectedPeriod === "semana" ? 6.2 : 24.5;
-
   const baseSales = isAllBranches 
     ? consolidatedMetrics.totalSales 
     : (currentBranch?.todaySales ?? 0);
@@ -123,14 +181,14 @@ export default function Home() {
     ? consolidatedMetrics.totalTickets 
     : (currentBranch?.todayTickets ?? 0);
 
-  const activeSales = Math.round(baseSales * periodMultiplier);
-  const activeTickets = Math.round(baseTickets * periodMultiplier);
+  const activeSales = Math.round(baseSales);
+  const activeTickets = Math.round(baseTickets);
   
   const activeCash = isAllBranches 
     ? consolidatedMetrics.totalCashInDrawer 
     : (currentBranch?.cashInDrawer ?? 0);
 
-  const avgTicket = Math.round(activeSales / Math.max(1, activeTickets));
+  const avgTicket = activeTickets > 0 ? Math.round(activeSales / activeTickets) : 0;
 
   // Filtered orders for active branch (only pending orders to be delivered)
   const filteredOrders = useMemo(() => {
@@ -177,9 +235,10 @@ export default function Home() {
 
   // Filtrado de productos estrella por categoría
   const displayedTopProducts = useMemo(() => {
-    if (productCategoryFilter === "todas") return ALL_TOP_BAKERY_PRODUCTS;
-    return ALL_TOP_BAKERY_PRODUCTS.filter((p) => p.category === productCategoryFilter);
-  }, [productCategoryFilter]);
+    const source = realTopProducts.length > 0 ? realTopProducts : ALL_TOP_BAKERY_PRODUCTS;
+    if (productCategoryFilter === "todas") return source;
+    return source.filter((p) => p.category === productCategoryFilter);
+  }, [productCategoryFilter, realTopProducts]);
 
   return (
     <div className="w-full max-w-full space-y-6 sm:space-y-7 overflow-x-hidden pb-10">
@@ -742,50 +801,60 @@ export default function Home() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {displayedTopProducts.map((prod, idx) => (
-            <div 
-              key={prod.id} 
-              className="p-4 rounded-2xl bg-stone-50/70 border border-stone-200/80 hover:border-orange-300 hover:bg-orange-50/20 transition-all flex flex-col justify-between space-y-3 group"
-            >
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1.5">
-                    <span className="w-7 h-7 rounded-xl bg-stone-200 text-stone-800 flex items-center justify-center font-black text-xs">
-                      #{idx + 1}
+        {displayedTopProducts.length === 0 ? (
+          <div className="p-8 text-center bg-stone-50 rounded-2xl border border-dashed border-stone-200 space-y-2">
+            <Croissant className="w-10 h-10 text-stone-300 mx-auto" />
+            <p className="font-bold text-sm text-stone-700">Sin ventas de productos registradas aún</p>
+            <p className="text-xs text-stone-400 max-w-sm mx-auto">
+              En cuanto se registren ventas reales en el Punto de Venta (POS), aquí aparecerá el ranking de los panes y pasteles más vendidos.
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {displayedTopProducts.map((prod, idx) => (
+              <div 
+                key={prod.id} 
+                className="p-4 rounded-2xl bg-stone-50/70 border border-stone-200/80 hover:border-orange-300 hover:bg-orange-50/20 transition-all flex flex-col justify-between space-y-3 group"
+              >
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-7 h-7 rounded-xl bg-stone-200 text-stone-800 flex items-center justify-center font-black text-xs">
+                        #{idx + 1}
+                      </span>
+                      <span className="text-base">{prod.icon}</span>
+                    </div>
+                    <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                      {prod.trend} hoy
                     </span>
-                    <span className="text-base">{prod.icon}</span>
                   </div>
-                  <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
-                    {prod.trend} hoy
-                  </span>
+
+                  <div>
+                    <p className="font-black text-sm text-stone-900 leading-snug group-hover:text-orange-600 transition-colors">
+                      {prod.name}
+                    </p>
+                    <p className="text-[11px] text-stone-500 mt-0.5">
+                      {prod.piecesSold} piezas vendidas • {formatCurrency(prod.price)} c/u
+                    </p>
+                  </div>
                 </div>
 
                 <div>
-                  <p className="font-black text-sm text-stone-900 leading-snug group-hover:text-orange-600 transition-colors">
-                    {prod.name}
-                  </p>
-                  <p className="text-[11px] text-stone-500 mt-0.5">
-                    {prod.piecesSold} piezas vendidas • {formatCurrency(prod.price)} c/u
-                  </p>
+                  <div className="flex items-baseline justify-between text-xs mb-1">
+                    <span className="text-[10px] text-stone-500 font-bold uppercase">{prod.categoryLabel}</span>
+                    <span className="font-black text-stone-900">{formatCurrency(prod.revenue)}</span>
+                  </div>
+                  <div className="w-full bg-stone-200 rounded-full h-1.5 overflow-hidden">
+                    <div
+                      className="bg-gradient-to-r from-orange-500 to-rose-500 h-full rounded-full transition-all duration-500"
+                      style={{ width: `${prod.share * 3.6}%` }}
+                    />
+                  </div>
                 </div>
               </div>
-
-              <div>
-                <div className="flex items-baseline justify-between text-xs mb-1">
-                  <span className="text-[10px] text-stone-500 font-bold uppercase">{prod.categoryLabel}</span>
-                  <span className="font-black text-stone-900">{formatCurrency(prod.revenue)}</span>
-                </div>
-                <div className="w-full bg-stone-200 rounded-full h-1.5 overflow-hidden">
-                  <div
-                    className="bg-gradient-to-r from-orange-500 to-rose-500 h-full rounded-full transition-all duration-500"
-                    style={{ width: `${prod.share * 3.6}%` }}
-                  />
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* ========================================================= */}
