@@ -109,11 +109,12 @@ function getShiftSuggestionByCurrentTime(date = new Date()) {
   }
 }
 
-function parseCutTimestamp(cut: ShiftCutRecord): number {
+function parseCutTimestamp(cut?: ShiftCutRecord | null): number {
+  if (!cut) return Date.now();
   if (typeof cut.timestamp === "number" && !isNaN(cut.timestamp) && cut.timestamp > 0) {
     return cut.timestamp;
   }
-  if (cut.date) {
+  if (cut.date && typeof cut.date === "string") {
     const dLower = cut.date.toLowerCase();
     if (dLower.includes("hoy")) {
       return Date.now();
@@ -128,22 +129,27 @@ function parseCutTimestamp(cut: ShiftCutRecord): number {
     }
     const m = cut.date.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
     if (m) {
-      return new Date(parseInt(m[3], 10), parseInt(m[2], 10) - 1, parseInt(m[1], 10)).getTime();
+      const ts = new Date(parseInt(m[3], 10), parseInt(m[2], 10) - 1, parseInt(m[1], 10)).getTime();
+      if (!isNaN(ts)) return ts;
     }
     const mIso = cut.date.match(/(\d{4})[\/\-](\d{2})[\/\-](\d{2})/);
     if (mIso) {
-      return new Date(parseInt(mIso[1], 10), parseInt(mIso[2], 10) - 1, parseInt(mIso[3], 10)).getTime();
+      const ts = new Date(parseInt(mIso[1], 10), parseInt(mIso[2], 10) - 1, parseInt(mIso[3], 10)).getTime();
+      if (!isNaN(ts)) return ts;
     }
   }
   return Date.now();
 }
 
-function getCutDateParts(cut: ShiftCutRecord) {
+function getCutDateParts(cut?: ShiftCutRecord | null) {
   const ts = parseCutTimestamp(cut);
-  const d = new Date(ts);
-  const year = d.getFullYear().toString();
-  const month = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
+  const d = new Date(isNaN(ts) ? Date.now() : ts);
+  const y = isNaN(d.getFullYear()) ? new Date().getFullYear() : d.getFullYear();
+  const m = isNaN(d.getMonth()) ? new Date().getMonth() : d.getMonth();
+  const dateNum = isNaN(d.getDate()) ? new Date().getDate() : d.getDate();
+  const year = y.toString();
+  const month = String(m + 1).padStart(2, "0");
+  const day = String(dateNum).padStart(2, "0");
   return {
     year,
     yearMonth: `${year}-${month}`,
@@ -223,9 +229,35 @@ export default function CajaPage() {
   const periodDropdownRef = useRef<HTMLDivElement>(null);
   const [filterStatus, setFilterStatus] = useState<"all" | "cuadrado" | "sobrante" | "faltante">("all");
 
-  const getStoredCajaInitialFund = (fallback: number = 0): number => {
+  // Active shift responsible name dynamically resolved from usersList (el perfil del administrador)
+  const assignedBranchUser = useMemo(() => {
+    if (!currentBranch?.id || !usersList || usersList.length === 0) return null;
+    return (
+      usersList.find((u) => currentBranch.assignedUserId && u.id === currentBranch.assignedUserId && u.status !== "inactivo") ||
+      usersList.find((u) => u.assignedBranchId === currentBranch.id && u.status !== "inactivo") ||
+      null
+    );
+  }, [currentBranch?.id, currentBranch?.assignedUserId, usersList]);
+
+  const currentShiftResponsible = useMemo(() => {
+    if (user && user.role === "cajero" && (user.assignedBranchId === currentBranch?.id || !user.assignedBranchId)) {
+      return user.name;
+    }
+    if (assignedBranchUser) {
+      return assignedBranchUser.name;
+    }
+    if (currentBranch?.currentShift?.cashier && usersList.some((u) => u.name === currentBranch.currentShift.cashier)) {
+      return currentBranch.currentShift.cashier;
+    }
+    if (currentBranch?.manager && usersList.some((u) => u.name === currentBranch.manager)) {
+      return currentBranch.manager;
+    }
+    return user?.name || "Don Toño Brito";
+  }, [user, currentBranch, assignedBranchUser, usersList]);
+
+  const getStoredCajaInitialFund = (fallback: number = 0, explicitCashier?: string): number => {
     const bId = currentBranch?.id || "branch-matriz";
-    const curCashier = currentShiftResponsible || currentBranch?.currentShift?.cashier || (user?.role !== "admin" ? user?.name : "");
+    const curCashier = explicitCashier || currentShiftResponsible || currentBranch?.currentShift?.cashier || (user?.role !== "admin" ? user?.name : "");
     const curShift = currentBranch?.currentShift?.name || "";
     const isAfternoon = isAfternoonShift(curShift, curCashier, user);
 
@@ -234,16 +266,18 @@ export default function CajaPage() {
         return Number(currentBranch.lastCut.nextFund) || 0;
       }
       try {
-        const raw = localStorage.getItem("brito_shift_cuts_history");
-        if (raw) {
-          const parsed = JSON.parse(raw);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            const bCut = parsed.find((c: any) => c && (c.branchId === bId || (!c.branchId && bId === "branch-matriz")));
-            if (bCut && typeof bCut.nextFund === "number") return bCut.nextFund;
+        if (typeof window !== "undefined") {
+          const raw = localStorage.getItem("brito_shift_cuts_history");
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              const bCut = parsed.find((c: any) => c && (c.branchId === bId || (!c.branchId && bId === "branch-matriz")));
+              if (bCut && typeof bCut.nextFund === "number") return bCut.nextFund;
+            }
           }
+          const branchSaved = localStorage.getItem(`brito_pos_initial_fund_${bId}`);
+          if (branchSaved !== null && !isNaN(Number(branchSaved))) return Number(branchSaved);
         }
-        const branchSaved = localStorage.getItem(`brito_pos_initial_fund_${bId}`);
-        if (branchSaved !== null && !isNaN(Number(branchSaved))) return Number(branchSaved);
       } catch (e) {}
       return 0;
     }
@@ -260,22 +294,24 @@ export default function CajaPage() {
       if (f > 0 && !(bId === "branch-matriz" && f === 800)) return f;
     }
     try {
-      const branchSaved = localStorage.getItem(`brito_pos_initial_fund_${bId}`);
-      if (branchSaved && !isNaN(Number(branchSaved)) && Number(branchSaved) > 0) {
-        const num = Number(branchSaved);
-        if (!(bId === "branch-matriz" && num === 800) && num !== 800 && num !== 1200) return num;
-      }
-      if (bId === "branch-matriz") {
-        const saved = localStorage.getItem("brito_pos_initial_fund");
-        if (saved && !isNaN(Number(saved)) && Number(saved) > 0 && Number(saved) !== 800) return Number(saved);
-      }
-      const raw = localStorage.getItem("brito_shift_cuts_history");
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          const bCut = parsed.find((c: any) => c && (c.branchId === bId || (!c.branchId && bId === "branch-matriz")));
-          if (bCut && typeof bCut.nextFund === "number" && bCut.nextFund > 0) {
-            if (!(bId === "branch-matriz" && bCut.nextFund === 800)) return bCut.nextFund;
+      if (typeof window !== "undefined") {
+        const branchSaved = localStorage.getItem(`brito_pos_initial_fund_${bId}`);
+        if (branchSaved && !isNaN(Number(branchSaved)) && Number(branchSaved) > 0) {
+          const num = Number(branchSaved);
+          if (!(bId === "branch-matriz" && num === 800) && num !== 800 && num !== 1200) return num;
+        }
+        if (bId === "branch-matriz") {
+          const saved = localStorage.getItem("brito_pos_initial_fund");
+          if (saved && !isNaN(Number(saved)) && Number(saved) > 0 && Number(saved) !== 800) return Number(saved);
+        }
+        const raw = localStorage.getItem("brito_shift_cuts_history");
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            const bCut = parsed.find((c: any) => c && (c.branchId === bId || (!c.branchId && bId === "branch-matriz")));
+            if (bCut && typeof bCut.nextFund === "number" && bCut.nextFund > 0) {
+              if (!(bId === "branch-matriz" && bCut.nextFund === 800)) return bCut.nextFund;
+            }
           }
         }
       }
@@ -1167,36 +1203,14 @@ export default function CajaPage() {
   const liveCashDifference = liveCountedValue - expectedCashInDrawer;
   const liveDeliveredToOwner = Math.max(0, liveCountedValue - (Number(nextFundAmount) || 0));
 
-  // Active shift responsible name dynamically resolved from usersList (el perfil del administrador)
-  const assignedBranchUser = useMemo(() => {
-    if (!currentBranch?.id || !usersList || usersList.length === 0) return null;
-    return (
-      usersList.find((u) => currentBranch.assignedUserId && u.id === currentBranch.assignedUserId && u.status !== "inactivo") ||
-      usersList.find((u) => u.assignedBranchId === currentBranch.id && u.status !== "inactivo") ||
-      null
-    );
-  }, [currentBranch?.id, currentBranch?.assignedUserId, usersList]);
 
-  const currentShiftResponsible = useMemo(() => {
-    if (user && user.role === "cajero" && (user.assignedBranchId === currentBranch?.id || !user.assignedBranchId)) {
-      return user.name;
-    }
-    if (assignedBranchUser) {
-      return assignedBranchUser.name;
-    }
-    if (currentBranch?.currentShift?.cashier && usersList.some((u) => u.name === currentBranch.currentShift.cashier)) {
-      return currentBranch.currentShift.cashier;
-    }
-    if (currentBranch?.manager && usersList.some((u) => u.name === currentBranch.manager)) {
-      return currentBranch.manager;
-    }
-    return user?.name || "Don Toño Brito";
-  }, [user, currentBranch, assignedBranchUser, usersList]);
 
   // Cuts filtered primarily by Period (Día, Mes, Año, Todos)
   const periodCuts = useMemo(() => {
-    if (filterPeriod === "todos") return cutsHistory;
+    if (!Array.isArray(cutsHistory)) return [];
+    if (filterPeriod === "todos") return cutsHistory.filter(Boolean);
     return cutsHistory.filter((cut) => {
+      if (!cut) return false;
       const parts = getCutDateParts(cut);
       if (filterPeriod === "dia") return parts.dateStr === selectedDayDate;
       if (filterPeriod === "mes") return parts.yearMonth === selectedMonthStr;
@@ -1211,28 +1225,34 @@ export default function CajaPage() {
     let month = 0;
     let year = 0;
 
-    cutsHistory.forEach((c) => {
-      const parts = getCutDateParts(c);
-      if (parts.dateStr === selectedDayDate) day++;
-      if (parts.yearMonth === selectedMonthStr) month++;
-      if (parts.year === selectedYearStr) year++;
-    });
+    if (Array.isArray(cutsHistory)) {
+      cutsHistory.forEach((c) => {
+        if (!c) return;
+        const parts = getCutDateParts(c);
+        if (parts.dateStr === selectedDayDate) day++;
+        if (parts.yearMonth === selectedMonthStr) month++;
+        if (parts.year === selectedYearStr) year++;
+      });
+    }
 
     return {
       day,
       month,
       year,
-      all: cutsHistory.length,
+      all: Array.isArray(cutsHistory) ? cutsHistory.length : 0,
     };
   }, [cutsHistory, selectedDayDate, selectedMonthStr, selectedYearStr]);
 
   // Distinct Responsibles list for filter dropdown
   const uniqueResponsibles = useMemo(() => {
     const set = new Set<string>();
-    cutsHistory.forEach((c) => {
-      const name = c.responsible || c.outgoingCashier;
-      if (name) set.add(name);
-    });
+    if (Array.isArray(cutsHistory)) {
+      cutsHistory.forEach((c) => {
+        if (!c) return;
+        const name = c.responsible || c.outgoingCashier;
+        if (name) set.add(name);
+      });
+    }
     return Array.from(set);
   }, [cutsHistory]);
 
@@ -1295,16 +1315,21 @@ export default function CajaPage() {
       "2025",
       "2024",
     ]);
-    cutsHistory.forEach((c) => {
-      const parts = getCutDateParts(c);
-      if (parts.year) set.add(parts.year);
-    });
+    if (Array.isArray(cutsHistory)) {
+      cutsHistory.forEach((c) => {
+        if (!c) return;
+        const parts = getCutDateParts(c);
+        if (parts.year) set.add(parts.year);
+      });
+    }
     return Array.from(set).sort((a, b) => Number(b) - Number(a));
   }, [cutsHistory]);
 
   // Filtered cuts history (Period + Search + Responsible + Status + Branch)
   const filteredCuts = useMemo(() => {
+    if (!Array.isArray(periodCuts)) return [];
     return periodCuts.filter((cut) => {
+      if (!cut) return false;
       // 0. Filter by branch
       if (!isAllBranches && currentBranch && currentBranch.id && currentBranch.id !== "all") {
         const cutBranch = (cut as any).branchId || (cut as any).branch_id;
@@ -1318,7 +1343,7 @@ export default function CajaPage() {
       // 1. Search Query
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
-        const matchId = cut.id.toLowerCase().includes(q);
+        const matchId = (cut.id || "").toLowerCase().includes(q);
         const matchResp = (cut.responsible || "").toLowerCase().includes(q);
         const matchOutgoing = (cut.outgoingCashier || "").toLowerCase().includes(q);
         const matchIncoming = (cut.incomingCashier || "").toLowerCase().includes(q);
@@ -1434,17 +1459,21 @@ export default function CajaPage() {
 
   // Overall Historical Audit Metrics (reflects filtered cuts of active period)
   const auditMetrics = useMemo(() => {
-    const totalCutsCount = filteredCuts.length;
-    const totalDeliveredCash = filteredCuts.reduce((sum, c) => {
-      const fund = c.nextFund ?? 0;
-      return sum + Math.max(0, c.countedCash - fund);
+    const list = Array.isArray(filteredCuts) ? filteredCuts : [];
+    const totalCutsCount = list.length;
+    const totalDeliveredCash = list.reduce((sum, c) => {
+      if (!c) return sum;
+      const fund = Number(c.nextFund) || 0;
+      const counted = Number(c.countedCash) || 0;
+      return sum + Math.max(0, counted - fund);
     }, 0);
-    const totalSalesAudit = filteredCuts.reduce((sum, c) => {
-      const val = c.totalSalesAll || c.totalSales || (c.cashSales + c.cardSales + c.transferSales) || 0;
+    const totalSalesAudit = list.reduce((sum, c) => {
+      if (!c) return sum;
+      const val = Number(c.totalSalesAll) || Number(c.totalSales) || ((Number(c.cashSales) || 0) + (Number(c.cardSales) || 0) + (Number(c.transferSales) || 0)) || 0;
       return sum + val;
     }, 0);
-    const squareCutsCount = filteredCuts.filter((c) => c.difference === 0).length;
-    const diffCutsCount = filteredCuts.filter((c) => c.difference !== 0).length;
+    const squareCutsCount = list.filter((c) => c && c.difference === 0).length;
+    const diffCutsCount = list.filter((c) => c && c.difference !== 0).length;
 
     return {
       totalCutsCount,
@@ -1457,7 +1486,7 @@ export default function CajaPage() {
 
   // Latest Cut for quick preview in empty state
   const latestCut = useMemo(() => {
-    return cutsHistory.length > 0 ? cutsHistory[0] : null;
+    return Array.isArray(cutsHistory) && cutsHistory.length > 0 ? cutsHistory[0] : null;
   }, [cutsHistory]);
 
   // Export History to CSV
@@ -2930,17 +2959,17 @@ export default function CajaPage() {
                             Último corte archivado en sistema:
                           </span>
                           <div className="flex items-center gap-2 flex-wrap">
-                            <strong className="text-xs font-black text-stone-900">{latestCut.id}</strong>
-                            <span className="text-[11px] text-stone-500 font-medium">({latestCut.date})</span>
+                            <strong className="text-xs font-black text-stone-900">{latestCut.id || "Corte"}</strong>
+                            <span className="text-[11px] text-stone-500 font-medium">({latestCut.date || "Fecha"})</span>
                             <span className="text-[10px] bg-amber-100 text-amber-950 font-black px-1.5 py-0.2 rounded">
-                              {latestCut.responsible || latestCut.outgoingCashier}
+                              {latestCut.responsible || latestCut.outgoingCashier || "Responsable"}
                             </span>
                           </div>
                         </div>
                       </div>
                       <div className="text-right shrink-0">
                         <span className="text-xs font-black text-emerald-700 block">
-                          {formatCurrency(latestCut.countedCash)}
+                          {formatCurrency(latestCut.countedCash ?? 0)}
                         </span>
                         <span className="text-[10px] text-amber-800 font-bold group-hover:underline">
                           Ver Ticket ➔
@@ -2967,15 +2996,16 @@ export default function CajaPage() {
                   </thead>
                   <tbody className="divide-y divide-stone-100">
                     {filteredCuts.map((cut) => {
-                      const totalVentas = cut.totalSalesAll || cut.totalSales || (cut.cashSales + cut.cardSales + cut.transferSales) || 0;
-                      const delivered = Math.max(0, cut.countedCash - (cut.nextFund ?? 0));
+                      if (!cut) return null;
+                      const totalVentas = cut.totalSalesAll || cut.totalSales || ((Number(cut.cashSales) || 0) + (Number(cut.cardSales) || 0) + (Number(cut.transferSales) || 0)) || 0;
+                      const delivered = Math.max(0, (Number(cut.countedCash) || 0) - (Number(cut.nextFund) || 0));
                       const isSquare = cut.difference === 0;
-                      const isPositive = cut.difference > 0;
+                      const isPositive = (Number(cut.difference) || 0) > 0;
                       const respName = cut.responsible || cut.outgoingCashier || "Responsable";
 
                       return (
                         <tr
-                          key={cut.id}
+                          key={cut.id || Math.random().toString()}
                           className="hover:bg-amber-50/40 transition-colors group cursor-pointer"
                           onClick={() => setSelectedCutForDetail(cut)}
                         >
