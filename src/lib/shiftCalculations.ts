@@ -24,10 +24,17 @@ export interface ShiftFinancialSummary {
   boundary: number;
   initialFund: number;
   purePosSalesCash: number;
+  purePosSalesCard: number;
+  purePosSalesTransfer: number;
   purePosSalesTotal: number;
   ordersCash: number;
+  ordersCard: number;
+  ordersTransfer: number;
   ordersTotal: number;
   totalCashSales: number;
+  totalCardSales: number;
+  totalTransferSales: number;
+  totalSalesAll: number;
   totalIncomesInCash: number;
   totalExpenses: number;
   netCashInDrawer: number;
@@ -207,7 +214,13 @@ export function getShiftFinancialSummary(params: ShiftCalculationParams): ShiftF
 
   const pureSales = effectiveSales.filter((s) => !isOrderSale(s));
   const purePosSalesCash = pureSales
-    .filter((s) => s.paymentMethod === "efectivo")
+    .filter((s) => (s.paymentMethod || (s as any).payment_method) === "efectivo")
+    .reduce((sum, s) => sum + (Number(s.total) || 0), 0);
+  const purePosSalesCard = pureSales
+    .filter((s) => (s.paymentMethod || (s as any).payment_method) === "tarjeta")
+    .reduce((sum, s) => sum + (Number(s.total) || 0), 0);
+  const purePosSalesTransfer = pureSales
+    .filter((s) => (s.paymentMethod || (s as any).payment_method) === "transferencia")
     .reduce((sum, s) => sum + (Number(s.total) || 0), 0);
   const purePosSalesTotal = pureSales
     .reduce((sum, s) => sum + (Number(s.total) || 0), 0);
@@ -242,7 +255,13 @@ export function getShiftFinancialSummary(params: ShiftCalculationParams): ShiftF
 
   // Cobros de pedidos que ingresaron como venta espejo en mostrador
   const fromSalesOrdersCash = effectiveSales
-    .filter((s) => s.paymentMethod === "efectivo" && isOrderSale(s))
+    .filter((s) => (s.paymentMethod || (s as any).payment_method) === "efectivo" && isOrderSale(s))
+    .reduce((acc, s) => acc + (Number(s.total) || 0), 0);
+  const fromSalesOrdersCard = effectiveSales
+    .filter((s) => (s.paymentMethod || (s as any).payment_method) === "tarjeta" && isOrderSale(s))
+    .reduce((acc, s) => acc + (Number(s.total) || 0), 0);
+  const fromSalesOrdersTransfer = effectiveSales
+    .filter((s) => (s.paymentMethod || (s as any).payment_method) === "transferencia" && isOrderSale(s))
     .reduce((acc, s) => acc + (Number(s.total) || 0), 0);
   const fromSalesOrdersTotal = effectiveSales
     .filter((s) => isOrderSale(s))
@@ -250,6 +269,8 @@ export function getShiftFinancialSummary(params: ShiftCalculationParams): ShiftF
 
   // Anticipos y liquidaciones directos en pedidos (evitando duplicar con ventas espejo)
   let fromDirectOrdersCash = 0;
+  let fromDirectOrdersCard = 0;
+  let fromDirectOrdersTransfer = 0;
   let fromDirectOrdersTotal = 0;
   effectiveOrders.forEach((o) => {
     const col = getOrderShiftCollection(o, boundary, effectiveBranchId);
@@ -258,12 +279,21 @@ export function getShiftFinancialSummary(params: ShiftCalculationParams): ShiftF
     );
     if (!alreadyInSales) {
       fromDirectOrdersCash += col.collectedCash;
+      fromDirectOrdersCard += col.collectedCard;
+      fromDirectOrdersTransfer += col.collectedTransfer;
       fromDirectOrdersTotal += col.collectedTotal;
     }
   });
 
   const ordersCash = fromSalesOrdersCash + fromDirectOrdersCash;
+  const ordersCard = fromSalesOrdersCard + fromDirectOrdersCard;
+  const ordersTransfer = fromSalesOrdersTransfer + fromDirectOrdersTransfer;
   const ordersTotal = fromSalesOrdersTotal + fromDirectOrdersTotal;
+
+  const totalCashSales = purePosSalesCash + ordersCash;
+  const totalCardSales = purePosSalesCard + ordersCard;
+  const totalTransferSales = purePosSalesTransfer + ordersTransfer;
+  const totalSalesAll = totalCashSales + totalCardSales + totalTransferSales;
 
   // 5. Recopilar y filtrar gastos y retiros del turno
   let expensesPool: CashExpense[] = Array.isArray(params.expenses) ? [...params.expenses] : [];
@@ -367,7 +397,6 @@ export function getShiftFinancialSummary(params: ShiftCalculationParams): ShiftF
     .reduce((sum, i) => sum + (Number(i.amount) || 0), 0);
 
   // 7. Balance final contable del cajón
-  const totalCashSales = purePosSalesCash + ordersCash;
   const netCashInDrawer = Math.max(0, initialFund + totalCashSales + totalIncomesInCash - totalExpenses);
 
   return {
@@ -376,10 +405,17 @@ export function getShiftFinancialSummary(params: ShiftCalculationParams): ShiftF
     boundary,
     initialFund,
     purePosSalesCash,
+    purePosSalesCard,
+    purePosSalesTransfer,
     purePosSalesTotal,
     ordersCash,
+    ordersCard,
+    ordersTransfer,
     ordersTotal,
     totalCashSales,
+    totalCardSales,
+    totalTransferSales,
+    totalSalesAll,
     totalIncomesInCash,
     totalExpenses,
     netCashInDrawer,

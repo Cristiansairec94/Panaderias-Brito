@@ -1171,7 +1171,8 @@ export default function POSPage() {
     return initialCashFund;
   }, [initialCashFund]);
 
-  // Relevo & Apertura de Turno: Estado de Autenticación de Cajero Entrante (Automático desde el corte)
+  // Relevo & Apertura de Turno: Estado de Autenticación de Cajero Entrante
+  const [incomingSelectedUser, setIncomingSelectedUser] = useState<string>("");
   const [incomingPassword, setIncomingPassword] = useState<string>("");
   const [showIncomingPassword, setShowIncomingPassword] = useState<boolean>(false);
   const [incomingAuthError, setIncomingAuthError] = useState<string>("");
@@ -1179,10 +1180,39 @@ export default function POSPage() {
 
   useEffect(() => {
     if (isShiftLocked) {
+      const defaultUser = lastCutInfo?.incomingCashier || activeBranch?.currentShift?.cashier || cashierName || "";
+      if (defaultUser) {
+        setIncomingSelectedUser(defaultUser);
+      }
       setIncomingPassword("");
       setIncomingAuthError("");
     }
-  }, [isShiftLocked]);
+  }, [isShiftLocked, lastCutInfo?.incomingCashier, activeBranch?.currentShift?.cashier, cashierName]);
+
+  const shiftCoworkerCandidates = useMemo(() => {
+    const branchId = activeBranch?.id;
+    const branchName = (activeBranch?.name || "").toLowerCase();
+    const branchShort = (activeBranch?.shortName || "").toLowerCase();
+
+    const branchUsers = usersList.filter((u) => {
+      if (u.status === "inactivo") return false;
+      const uBranchId = u.assignedBranchId;
+      const uBranchName = (u.assignedBranchName || "").toLowerCase();
+      return (
+        (branchId && uBranchId === branchId) ||
+        (uBranchId && branchId && resolveBranchId(uBranchId) === resolveBranchId(branchId)) ||
+        (branchShort && uBranchName.includes(branchShort)) ||
+        (branchName && uBranchName && branchName.includes(uBranchName))
+      );
+    });
+
+    const otherUsers = usersList.filter((u) => {
+      if (u.status === "inactivo") return false;
+      return !branchUsers.some((bu) => bu.id === u.id);
+    });
+
+    return { branchUsers, otherUsers };
+  }, [usersList, activeBranch]);
 
   const handleUnlockShiftWithCredentials = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -1190,7 +1220,7 @@ export default function POSPage() {
 
     setIncomingAuthError("");
 
-    const targetCashierName = lastCutInfo?.incomingCashier || activeBranch?.currentShift?.cashier || cashierName;
+    const targetCashierName = incomingSelectedUser || lastCutInfo?.incomingCashier || activeBranch?.currentShift?.cashier || cashierName;
     if (!targetCashierName) {
       setIncomingAuthError("No se encontró el perfil asignado para tomar el turno.");
       return;
@@ -1218,6 +1248,7 @@ export default function POSPage() {
       // 2. Determinar turno
       const isAft = isAfternoonShift(lastCutInfo?.nextShift || shiftName, effectiveCashier, validUser);
       const effectiveShift = lastCutInfo?.nextShift || (isAft ? "Turno Vespertino (14:00 - 22:00)" : "Turno Matutino (06:00 - 14:00)");
+      const shiftShortLabel = isAft ? "Turno Vespertino (Tarde)" : "Turno Matutino (Mañana)";
       const bId = activeBranch?.id || "branch-matriz";
 
       // 3. Hora de salida anterior y hora de entrada actual
@@ -1226,7 +1257,38 @@ export default function POSPage() {
       const outgoingCashierName = lastCutInfo?.outgoingCashier || "Cajero anterior";
       const exitTimeStr = lastCutInfo?.timestamp ? formatTime24(lastCutInfo.timestamp) : (lastCutInfo?.date || "Turno anterior");
 
-      // 4. Cambiar sesión activa al compañero validado
+      // 4. Notificación directa e inmediata a los perfiles administrativos (Don Toño Brito, Paulina Brito, etc.)
+      const branchLabel = activeBranch?.shortName || activeBranch?.name || "Sucursal";
+      const fullBranchName = activeBranch?.name || branchLabel;
+      const relevoNotif: FBNotification = {
+        id: `notif-turno-${Date.now()}`,
+        senderName: `🟢 Inicio de Turno (${branchLabel})`,
+        senderAvatar: getEffectiveAvatar(validUser, effectiveCashier),
+        badgeIcon: "dinero",
+        category: "caja",
+        title: `${effectiveCashier} ha comenzado su turno`,
+        highlightText: `${effectiveCashier} • ${shiftShortLabel} • ${fullBranchName}`,
+        description: `${effectiveCashier} ha comenzado su turno en ${fullBranchName} a las ${entryTimeStr} (relevo de ${outgoingCashierName}, salida: ${exitTimeStr}). Fondo inicial en caja: ${formatCurrency(baseShiftFund)}.`,
+        timeAgo: "Hace un momento",
+        group: "recientes",
+        read: false,
+        timestamp: Date.now(),
+        createdAt: new Date().toISOString(),
+        branchId: activeBranch?.id,
+        branchName: fullBranchName,
+        operatingBranchId: activeBranch?.id,
+        operatingBranchName: fullBranchName,
+        actionLabel: "Ver Control de Caja",
+        actionLink: "/caja",
+      };
+
+      try {
+        sessionStorage.setItem("brito_last_shift_start_notif", `${effectiveCashier.toLowerCase().trim()}_${Date.now()}`);
+      } catch {}
+
+      addNotification(relevoNotif);
+
+      // 5. Cambiar sesión activa al compañero validado
       if (validUser && loginAs) {
         loginAs(validUser);
       }
@@ -1235,7 +1297,7 @@ export default function POSPage() {
       setShiftName(effectiveShift);
       setInitialCashFund(baseShiftFund);
 
-      // 5. Persistir estado de apertura de turno en almacenamiento local
+      // 6. Persistir estado de apertura de turno en almacenamiento local
       try {
         localStorage.setItem(`brito_pos_initial_fund_${bId}`, baseShiftFund.toString());
         if (bId === "branch-matriz") {
@@ -1256,7 +1318,7 @@ export default function POSPage() {
         window.dispatchEvent(new Event("brito_branches_updated"));
       } catch (e) {}
 
-      // 6. Actualizar sucursal en BranchContext
+      // 7. Actualizar sucursal en BranchContext
       updateBranch(bId, {
         currentShift: {
           id: `shift-${bId}-${Date.now()}`,
@@ -1281,33 +1343,6 @@ export default function POSPage() {
         todayOrdersTotal: 0,
         todayOrdersCount: 0,
       });
-
-      // 7. Notificación en tiempo real a los perfiles administrativos (Don Toño, Paulina, etc.)
-      const branchLabel = activeBranch?.shortName || activeBranch?.name || "Sucursal";
-      const relevoNotif: FBNotification = {
-        id: `notif-relevo-${Date.now()}`,
-        senderName: `🤝 Relevo en ${branchLabel}`,
-        senderAvatar: validUser?.avatar || "👩‍🍳",
-        badgeIcon: "dinero",
-        category: "caja",
-        title: "Relevo de Turno: Entrada & Salida",
-        highlightText: `Salida: ${outgoingCashierName} (${exitTimeStr}) ➔ Entrada: ${effectiveCashier} (${entryTimeStr})`,
-        description: `Sucursal ${activeBranch?.name || branchLabel}: ${outgoingCashierName} entregó el turno a las ${exitTimeStr} y ${effectiveCashier} acaba de ingresar a las ${entryTimeStr} (${effectiveShift}). Fondo inicial en caja: ${formatCurrency(baseShiftFund)}. Folio corte: ${lastCutInfo?.id || "CORTE"}.`,
-        timeAgo: "Hace un momento",
-        group: "recientes",
-        read: false,
-        timestamp: Date.now(),
-        createdAt: new Date().toISOString(),
-        branchId: activeBranch?.id,
-        branchName: activeBranch?.name,
-        operatingBranchId: activeBranch?.id,
-        operatingBranchName: activeBranch?.name,
-      };
-
-      addNotification(relevoNotif);
-      if (realtimeHub?.broadcastNotification) {
-        realtimeHub.broadcastNotification(relevoNotif);
-      }
 
       // 8. Desbloquear pantalla
       setIsShiftLocked(false);
@@ -2295,6 +2330,9 @@ export default function POSPage() {
   }, [activeBranch, branches, cashierName, shiftStartBoundary, currentShiftSales, currentShiftOrders, currentShiftExpenses, currentShiftIncomes, cashMovements, initialCashFund]);
 
   const totalCashSales = posShiftSummary.totalCashSales;
+  const totalCardSales = posShiftSummary.totalCardSales;
+  const totalTransferSales = posShiftSummary.totalTransferSales;
+  const totalSalesAll = posShiftSummary.totalSalesAll;
   const totalExpenses = posShiftSummary.totalExpenses;
   const totalExtraInCash = posShiftSummary.totalIncomesInCash;
   const calculatedNetCashInDrawer = posShiftSummary.netCashInDrawer;
@@ -2971,31 +3009,57 @@ export default function POSPage() {
 
               {/* 3. RELEVO DE QUIÉN TOMA EL TURNO (PERFIL AUTOMÁTICO) & AUTENTICACIÓN CON CONTRASEÑA */}
               {(() => {
-                const incomingCashierName = lastCutInfo?.incomingCashier || activeBranch?.currentShift?.cashier || cashierName;
-                const isAft = isAfternoonShift(lastCutInfo?.nextShift || shiftName, incomingCashierName);
-                const incomingShiftDisplay = lastCutInfo?.nextShift || (isAft ? "Turno Vespertino" : "Turno Matutino");
+                const incomingCashierName = incomingSelectedUser || lastCutInfo?.incomingCashier || activeBranch?.currentShift?.cashier || cashierName;
                 const matchedUser = usersList.find((u) => matchesCashier(u.name, incomingCashierName) || matchesCashier(u.username, incomingCashierName));
+                const isAft = isAfternoonShift(lastCutInfo?.nextShift || shiftName, incomingCashierName, matchedUser);
+                const incomingShiftDisplay = lastCutInfo?.nextShift || (isAft ? "Turno Vespertino" : "Turno Matutino");
 
                 return (
                   <form onSubmit={handleUnlockShiftWithCredentials} className="space-y-3">
                     <div className="p-3.5 sm:p-4 bg-gradient-to-r from-emerald-950/80 to-stone-900 border-2 border-emerald-500/50 rounded-2xl space-y-3 shadow-lg">
                       <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2.5 min-w-0">
-                          <div className="w-10 h-10 bg-emerald-600/30 rounded-xl border border-emerald-400/40 flex items-center justify-center text-xl shrink-0 shadow-inner">
-                            {getEffectiveAvatar(matchedUser, incomingCashierName)}
-                          </div>
-                          <div className="min-w-0">
-                            <span className="text-[10px] sm:text-xs text-emerald-400 uppercase font-black tracking-wider block">
-                              TOMA EL TURNO AHORA:
-                            </span>
-                            <span className="text-sm sm:text-base font-black text-white truncate block">
-                              {incomingCashierName}
-                            </span>
-                          </div>
-                        </div>
-                        <span className="text-[11px] font-bold text-emerald-300 bg-emerald-900/80 px-2.5 py-1 rounded-lg border border-emerald-500/40 shrink-0">
+                        <span className="text-[10px] sm:text-xs text-emerald-400 uppercase font-black tracking-wider flex items-center gap-1.5">
+                          <span>👤</span> Toma el turno ahora (Usuario):
+                        </span>
+                        <span className="text-[11px] font-bold text-emerald-300 bg-emerald-900/80 px-2.5 py-0.5 rounded-lg border border-emerald-500/40 shrink-0">
                           {incomingShiftDisplay.split(" ")[0]} {incomingShiftDisplay.split(" ")[1] || ""}
                         </span>
+                      </div>
+
+                      {/* Selector de Compañero */}
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-10 h-10 bg-emerald-600/30 rounded-xl border border-emerald-400/40 flex items-center justify-center text-xl shrink-0 shadow-inner">
+                          {getEffectiveAvatar(matchedUser, incomingCashierName)}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <label htmlFor="incoming-cashier-shift-select" className="sr-only">Seleccionar cajero entrante</label>
+                          <select
+                            id="incoming-cashier-shift-select"
+                            value={incomingCashierName}
+                            onChange={(e) => {
+                              setIncomingSelectedUser(e.target.value);
+                              setIncomingAuthError("");
+                            }}
+                            className="w-full bg-stone-950 border-2 border-emerald-500/60 text-white rounded-xl px-3 py-2 text-xs sm:text-sm font-black focus:ring-2 focus:ring-emerald-400 focus:outline-none cursor-pointer"
+                          >
+                            <optgroup label={`Compañeros de ${activeBranch?.shortName || "esta Sucursal"}`}>
+                              {shiftCoworkerCandidates.branchUsers.map((u) => (
+                                <option key={u.id} value={u.name}>
+                                  {u.avatar || "👤"} {u.name} — {u.shiftName || u.jobTitle || "Cajero"}
+                                </option>
+                              ))}
+                            </optgroup>
+                            {shiftCoworkerCandidates.otherUsers.length > 0 && (
+                              <optgroup label="Otros compañeros de la empresa">
+                                {shiftCoworkerCandidates.otherUsers.map((u) => (
+                                  <option key={u.id} value={u.name}>
+                                    {u.avatar || "👤"} {u.name} ({u.assignedBranchName || "General"})
+                                  </option>
+                                ))}
+                              </optgroup>
+                            )}
+                          </select>
+                        </div>
                       </div>
 
                       {/* Campo de Contraseña / PIN del compañero */}
@@ -3003,14 +3067,14 @@ export default function POSPage() {
                         <label className="text-[11px] font-black text-emerald-300 flex items-center justify-between">
                           <span className="flex items-center gap-1.5">
                             <Lock className="w-3.5 h-3.5 text-emerald-400" />
-                            <span>Contraseña o PIN de {incomingCashierName}:</span>
+                            <span>Contraseña o PIN de Acceso:</span>
                           </span>
-                          <span className="text-[10px] text-amber-300/80 font-semibold">* Requerido para acceder</span>
+                          <span className="text-[10px] text-amber-300/80 font-semibold">* Requerido</span>
                         </label>
                         <div className="relative">
                           <input
                             type={showIncomingPassword ? "text" : "password"}
-                            placeholder={`Ingresa la contraseña de ${incomingCashierName}...`}
+                            placeholder="Ingresa tu contraseña o PIN de acceso..."
                             value={incomingPassword}
                             onChange={(e) => {
                               setIncomingPassword(e.target.value);
@@ -4062,14 +4126,46 @@ export default function POSPage() {
                 <span className="text-amber-400/60">•</span>
                 <span className="text-stone-100 font-semibold">{cashierName}</span>
                 <span className="text-amber-400/60">•</span>
-                {/* Insignia Dinámica en Tiempo Real de Dinero en Caja en la Barra Café */}
-                <span
-                  className="inline-flex items-center gap-1 bg-emerald-950/90 border border-emerald-500/50 text-emerald-300 px-2 py-0.5 rounded-lg text-[10px] font-mono font-black shadow-xs select-none"
-                  title={`Dinero actual en cajón para ${activeBranch?.name || "Sucursal Matriz"}`}
-                >
-                  <span>💵 Caja:</span>
-                  <strong className="text-emerald-400 font-black">{formatCurrency(netCashInDrawer)}</strong>
-                </span>
+                {/* Insignia Dinámica en Tiempo Real de Dinero en Caja y Métodos en la Barra Café */}
+                <div className="inline-flex items-center gap-1.5 flex-wrap">
+                  <span
+                    className="inline-flex items-center gap-1 bg-emerald-950/90 border border-emerald-500/50 text-emerald-300 px-2 py-0.5 rounded-lg text-[10px] font-mono font-black shadow-xs select-none"
+                    title={`Dinero actual en cajón para ${activeBranch?.name || "Sucursal"}: ${formatCurrency(netCashInDrawer)} (Fondo + Efvo - Gastos)`}
+                  >
+                    <span>💵 Caja:</span>
+                    <strong className="text-emerald-400 font-black">{formatCurrency(netCashInDrawer)}</strong>
+                  </span>
+
+                  {totalCardSales > 0 && (
+                    <span
+                      className="inline-flex items-center gap-1 bg-blue-950/90 border border-blue-500/50 text-blue-300 px-2 py-0.5 rounded-lg text-[10px] font-mono font-black shadow-xs select-none"
+                      title={`Ventas con Tarjeta (Terminales): ${formatCurrency(totalCardSales)}`}
+                    >
+                      <span>💳 Tarj:</span>
+                      <strong className="text-blue-300 font-black">{formatCurrency(totalCardSales)}</strong>
+                    </span>
+                  )}
+
+                  {totalTransferSales > 0 && (
+                    <span
+                      className="inline-flex items-center gap-1 bg-orange-950/90 border border-orange-500/50 text-orange-300 px-2 py-0.5 rounded-lg text-[10px] font-mono font-black shadow-xs select-none"
+                      title={`Ventas por Transferencia (SPEI): ${formatCurrency(totalTransferSales)}`}
+                    >
+                      <span>✈ Transf:</span>
+                      <strong className="text-orange-300 font-black">{formatCurrency(totalTransferSales)}</strong>
+                    </span>
+                  )}
+
+                  {totalSalesAll > 0 && (
+                    <span
+                      className="inline-flex items-center gap-1 bg-stone-900/90 border border-amber-400/50 text-amber-300 px-2 py-0.5 rounded-lg text-[10px] font-mono font-black shadow-xs select-none"
+                      title={`Venta Total del Turno (Efvo + Tarj + Transf): ${formatCurrency(totalSalesAll)}`}
+                    >
+                      <span>⭐ Turno:</span>
+                      <strong className="text-amber-400 font-black">{formatCurrency(totalSalesAll)}</strong>
+                    </span>
+                  )}
+                </div>
                 <span className="text-amber-400/60">•</span>
                 <span className="text-amber-300/80 font-medium">Mostrador</span>
               </div>

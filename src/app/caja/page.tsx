@@ -801,7 +801,7 @@ export default function CajaPage() {
             if (sBranch !== currentBranch.id) return false;
           }
           const t = parseDateTimeSafe(s.timestamp || s.createdAt || s.date);
-          return shiftStart <= 0 || (t > 0 && t > shiftStart);
+          return shiftStart <= 0 || (t > 0 && t >= shiftStart);
         });
         const cSum = filtered.filter((s: any) => (s.paymentMethod || s.payment_method) === "efectivo").reduce((acc: number, s: any) => acc + (Number(s.total) || 0), 0);
         const kSum = filtered.filter((s: any) => (s.paymentMethod || s.payment_method) === "tarjeta").reduce((acc: number, s: any) => acc + (Number(s.total) || 0), 0);
@@ -3810,6 +3810,33 @@ export default function CajaPage() {
                   <div className="bg-white/95 p-2.5 rounded-xl border border-rose-200/80 shadow-2xs">
                     <span className="text-[9px] font-black uppercase text-rose-800 block">Gastos Pagados</span>
                     <span className="text-xs font-black text-rose-700 block mt-0.5">-{formatCurrency(totalExpenses)}</span>
+                  </div>
+                </div>
+
+                {/* Desglose de Ventas por Tarjetas y Transferencias del Turno */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1 border-t border-amber-200/80">
+                  <div className="bg-blue-50/80 p-2.5 rounded-xl border border-blue-200 shadow-2xs flex items-center justify-between">
+                    <div>
+                      <span className="text-[9px] font-black uppercase text-blue-800 block">💳 Ventas Tarjeta</span>
+                      <span className="text-[10px] text-blue-600 font-medium">Terminales / Vouchers</span>
+                    </div>
+                    <span className="text-xs font-black text-blue-900">+{formatCurrency(cardSales)}</span>
+                  </div>
+
+                  <div className="bg-orange-50/80 p-2.5 rounded-xl border border-orange-200 shadow-2xs flex items-center justify-between">
+                    <div>
+                      <span className="text-[9px] font-black uppercase text-orange-800 block">✈ Transferencias</span>
+                      <span className="text-[10px] text-orange-600 font-medium">SPEI / Bancos</span>
+                    </div>
+                    <span className="text-xs font-black text-orange-900">+{formatCurrency(transferSales)}</span>
+                  </div>
+
+                  <div className="bg-amber-100/90 p-2.5 rounded-xl border border-amber-400 shadow-2xs flex items-center justify-between">
+                    <div>
+                      <span className="text-[9px] font-black uppercase text-amber-950 block">⭐ Gran Total Turno</span>
+                      <span className="text-[10px] text-amber-800 font-bold">Total Vendido</span>
+                    </div>
+                    <span className="text-sm font-black text-amber-950">{formatCurrency(cashSales + cardSales + transferSales)}</span>
                   </div>
                 </div>
 

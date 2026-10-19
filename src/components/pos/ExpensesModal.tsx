@@ -1159,9 +1159,16 @@ export default function ExpensesModal({
 
   const shiftPurePosTotal = shiftFinancialSummary.purePosSalesTotal;
   const shiftPurePosCash = shiftFinancialSummary.purePosSalesCash;
+  const shiftPurePosCard = shiftFinancialSummary.purePosSalesCard;
+  const shiftPurePosTransfer = shiftFinancialSummary.purePosSalesTransfer;
   const shiftOrdersTotal = shiftFinancialSummary.ordersTotal;
   const shiftOrdersCash = shiftFinancialSummary.ordersCash;
+  const shiftOrdersCard = shiftFinancialSummary.ordersCard;
+  const shiftOrdersTransfer = shiftFinancialSummary.ordersTransfer;
   const totalShiftCashSales = shiftFinancialSummary.totalCashSales;
+  const totalShiftCardSales = shiftFinancialSummary.totalCardSales;
+  const totalShiftTransferSales = shiftFinancialSummary.totalTransferSales;
+  const totalSalesAll = shiftFinancialSummary.totalSalesAll;
   const totalExpenses = shiftFinancialSummary.totalExpenses;
   const totalIncomesInCash = shiftFinancialSummary.totalIncomesInCash;
   const netCashInDrawer = shiftFinancialSummary.netCashInDrawer;
@@ -2649,21 +2656,21 @@ export default function ExpensesModal({
               setCashDetailFilter("ventas");
               setCashMethodFilter("all");
             }}
-            className="p-2.5 sm:p-3 rounded-2xl border-2 transition-all text-center cursor-pointer group flex flex-col justify-center items-center bg-emerald-50/70 border-emerald-200/90 hover:bg-emerald-100/70 hover:border-emerald-400 shadow-2xs active:scale-98"
+            className="p-2 sm:p-2.5 rounded-2xl border-2 transition-all text-center cursor-pointer group flex flex-col justify-center items-center bg-emerald-50/70 border-emerald-200/90 hover:bg-emerald-100/70 hover:border-emerald-400 shadow-2xs active:scale-98"
             title="Abrir información detallada de Ventas en Mostrador"
           >
-            <span className="text-xs sm:text-sm uppercase font-black text-emerald-950 block leading-tight tracking-wide">
-              Ventas
+            <span className="text-xs uppercase font-black text-emerald-950 block leading-tight tracking-wide">
+              Ventas Mostrador
             </span>
-            <span className="text-lg sm:text-xl md:text-2xl font-black text-emerald-700 block my-1 tracking-tight truncate">
-              +{formatCurrency(reconciledPurePosCash)}
+            <span className="text-lg sm:text-xl font-black text-emerald-700 block my-0.5 tracking-tight truncate">
+              +{formatCurrency(shiftPurePosTotal)}
             </span>
-            {shiftPurePosTotal > shiftPurePosCash && (
-              <span className="text-[10px] text-emerald-700 font-bold block truncate">
-                Total cobrado: {formatCurrency(shiftPurePosTotal)}
-              </span>
-            )}
-            <span className="text-[11px] sm:text-xs font-black text-emerald-800 bg-emerald-100/90 group-hover:bg-emerald-200 border border-emerald-200/80 px-2.5 py-0.5 rounded-full mt-1 inline-flex items-center justify-center gap-1 shadow-2xs">
+            <div className="flex items-center justify-center gap-1 flex-wrap text-[9px] font-bold text-stone-600">
+              <span className="text-emerald-900 bg-emerald-100/90 px-1 py-0.2 rounded" title="Efectivo">💵 {formatCurrency(shiftPurePosCash)}</span>
+              {shiftPurePosCard > 0 && <span className="text-blue-900 bg-blue-100/90 px-1 py-0.2 rounded" title="Tarjeta">💳 {formatCurrency(shiftPurePosCard)}</span>}
+              {shiftPurePosTransfer > 0 && <span className="text-orange-900 bg-orange-100/90 px-1 py-0.2 rounded" title="Transferencia">✈ {formatCurrency(shiftPurePosTransfer)}</span>}
+            </div>
+            <span className="text-[10px] sm:text-[11px] font-black text-emerald-800 bg-emerald-100/90 group-hover:bg-emerald-200 border border-emerald-200/80 px-2 py-0.5 rounded-full mt-1 inline-flex items-center justify-center gap-1 shadow-2xs">
               👁️ Ver historial
             </span>
           </button>
@@ -2676,21 +2683,21 @@ export default function ExpensesModal({
               setCashDetailFilter("pedidos");
               setCashMethodFilter("all");
             }}
-            className="p-2.5 sm:p-3 rounded-2xl border-2 transition-all text-center cursor-pointer group flex flex-col justify-center items-center bg-amber-50/80 border-amber-300 hover:bg-amber-100 hover:border-amber-400 shadow-2xs active:scale-98"
+            className="p-2 sm:p-2.5 rounded-2xl border-2 transition-all text-center cursor-pointer group flex flex-col justify-center items-center bg-amber-50/80 border-amber-300 hover:bg-amber-100 hover:border-amber-400 shadow-2xs active:scale-98"
             title="Abrir información detallada de Pedidos Especiales"
           >
-            <span className="text-xs sm:text-sm uppercase font-black text-amber-950 block leading-tight tracking-wide">
-              Pedidos
+            <span className="text-xs uppercase font-black text-amber-950 block leading-tight tracking-wide">
+              Pedidos Especiales
             </span>
-            <span className="text-lg sm:text-xl md:text-2xl font-black text-amber-800 block my-1 tracking-tight truncate">
-              +{formatCurrency(shiftOrdersCash)}
+            <span className="text-lg sm:text-xl font-black text-amber-800 block my-0.5 tracking-tight truncate">
+              +{formatCurrency(shiftOrdersTotal)}
             </span>
-            {shiftOrdersTotal > shiftOrdersCash && (
-              <span className="text-[10px] text-amber-700 font-bold block truncate">
-                Total cobrado: {formatCurrency(shiftOrdersTotal)}
-              </span>
-            )}
-            <span className="text-[11px] sm:text-xs font-black text-amber-900 bg-amber-200/90 group-hover:bg-amber-300 border border-amber-300/80 px-2.5 py-0.5 rounded-full mt-1 inline-flex items-center justify-center gap-1 shadow-2xs">
+            <div className="flex items-center justify-center gap-1 flex-wrap text-[9px] font-bold text-stone-600">
+              <span className="text-amber-900 bg-amber-100/90 px-1 py-0.2 rounded" title="Efectivo">💵 {formatCurrency(shiftOrdersCash)}</span>
+              {shiftOrdersCard > 0 && <span className="text-blue-900 bg-blue-100/90 px-1 py-0.2 rounded" title="Tarjeta">💳 {formatCurrency(shiftOrdersCard)}</span>}
+              {shiftOrdersTransfer > 0 && <span className="text-orange-900 bg-orange-100/90 px-1 py-0.2 rounded" title="Transferencia">✈ {formatCurrency(shiftOrdersTransfer)}</span>}
+            </div>
+            <span className="text-[10px] sm:text-[11px] font-black text-amber-900 bg-amber-200/90 group-hover:bg-amber-300 border border-amber-300/80 px-2 py-0.5 rounded-full mt-1 inline-flex items-center justify-center gap-1 shadow-2xs">
               👁️ Ver historial
             </span>
           </button>
@@ -4925,16 +4932,61 @@ export default function ExpensesModal({
 
                         <div className="pt-2 border-t-2 border-dashed border-stone-300 flex items-center justify-between p-2.5 bg-amber-100/90 border border-amber-300 rounded-xl">
                           <span className="text-amber-950 font-black text-sm flex items-center gap-1.5">
-                            <span>💵</span> (=) Dinero Total que Debe Estar en el Cajón:
+                            <span>💵</span> (=) Dinero Físico en Cajón (Arqueo a Contar):
                           </span>
                           <span className="font-black text-amber-950 text-base sm:text-lg">
                             {formatCurrency(netCashInDrawer)}
                           </span>
                         </div>
+
+                        {/* Movimientos Electrónicos del Turno para Cuadre Bancario */}
+                        <div className="pt-2 border-t-2 border-stone-200 space-y-2">
+                          <span className="text-xs font-black text-stone-700 uppercase tracking-wider block">
+                            💳 Movimientos Electrónicos del Turno (Para Cuadre con Terminales y Bancos)
+                          </span>
+                          
+                          <div className="flex items-center justify-between p-2.5 bg-blue-50/80 border border-blue-200 rounded-xl">
+                            <div>
+                              <span className="text-blue-950 flex items-center gap-1.5 font-bold">
+                                <span>💳</span> (+) Cobrado con Tarjeta (Terminales Clip / Mercado Pago)
+                              </span>
+                              <span className="text-[10px] text-blue-700 font-medium block">
+                                Cuadra contra los vouchers impresos o el reporte de la terminal
+                              </span>
+                            </div>
+                            <span className="font-black text-blue-900 text-sm">+{formatCurrency(totalShiftCardSales)}</span>
+                          </div>
+
+                          <div className="flex items-center justify-between p-2.5 bg-orange-50/80 border border-orange-200 rounded-xl">
+                            <div>
+                              <span className="text-orange-950 flex items-center gap-1.5 font-bold">
+                                <span>✈</span> (+) Cobrado por Transferencia (SPEI / Cuentas de Banco)
+                              </span>
+                              <span className="text-[10px] text-orange-700 font-medium block">
+                                Cuadra contra los comprobantes y estados de cuenta bancarios
+                              </span>
+                            </div>
+                            <span className="font-black text-orange-900 text-sm">+{formatCurrency(totalShiftTransferSales)}</span>
+                          </div>
+
+                          <div className="flex items-center justify-between p-2.5 bg-gradient-to-r from-amber-500/20 via-orange-500/20 to-amber-500/20 border-2 border-amber-400 rounded-xl">
+                            <div>
+                              <span className="text-stone-900 flex items-center gap-1.5 font-black text-sm">
+                                <span>⭐</span> Total General Ingresos del Turno (Efectivo + Tarjeta + Transf):
+                              </span>
+                              <span className="text-[10px] text-stone-600 font-bold block">
+                                Importe total vendido y cobrado por la cajera durante todo su turno
+                              </span>
+                            </div>
+                            <span className="font-black text-amber-950 text-base sm:text-lg">
+                              {formatCurrency(totalSalesAll)}
+                            </span>
+                          </div>
+                        </div>
                       </div>
 
                       <p className="text-xs text-stone-500 font-medium leading-relaxed pt-1">
-                        💡 <strong>Nota para la cajera:</strong> Al contar el dinero en efectivo que tienes en tu cajón en este momento, la suma de monedas y billetes debe dar exactamente esta cantidad. Al hacer el corte de turno, el arqueo comparará lo que cuentes contra este valor.
+                        💡 <strong>Nota para la cajera:</strong> Tu turno está 100% cuadrado cuando el conteo de billetes y monedas en el cajón coincide con <strong>{formatCurrency(netCashInDrawer)}</strong>, los vouchers de terminal suman <strong>{formatCurrency(totalShiftCardSales)}</strong> y las transferencias confirmadas suman <strong>{formatCurrency(totalShiftTransferSales)}</strong>.
                       </p>
                     </div>
                   </div>

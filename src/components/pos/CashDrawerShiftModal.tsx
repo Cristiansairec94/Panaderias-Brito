@@ -1250,74 +1250,77 @@ export default function CashDrawerShiftModal({
                 /* Formulario Directo de Arqueo y Relevo */
                 <div className="space-y-3.5">
                   {/* 1. Resumen Financiero del Turno (coincide con Movimientos de Caja) */}
-                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 p-3.5 bg-gradient-to-br from-stone-50 to-amber-50/40 rounded-3xl border-2 border-stone-200/90 shadow-xs">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2 p-3 bg-gradient-to-br from-stone-50 to-amber-50/40 rounded-3xl border-2 border-stone-200/90 shadow-xs">
                     <div
-                      className="bg-white p-3 sm:p-4 rounded-2xl border border-stone-200/80 shadow-xs flex flex-col items-center justify-center text-center"
+                      className="bg-white p-2.5 sm:p-3 rounded-2xl border border-stone-200/80 shadow-xs flex flex-col items-center justify-center text-center"
                     >
-                      <span className="text-[11px] sm:text-xs text-stone-500 font-black block uppercase tracking-wider">Fondo Inicial</span>
-                      <span className="text-xl sm:text-2xl font-black text-stone-900 mt-0.5 block">{formatCurrency(effectiveInitialFund)}</span>
+                      <span className="text-[10px] sm:text-[11px] text-stone-500 font-black block uppercase tracking-wider">Fondo Inicial</span>
+                      <span className="text-base sm:text-lg font-black text-stone-900 mt-0.5 block">{formatCurrency(effectiveInitialFund)}</span>
                     </div>
                     <button
                       type="button"
                       onClick={() => setModalView("history")}
-                      className="bg-white p-3 sm:p-4 rounded-2xl border border-emerald-200/80 shadow-xs transition-transform hover:scale-105 duration-200 flex flex-col items-center justify-center text-center cursor-pointer"
+                      className="bg-white p-2.5 sm:p-3 rounded-2xl border border-emerald-200/80 shadow-xs transition-transform hover:scale-105 duration-200 flex flex-col items-center justify-center text-center cursor-pointer"
                       title="Ver historial de ventas de mostrador"
                     >
-                      <span className="text-[11px] sm:text-xs text-emerald-700 font-black block uppercase tracking-wider">(+) Ventas</span>
-                      <span className="text-xl sm:text-2xl font-black text-emerald-700 mt-0.5 block">+{formatCurrency(purePosCash)}</span>
-                      <span className="text-[11px] sm:text-xs font-black text-emerald-800 bg-emerald-100/90 border border-emerald-200/80 px-2 py-0.5 rounded-full mt-1.5 inline-flex items-center gap-1 shadow-2xs">
-                        👁️ Ver historial
-                      </span>
+                      <span className="text-[10px] sm:text-[11px] text-emerald-700 font-black block uppercase tracking-wider">(+) Efvo POS</span>
+                      <span className="text-base sm:text-lg font-black text-emerald-700 mt-0.5 block">+{formatCurrency(purePosCash)}</span>
                     </button>
                     <button
                       type="button"
                       onClick={() => setModalView("history")}
-                      className="bg-white p-3 sm:p-4 rounded-2xl border border-amber-300 shadow-xs transition-transform hover:scale-105 duration-200 flex flex-col items-center justify-center text-center cursor-pointer"
+                      className="bg-white p-2.5 sm:p-3 rounded-2xl border border-amber-300 shadow-xs transition-transform hover:scale-105 duration-200 flex flex-col items-center justify-center text-center cursor-pointer"
                       title="Ver historial de pedidos especiales cobrados"
                     >
-                      <span className="text-[11px] sm:text-xs text-amber-800 font-black block uppercase tracking-wider">(+) Pedidos</span>
-                      <span className="text-xl sm:text-2xl font-black text-amber-800 mt-0.5 block">+{formatCurrency(totalOrdersCash)}</span>
-                      <span className="text-[11px] sm:text-xs font-black text-amber-900 bg-amber-200/90 border border-amber-300 px-2 py-0.5 rounded-full mt-1.5 inline-flex items-center gap-1 shadow-2xs">
-                        👁️ Ver pedidos
-                      </span>
+                      <span className="text-[10px] sm:text-[11px] text-amber-800 font-black block uppercase tracking-wider">(+) Pedidos Efvo</span>
+                      <span className="text-base sm:text-lg font-black text-amber-800 mt-0.5 block">+{formatCurrency(totalOrdersCash)}</span>
                     </button>
                     <button
                       type="button"
                       onClick={() => setModalView("history")}
-                      className="bg-white p-3 sm:p-4 rounded-2xl border border-teal-200/80 shadow-xs transition-transform hover:scale-105 duration-200 flex flex-col items-center justify-center text-center cursor-pointer"
+                      className="bg-white p-2.5 sm:p-3 rounded-2xl border border-blue-300 shadow-xs transition-transform hover:scale-105 duration-200 flex flex-col items-center justify-center text-center cursor-pointer"
+                      title="Ver ventas cobradas con tarjeta"
+                    >
+                      <span className="text-[10px] sm:text-[11px] text-blue-800 font-black block uppercase tracking-wider">💳 (+) Tarjetas</span>
+                      <span className="text-base sm:text-lg font-black text-blue-700 mt-0.5 block">+{formatCurrency(cardSales)}</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setModalView("history")}
+                      className="bg-white p-2.5 sm:p-3 rounded-2xl border border-orange-300 shadow-xs transition-transform hover:scale-105 duration-200 flex flex-col items-center justify-center text-center cursor-pointer"
+                      title="Ver ventas cobradas por transferencia SPEI"
+                    >
+                      <span className="text-[10px] sm:text-[11px] text-orange-800 font-black block uppercase tracking-wider">✈ (+) Transf</span>
+                      <span className="text-base sm:text-lg font-black text-orange-700 mt-0.5 block">+{formatCurrency(transferSales)}</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setModalView("history")}
+                      className="bg-white p-2.5 sm:p-3 rounded-2xl border border-teal-200/80 shadow-xs transition-transform hover:scale-105 duration-200 flex flex-col items-center justify-center text-center cursor-pointer"
                       title="Ver historial de entradas de cambio"
                     >
-                      <span className="text-[11px] sm:text-xs text-teal-700 font-black block uppercase tracking-wider">(+) Entradas</span>
-                      <span className="text-xl sm:text-2xl font-black text-teal-700 mt-0.5 block">+{formatCurrency(totalIncomesInCash)}</span>
-                      <span className="text-[11px] sm:text-xs font-black text-teal-800 bg-teal-100/90 border border-teal-200/80 px-2 py-0.5 rounded-full mt-1.5 inline-flex items-center gap-1 shadow-2xs">
-                        👁️ Ver historial
-                      </span>
+                      <span className="text-[10px] sm:text-[11px] text-teal-700 font-black block uppercase tracking-wider">(+) Entradas</span>
+                      <span className="text-base sm:text-lg font-black text-teal-700 mt-0.5 block">+{formatCurrency(totalIncomesInCash)}</span>
                     </button>
                     <button
                       type="button"
                       onClick={() => setModalView("history")}
-                      className="bg-white p-3 sm:p-4 rounded-2xl border border-rose-200/80 shadow-xs transition-transform hover:scale-105 duration-200 flex flex-col items-center justify-center text-center cursor-pointer"
+                      className="bg-white p-2.5 sm:p-3 rounded-2xl border border-rose-200/80 shadow-xs transition-transform hover:scale-105 duration-200 flex flex-col items-center justify-center text-center cursor-pointer"
                       title="Ver historial de gastos y retiros"
                     >
-                      <span className="text-[11px] sm:text-xs text-rose-700 font-black block uppercase tracking-wider">(-) Gastos</span>
-                      <span className="text-xl sm:text-2xl font-black text-rose-700 mt-0.5 block">-{formatCurrency(totalExpenses)}</span>
-                      <span className="text-[11px] sm:text-xs font-black text-rose-800 bg-rose-100/90 border border-rose-200/80 px-2 py-0.5 rounded-full mt-1.5 inline-flex items-center gap-1 shadow-2xs">
-                        👁️ Ver historial
-                      </span>
+                      <span className="text-[10px] sm:text-[11px] text-rose-700 font-black block uppercase tracking-wider">(-) Gastos</span>
+                      <span className="text-base sm:text-lg font-black text-rose-700 mt-0.5 block">-{formatCurrency(totalExpenses)}</span>
                     </button>
                     <button
                       type="button"
                       onClick={() => setModalView("history")}
-                      className="bg-gradient-to-br from-amber-100 via-amber-200/80 to-orange-100 p-3 sm:p-4 rounded-2xl border-2 border-amber-400 shadow-sm transition-transform hover:scale-105 duration-200 ring-2 ring-amber-400/20 flex flex-col items-center justify-center text-center cursor-pointer"
+                      className="bg-gradient-to-br from-amber-100 via-amber-200/80 to-orange-100 p-2.5 sm:p-3 rounded-2xl border-2 border-amber-400 shadow-sm transition-transform hover:scale-105 duration-200 ring-2 ring-amber-400/20 flex flex-col items-center justify-center text-center cursor-pointer"
                       title="Ver historial de balance en caja"
                     >
-                      <span className="text-[11px] sm:text-xs text-amber-950 font-black block uppercase tracking-wider">
-                        En Caja
+                      <span className="text-[10px] sm:text-[11px] text-amber-950 font-black block uppercase tracking-wider">
+                        En Cajón
                       </span>
-                      <span className="text-2xl sm:text-3xl font-black text-amber-950 mt-0.5 block leading-none">{formatCurrency(expectedCashInDrawer)}</span>
-                      <span className="text-[11px] sm:text-xs font-black text-amber-900 bg-amber-200/90 border border-amber-300 px-2 py-0.5 rounded-full mt-1.5 inline-flex items-center gap-1 shadow-2xs">
-                        👁️ Ver historial
-                      </span>
+                      <span className="text-lg sm:text-xl font-black text-amber-950 mt-0.5 block leading-none">{formatCurrency(expectedCashInDrawer)}</span>
                     </button>
                   </div>
 
@@ -1409,6 +1412,22 @@ export default function CashDrawerShiftModal({
                       <span className="text-3xl sm:text-4xl font-black text-amber-950 bg-gradient-to-r from-amber-200 to-amber-300 px-5 py-2 rounded-2xl shadow-md border-2 border-amber-400">
                         {formatCurrency(expectedCashInDrawer)}
                       </span>
+                    </div>
+
+                    {/* Desglose Integral para Cuadre de Turno (Tarjetas y Transferencias) */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 p-2.5 bg-white/95 rounded-2xl border border-amber-300/80 text-xs shadow-2xs">
+                      <div className="flex items-center justify-between px-2 py-1 bg-blue-50/80 rounded-xl border border-blue-200">
+                        <span className="text-blue-900 font-bold flex items-center gap-1">💳 Tarjetas (Vouchers):</span>
+                        <span className="font-black text-blue-950">{formatCurrency(cardSales)}</span>
+                      </div>
+                      <div className="flex items-center justify-between px-2 py-1 bg-orange-50/80 rounded-xl border border-orange-200">
+                        <span className="text-orange-900 font-bold flex items-center gap-1">✈ Transf. (SPEI):</span>
+                        <span className="font-black text-orange-950">{formatCurrency(transferSales)}</span>
+                      </div>
+                      <div className="flex items-center justify-between px-2 py-1 bg-amber-100/90 rounded-xl border border-amber-400">
+                        <span className="text-amber-950 font-black flex items-center gap-1">⭐ Total Turno:</span>
+                        <span className="font-black text-amber-950 text-sm">{formatCurrency(totalSalesAll)}</span>
+                      </div>
                     </div>
 
                     {/* Conteo Rápido: Botón 1 Toque o Input Manual */}
