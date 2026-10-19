@@ -78,8 +78,6 @@ if (typeof window !== "undefined") {
         "brito_bread_deliveries",
         "brito_inventory_items",
         "brito_inventory_movements",
-        "brito_products",
-        "brito_products_v6",
         "brito_customers",
         "brito_current_shift_start_timestamp",
       ];
@@ -170,8 +168,6 @@ export async function executeCompleteOperationalWipe(options: { wipeSupabase?: b
     "brito_bread_deliveries",
     "brito_inventory_items",
     "brito_inventory_movements",
-    "brito_products",
-    "brito_products_v6",
     "brito_customers",
     "brito_current_shift_start_timestamp",
   ];
@@ -237,9 +233,8 @@ export async function executeCompleteOperationalWipe(options: { wipeSupabase?: b
       await supabase.from("cash_expenses").delete().neq("id", "none");
       await supabase.from("cash_movements").delete().neq("id", "none");
       await supabase.from("cash_shifts").delete().neq("id", "none");
-      await supabase.from("products").delete().neq("id", "none");
       await supabase.from("customers").delete().neq("id", "cli-general");
-      console.log("[WipeOperationalData] Tablas de Supabase en 0.");
+      console.log("[WipeOperationalData] Tablas operativas de Supabase en 0.");
     } catch (err) {
       console.warn("[WipeOperationalData] Nota al limpiar Supabase:", err);
     }

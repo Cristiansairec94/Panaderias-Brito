@@ -65,6 +65,7 @@ CREATE TABLE IF NOT EXISTS public.products (
   barcode TEXT,
   name TEXT NOT NULL,
   price NUMERIC(10, 2) NOT NULL,
+  cost NUMERIC(10, 2),
   category TEXT NOT NULL REFERENCES public.categories(id) ON UPDATE CASCADE,
   image TEXT,
   icon TEXT DEFAULT '🥖',
@@ -79,6 +80,8 @@ CREATE TABLE IF NOT EXISTS public.products (
   is_active BOOLEAN DEFAULT true NOT NULL,
   created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL
 );
+
+ALTER TABLE public.products ADD COLUMN IF NOT EXISTS cost NUMERIC(10, 2);
 
 ALTER TABLE public.products ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "anon_products" ON public.products;

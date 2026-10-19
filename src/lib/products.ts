@@ -71,6 +71,23 @@ export function saveStoredCategories(categories: ProductCategory[]): void {
   }
 }
 
+export async function syncCategoryToSupabase(cat: ProductCategory): Promise<void> {
+  if (typeof window === "undefined" || !cat || !cat.id) return;
+  try {
+    const supabase = createClient();
+    await supabase.from("categories").upsert(
+      {
+        id: cat.id,
+        name: cat.label || cat.id,
+        icon: cat.icon || "🏷️",
+      },
+      { onConflict: "id" }
+    );
+  } catch (err) {
+    console.warn("[syncCategoryToSupabase] Error sincronizando categoría:", err);
+  }
+}
+
 export function addCategory(data: { label: string; icon?: string; id?: string }): ProductCategory {
   const current = getStoredCategories();
   let cleanId = (data.id || data.label)
@@ -99,6 +116,7 @@ export function addCategory(data: { label: string; icon?: string; id?: string })
 
   const updated = [...current, newCat];
   saveStoredCategories(updated);
+  syncCategoryToSupabase(newCat);
   return newCat;
 }
 
@@ -115,6 +133,7 @@ export function updateCategory(id: string, updates: { label?: string; icon?: str
 
   current[index] = updatedCat;
   saveStoredCategories(current);
+  syncCategoryToSupabase(updatedCat);
   return updatedCat;
 }
 
@@ -442,6 +461,76 @@ export function updateProductPrice(id: string, newPrice: number): void {
   }
 }
 
+/**
+ * Sincroniza un producto individual con Supabase con soporte para auto-creación
+ * de categorías y tolerancia a columnas ausentes (como 'cost' si aún no se ha ejecutado el alter table).
+ */
+export async function syncProductToSupabase(product: Product): Promise<boolean> {
+  if (typeof window === "undefined" || !product || !product.id) return false;
+  try {
+    const supabase = createClient();
+
+    // 1. Asegurar categoría en Supabase para evitar violación de llave foránea (error 23503)
+    if (product.category) {
+      try {
+        const categories = getStoredCategories();
+        const catObj = categories.find((c) => c.id === product.category);
+        await supabase.from("categories").upsert(
+          {
+            id: product.category,
+            name: catObj?.label || product.category,
+            icon: catObj?.icon || product.icon || "🏷️",
+          },
+          { onConflict: "id" }
+        );
+      } catch (catErr) {
+        console.warn("[syncProductToSupabase] Error asegurando categoría:", catErr);
+      }
+    }
+
+    // 2. Construir payload completo
+    const payload: any = {
+      id: product.id,
+      code: product.code || `PRD-${product.id}`,
+      barcode: product.barcode || null,
+      name: product.name,
+      price: Number(product.price) || 0,
+      cost: product.cost !== undefined && product.cost !== null ? Number(product.cost) : null,
+      category: product.category || "pan_dulce",
+      image: product.image || null,
+      icon: product.icon || "🥖",
+      stock: Number(product.stock) || 0,
+      description: product.description || null,
+      unit: product.unit || "pieza",
+      has_iva: !!product.hasIva,
+      iva_rate: Number(product.ivaRate) || 0,
+      has_ieps: !!product.hasIeps,
+      ieps_rate: Number(product.iepsRate) || 0,
+      tax_included: product.taxIncluded !== undefined ? product.taxIncluded : true,
+      is_active: true,
+    };
+
+    let { error } = await supabase.from("products").upsert(payload, { onConflict: "id" });
+
+    // 3. Si Supabase devuelve error por columna 'cost' no encontrada (PGRST204), reintentar sin 'cost'
+    if (error && error.message && error.message.toLowerCase().includes("cost")) {
+      delete payload.cost;
+      const retry = await supabase.from("products").upsert(payload, { onConflict: "id" });
+      error = retry.error;
+    }
+
+    if (error) {
+      console.warn("[syncProductToSupabase] Error al sincronizar producto en Supabase:", error);
+      return false;
+    }
+
+    return true;
+  } catch (err) {
+    console.warn("[syncProductToSupabase] Excepción al sincronizar con Supabase:", err);
+    return false;
+  }
+}
+
 export function addProduct(product: Omit<Product, "id">): Product {
   const current = getStoredProducts();
   const assignedCode = product.code?.trim() || generateProductCode(product.category);
@@ -459,38 +548,18 @@ export function addProduct(product: Omit<Product, "id">): Product {
     } catch {}
   }
 
+  // 1. Guardar de forma sincrónica en localStorage para disponibilidad instantánea
   saveStoredProducts([...current, newProduct]);
 
+  // 2. Sincronizar de forma segura y tolerante a fallos con Supabase
   if (typeof window !== "undefined") {
-    try {
-      const supabase = createClient();
-      supabase.from("products").upsert({
-        id: newProduct.id,
-        code: newProduct.code,
-        barcode: newProduct.barcode,
-        name: newProduct.name,
-        price: Number(newProduct.price),
-        cost: newProduct.cost !== undefined ? Number(newProduct.cost) : null,
-        category: newProduct.category,
-        image: newProduct.image || null,
-        icon: newProduct.icon || "🥖",
-        stock: Number(newProduct.stock) || 0,
-        description: newProduct.description || null,
-        unit: newProduct.unit || "pieza",
-        has_iva: !!newProduct.hasIva,
-        iva_rate: Number(newProduct.ivaRate) || 0,
-        has_ieps: !!newProduct.hasIeps,
-        ieps_rate: Number(newProduct.iepsRate) || 0,
-        tax_included: newProduct.taxIncluded !== undefined ? newProduct.taxIncluded : true,
-        is_active: true,
-      }, { onConflict: "id" }).then();
-    } catch {}
-
-    try {
-      if (realtimeHub?.broadcastProduct) {
-        realtimeHub.broadcastProduct("create", newProduct);
-      }
-    } catch {}
+    syncProductToSupabase(newProduct).then(() => {
+      try {
+        if (realtimeHub?.broadcastProduct) {
+          realtimeHub.broadcastProduct("create", newProduct);
+        }
+      } catch {}
+    });
   }
 
   return newProduct;
@@ -513,45 +582,14 @@ export function updateProduct(id: string, updates: Partial<Product>): Product | 
   saveStoredProducts(updated);
 
   if (typeof window !== "undefined" && updatedItem) {
-    const itemToSync: Product = updatedItem;
-    try {
-      const supabase = createClient();
-      const fullPayload: any = {
-        id: itemToSync.id,
-        name: itemToSync.name,
-        price: Number(itemToSync.price) || 0,
-        cost: itemToSync.cost !== undefined ? Number(itemToSync.cost) : null,
-        category: itemToSync.category || "pan_dulce",
-        code: itemToSync.code || `PRD-${itemToSync.id}`,
-        barcode: itemToSync.barcode || null,
-        stock: Number(itemToSync.stock) || 0,
-        image: itemToSync.image || null,
-        icon: itemToSync.icon || "🥖",
-        description: itemToSync.description || null,
-        unit: itemToSync.unit || "pieza",
-        is_active: true,
-        has_iva: !!itemToSync.hasIva,
-        iva_rate: Number(itemToSync.ivaRate) || 0,
-        has_ieps: !!itemToSync.hasIeps,
-        ieps_rate: Number(itemToSync.iepsRate) || 0,
-        tax_included: itemToSync.taxIncluded !== undefined ? itemToSync.taxIncluded : true,
-      };
-
-      supabase
-        .from("products")
-        .upsert(fullPayload, { onConflict: "id" })
-        .then(({ error }: any) => {
-          if (error) {
-            supabase.from("products").update(fullPayload).eq("id", id).then();
-          }
-        });
-    } catch {}
-
-    try {
-      if (realtimeHub?.broadcastProduct) {
-        realtimeHub.broadcastProduct("update", itemToSync);
-      }
-    } catch {}
+    const itemToSync = updatedItem;
+    syncProductToSupabase(itemToSync).then(() => {
+      try {
+        if (realtimeHub?.broadcastProduct) {
+          realtimeHub.broadcastProduct("update", itemToSync);
+        }
+      } catch {}
+    });
   }
 
   return updatedItem;
@@ -610,41 +648,63 @@ export async function fetchProductsFromDb(): Promise<Product[]> {
       const stored = getStoredProducts();
       const activeRows = data.filter((p: any) => p && p.id && p.is_active !== false && !deletedIds.has(p.id));
 
-      if (activeRows.length > 0 || localStorage.getItem("brito_catalog_initialized") === "true") {
-        const mapped: Product[] = activeRows.map((p: any) => {
-          const storedMatch = stored.find((s) => s.id === p.id);
-          return {
-            id: p.id,
-            code: p.code || storedMatch?.code || `PRD-${p.id}`,
-            barcode: p.barcode || storedMatch?.barcode,
-            name: p.name,
-            price: Number(p.price),
-            cost: p.cost !== undefined && p.cost !== null ? Number(p.cost) : (storedMatch?.cost !== undefined ? Number(storedMatch.cost) : undefined),
-            category: p.category || p.category_id || storedMatch?.category || "pan_dulce",
-            icon: p.icon || storedMatch?.icon || "🥖",
-            stock: typeof p.stock === "number" ? p.stock : (storedMatch?.stock ?? 0),
-            description: p.description || storedMatch?.description,
-            image: p.image || storedMatch?.image,
-            unit: p.unit || storedMatch?.unit || "pieza",
-            hasIva: !!p.has_iva,
-            ivaRate: Number(p.iva_rate) || 0,
-            hasIeps: !!p.has_ieps,
-            iepsRate: Number(p.ieps_rate) || 0,
-            taxIncluded: p.tax_included !== undefined ? p.tax_included : true,
-          };
-        });
+      const mapped: Product[] = activeRows.map((p: any) => {
+        const storedMatch = stored.find((s) => s.id === p.id);
+        return {
+          id: p.id,
+          code: p.code || storedMatch?.code || `PRD-${p.id}`,
+          barcode: p.barcode || storedMatch?.barcode,
+          name: p.name,
+          price: Number(p.price),
+          cost: p.cost !== undefined && p.cost !== null ? Number(p.cost) : (storedMatch?.cost !== undefined ? Number(storedMatch.cost) : undefined),
+          category: p.category || p.category_id || storedMatch?.category || "pan_dulce",
+          icon: p.icon || storedMatch?.icon || "🥖",
+          stock: typeof p.stock === "number" ? p.stock : (storedMatch?.stock ?? 0),
+          description: p.description || storedMatch?.description,
+          image: p.image || storedMatch?.image,
+          unit: p.unit || storedMatch?.unit || "pieza",
+          hasIva: !!p.has_iva,
+          ivaRate: Number(p.iva_rate) || 0,
+          hasIeps: !!p.has_ieps,
+          iepsRate: Number(p.ieps_rate) || 0,
+          taxIncluded: p.tax_included !== undefined ? p.tax_included : true,
+        };
+      });
 
-        const mergedMap = new Map<string, Product>();
-        for (const sp of stored) {
-          if (sp?.id && !deletedIds.has(sp.id)) mergedMap.set(sp.id, sp);
+      // COMBINAR DE MANERA BIDIRECCIONAL: Jamás borrar productos creados localmente
+      const mergedMap = new Map<string, Product>();
+
+      // 1. Agregar los productos de Supabase
+      for (const mp of mapped) {
+        if (mp?.id && !deletedIds.has(mp.id)) {
+          mergedMap.set(mp.id, mp);
         }
-        for (const mp of mapped) {
-          if (mp?.id) mergedMap.set(mp.id, mp);
-        }
-        const finalProducts = Array.from(mergedMap.values());
-        saveStoredProducts(finalProducts);
-        return finalProducts;
       }
+
+      // 2. Conservar cualquier producto guardado localmente que no haya llegado a Supabase aún
+      const supabaseIds = new Set(mapped.map((m) => m.id));
+      for (const sp of stored) {
+        if (sp?.id && !deletedIds.has(sp.id)) {
+          if (!supabaseIds.has(sp.id)) {
+            // Este producto existe localmente pero falta en Supabase: ¡subirlo de inmediato!
+            syncProductToSupabase(sp);
+          }
+          const existingInMap = mergedMap.get(sp.id);
+          if (existingInMap) {
+            // Preservar 'cost' local si la base de datos de Supabase aún no tiene la columna cost
+            mergedMap.set(sp.id, {
+              ...existingInMap,
+              cost: sp.cost !== undefined && sp.cost !== null ? sp.cost : existingInMap.cost,
+            });
+          } else {
+            mergedMap.set(sp.id, sp);
+          }
+        }
+      }
+
+      const finalProducts = Array.from(mergedMap.values());
+      saveStoredProducts(finalProducts);
+      return finalProducts;
     }
   } catch (e) {
     console.warn("fetchProductsFromDb fallback to local:", e);
