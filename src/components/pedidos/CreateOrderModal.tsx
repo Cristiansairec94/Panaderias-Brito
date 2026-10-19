@@ -717,7 +717,7 @@ export default function CreateOrderModal({
       playScanBeep(true);
       setLastScannedAlert({
         success: true,
-        message: `¡Agregado "${code}" al pedido! Ajusta su precio y cantidad en la lista de abajo.`,
+        message: `¡Agregado "${code}" al pedido! Ajusta su cantidad en la lista de abajo.`,
         productName: code,
         price: 100,
         code,
@@ -842,17 +842,6 @@ export default function CreateOrderModal({
     });
   };
 
-  const handleSetExactItemPrice = (index: number, newPriceStr: string) => {
-    const clean = cleanDecimalNumbers(newPriceStr);
-    const num = clean === "" ? 0 : parseFloat(clean);
-    setItems((prev) => {
-      const copy = [...prev];
-      if (!copy[index]) return prev;
-      copy[index].unitPrice = num;
-      copy[index].subtotal = copy[index].quantity * num;
-      return copy;
-    });
-  };
 
   const handleAddCustomPiece = (name: string, price: number = 100) => {
     const cleanName = name.trim() || "Pastel / Encargo Especial";
@@ -1535,18 +1524,10 @@ export default function CreateOrderModal({
                   >
                     <div className="min-w-0 flex-1 pr-2">
                       <span className="font-bold text-stone-900 truncate block">{it.name}</span>
-                      <div className="flex items-center gap-1.5 mt-0.5">
-                        <span className="text-[10px] text-stone-500 font-bold">$</span>
-                        <input
-                          type="text"
-                          inputMode="decimal"
-                          value={it.unitPrice > 0 ? it.unitPrice.toString() : ""}
-                          placeholder="0.00"
-                          onChange={(e) => handleSetExactItemPrice(idx, e.target.value)}
-                          className="w-16 h-5 text-left font-black text-[11px] bg-stone-50 border border-stone-200 focus:border-amber-500 rounded px-1 text-stone-900"
-                          title="Precio unitario (haz clic para editar)"
-                        />
-                        <span className="text-[10px] text-stone-500">c/u</span>
+                      <div className="flex items-center gap-1 mt-0.5">
+                        <span className="text-[11px] text-stone-500 font-semibold">
+                          {formatCurrency(it.unitPrice)} c/u
+                        </span>
                       </div>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
