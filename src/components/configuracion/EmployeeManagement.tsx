@@ -48,10 +48,6 @@ const PUESTOS_PANADERIA = [
   "Supervisor de Calidad"
 ];
 
-const AVATAR_OPTIONS = [
-  "👨‍🍳", "👩‍🍳", "🥖", "🥐", "👨‍💼", "👩‍💼", "🧑‍💻", "🧁", "🍪", "🏪", "📦", "📋", "🚚"
-];
-
 interface SystemRoleOption {
   id: UserRole;
   label: string;
@@ -996,31 +992,6 @@ export default function EmployeeManagement({ onGoToUsersTab }: EmployeeManagemen
                     <p className="text-[10px] text-stone-400 font-medium">
                       Formatos compatibles: JPG, PNG o WebP (máximo 3MB).
                     </p>
-                  </div>
-                </div>
-
-                <div className="pt-2 border-t border-stone-200">
-                  <p className="text-[10px] font-bold text-stone-600 mb-1.5">
-                    O selecciona un avatar representativo:
-                  </p>
-                  <div className="flex items-center gap-2 overflow-x-auto py-1">
-                    {AVATAR_OPTIONS.map((emoji) => (
-                      <button
-                        key={emoji}
-                        type="button"
-                        onClick={() => {
-                          setFormAvatar(emoji);
-                          setFormPhotoUrl("");
-                        }}
-                        className={`w-9 h-9 rounded-xl flex items-center justify-center text-lg transition-all shrink-0 cursor-pointer ${
-                          !formPhotoUrl && formAvatar === emoji
-                            ? "bg-blue-600 text-white scale-110 shadow-md ring-2 ring-blue-300"
-                            : "bg-white hover:bg-stone-100 text-stone-700 border border-stone-200"
-                        }`}
-                      >
-                        {emoji}
-                      </button>
-                    ))}
                   </div>
                 </div>
               </div>

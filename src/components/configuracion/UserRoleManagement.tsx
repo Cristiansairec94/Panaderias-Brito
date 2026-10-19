@@ -221,10 +221,6 @@ export const PERMISSION_DEFINITIONS: {
   },
 ];
 
-const AVATAR_OPTIONS = [
-  "👨‍🍳", "👩‍🍳", "👨‍💼", "👩‍💼", "🧑‍💻", "🥖", "🥐", "🏪", "🧾", "📦", "🧁", "🍪", "📋", "🪙"
-];
-
 export default function UserRoleManagement() {
   const { user: currentUser, usersList, addUser, updateUser, deleteUser, toggleUserStatus } = useAuth();
   const { branches, updateBranch } = useBranch();
@@ -1069,31 +1065,6 @@ export default function UserRoleManagement() {
                       <p className="text-[10px] text-stone-400 font-medium">
                         Formatos compatibles: JPG, PNG o WebP desde tu computadora o teléfono.
                       </p>
-                    </div>
-                  </div>
-
-                  <div className="pt-2 border-t border-amber-200/60">
-                    <p className="text-[10px] font-bold text-stone-600 mb-1.5">
-                      O elige un avatar / ícono representativo:
-                    </p>
-                    <div className="flex items-center gap-2 overflow-x-auto py-1">
-                      {AVATAR_OPTIONS.map((emoji) => (
-                        <button
-                          key={emoji}
-                          type="button"
-                          onClick={() => {
-                            setFormAvatar(emoji);
-                            setFormPhotoUrl("");
-                          }}
-                          className={`w-8 h-8 rounded-xl flex items-center justify-center text-base transition-all shrink-0 cursor-pointer ${
-                            !formPhotoUrl && formAvatar === emoji
-                              ? "bg-amber-400 scale-110 shadow-md ring-2 ring-amber-300"
-                              : "bg-white hover:bg-stone-100 text-stone-700 border border-stone-200"
-                          }`}
-                        >
-                          {emoji}
-                        </button>
-                      ))}
                     </div>
                   </div>
                 </div>
