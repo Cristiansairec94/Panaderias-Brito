@@ -791,83 +791,6 @@ function parseOrderNotification(notif: FBNotification) {
   };
 }
 
-// Analizador especializado para notificaciones de toma de puesto / inicio de turno en caja
-function parseShiftStartNotification(notif: FBNotification) {
-  const title = notif.title || "";
-  const desc = notif.description || "";
-  const highlight = notif.highlightText || "";
-  const full = `${title} ${highlight} ${desc}`;
-
-  // 1. Extraer nombre del personal
-  let cashierName = "";
-  const titleMatch = title.match(/^(.+?)\s+(?:ha tomado|ha comenzado|comenzó|tomó|inició|inicio)\s+/i);
-  if (titleMatch && titleMatch[1]) {
-    cashierName = titleMatch[1].replace(/^[🟢🏁✅\s]+/, "").trim();
-  } else if (highlight.includes("•")) {
-    cashierName = highlight.split("•")[0].replace(/^[🟢🏁✅\s]+/, "").trim();
-  } else if (desc) {
-    const descMatch = desc.match(/^(.+?)\s+(?:ha tomado|ha comenzado|comenzó|tomó|inició)/i);
-    if (descMatch && descMatch[1]) {
-      cashierName = descMatch[1].trim();
-    }
-  }
-  if (!cashierName || cashierName.toLowerCase().includes("inicio") || cashierName.toLowerCase().includes("turno")) {
-    const sender = notif.senderName || "";
-    const cleanSender = sender.replace(/^🟢\s*(?:Turno en Caja|Inicio de Turno)\s*\(/i, "").replace(/\)$/, "").trim();
-    if (cleanSender && !cleanSender.toLowerCase().includes("sucursal") && !cleanSender.toLowerCase().includes("matriz")) {
-      cashierName = cleanSender;
-    } else {
-      cashierName = "Personal en Caja";
-    }
-  }
-
-  // 2. Extraer sucursal
-  let branchName = notif.branchName || notif.operatingBranchName || "";
-  if (!branchName || branchName.toLowerCase() === "sucursal") {
-    if (full.toLowerCase().includes("matriz") || full.toLowerCase().includes("centro")) branchName = "Sucursal Matriz";
-    else if (full.toLowerCase().includes("angeles") || full.toLowerCase().includes("ángeles")) branchName = "Sucursal Los Ángeles";
-    else if (full.toLowerCase().includes("san juan") || full.toLowerCase().includes("sanjuan")) branchName = "Sucursal San Juan";
-    else if (full.toLowerCase().includes("benito") || full.toLowerCase().includes("juarez") || full.toLowerCase().includes("juárez")) branchName = "Sucursal Benito Juárez";
-    else if (full.toLowerCase().includes("ildefonso")) branchName = "Sucursal San Ildefonso";
-    else if (full.toLowerCase().includes("flores") || full.toLowerCase().includes("magon") || full.toLowerCase().includes("magón")) branchName = "Sucursal Flores Magón";
-    else branchName = "Sucursal Matriz";
-  }
-
-  // 3. Extraer hora exacta en que tomó la caja
-  let entryTime = "";
-  const timeMatch = full.match(/(?:a las|hora:|entrada:)\s*(\d{1,2}:\d{2}(?:\s*[ap]\.?m\.?|\s*hrs)?)/i);
-  if (timeMatch && timeMatch[1]) {
-    entryTime = timeMatch[1].trim();
-  } else if (notif.timestamp) {
-    entryTime = new Date(notif.timestamp).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit", hour12: true });
-  } else {
-    entryTime = new Date().toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit", hour12: true });
-  }
-
-  // 4. Turno (Matutino / Vespertino)
-  let shiftLabel = "Turno Matutino";
-  if (full.toLowerCase().includes("vespertino") || full.toLowerCase().includes("tarde")) {
-    shiftLabel = "Turno Vespertino";
-  } else if (full.toLowerCase().includes("matutino") || full.toLowerCase().includes("mañana")) {
-    shiftLabel = "Turno Matutino";
-  }
-
-  // 5. Fondo recibido
-  let fundStr = "";
-  const fundMatch = full.match(/(?:fondo(?:\s+inicial)?(?:\s+en\s+caja)?(?:\s+dejado)?(?:\s+recibido)?:\s*)(\$[\d,]+(?:\.\d{2})?)/i);
-  if (fundMatch && fundMatch[1]) {
-    fundStr = fundMatch[1];
-  }
-
-  return {
-    cashierName,
-    branchName,
-    entryTime,
-    shiftLabel,
-    fundStr,
-  };
-}
-
 // Subcomponent for individual card item styled with elegant bakery aesthetics
 function NotificationCardItem({
   notif,
@@ -985,7 +908,7 @@ function NotificationCardItem({
           : isOrderDelivered
           ? "bg-sky-50/95 border-sky-300 ring-2 ring-sky-200/70 hover:border-sky-400 hover:shadow-md hover:shadow-sky-100"
           : isShiftStart
-          ? "bg-gradient-to-br from-emerald-50/80 via-teal-50/30 to-stone-50 border-emerald-400/90 ring-1 ring-emerald-300/40 hover:border-emerald-500 hover:shadow-md"
+          ? "bg-emerald-50/60 border-emerald-200/90 hover:border-emerald-300"
           : "bg-white/95 border-[#e8ded2] hover:border-amber-400 hover:shadow-md"
       }`}
     >
@@ -994,12 +917,11 @@ function NotificationCardItem({
         <div className="flex items-center gap-1.5 flex-wrap">
           {isShiftStart && (
             <>
-              <span className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-[11px] font-black bg-emerald-600 text-white shadow-2xs">
-                <span className="w-2 h-2 rounded-full bg-white animate-ping" />
-                <span>🟢 PERSONAL EN CAJA</span>
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-600 text-white shadow-2xs">
+                🟢 INICIO DE TURNO
               </span>
               {notif.branchName && (
-                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-black bg-emerald-100 text-emerald-950 border border-emerald-300 shadow-2xs">
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-stone-100 text-stone-700 border border-stone-200 shadow-2xs">
                   🏬 {notif.branchName}
                 </span>
               )}
@@ -1279,115 +1201,17 @@ function NotificationCardItem({
               )}
             </>
           ) : isShiftStart ? (
-            (() => {
-              const shiftInfo = parseShiftStartNotification(notif);
-              return (
-                <div className="space-y-2.5 pt-0.5">
-                  {/* Encabezado Grande con Nombre del Personal */}
-                  <div>
-                    <h4 className="text-sm sm:text-base font-black text-stone-900 leading-tight">
-                      {shiftInfo.cashierName} ha tomado su puesto en la caja
-                    </h4>
-                    <p className="text-xs font-bold text-emerald-800 flex items-center gap-1.5 mt-1">
-                      <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-                      <span>{shiftInfo.shiftLabel} • {shiftInfo.branchName}</span>
-                    </p>
-                  </div>
-
-                  {/* Ficha Resumen Grande y Destacada */}
-                  <div className="bg-gradient-to-br from-emerald-50/90 via-teal-50/40 to-stone-50 rounded-2xl p-3 sm:p-3.5 border-2 border-emerald-400/90 shadow-sm space-y-2.5">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      {/* Personal / Cajero(a) */}
-                      <div className="bg-white/95 p-2.5 rounded-xl border border-emerald-200/90 shadow-2xs flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center text-base shrink-0">
-                          👤
-                        </div>
-                        <div className="min-w-0">
-                          <span className="text-[10px] uppercase font-extrabold text-stone-500 block leading-tight">
-                            Personal en Caja:
-                          </span>
-                          <span className="text-xs sm:text-sm font-black text-stone-900 truncate block">
-                            {shiftInfo.cashierName}
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Sucursal */}
-                      <div className="bg-white/95 p-2.5 rounded-xl border border-amber-200/90 shadow-2xs flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-lg bg-amber-100 flex items-center justify-center text-base shrink-0">
-                          🏬
-                        </div>
-                        <div className="min-w-0">
-                          <span className="text-[10px] uppercase font-extrabold text-stone-500 block leading-tight">
-                            Sucursal:
-                          </span>
-                          <span className="text-xs sm:text-sm font-black text-amber-950 truncate block">
-                            {shiftInfo.branchName}
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Hora en que tomó la caja */}
-                      <div className="bg-white/95 p-2.5 rounded-xl border border-emerald-300 shadow-2xs flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center text-base shrink-0">
-                          🕒
-                        </div>
-                        <div className="min-w-0">
-                          <span className="text-[10px] uppercase font-extrabold text-stone-500 block leading-tight">
-                            Hora de Toma de Caja:
-                          </span>
-                          <span className="text-xs sm:text-sm font-mono font-black text-emerald-900 block">
-                            {shiftInfo.entryTime}
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Fondo inicial recibido o Estatus */}
-                      <div className="bg-white/95 p-2.5 rounded-xl border border-teal-200/90 shadow-2xs flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-lg bg-teal-100 flex items-center justify-center text-base shrink-0">
-                          {shiftInfo.fundStr ? "🪙" : "🟢"}
-                        </div>
-                        <div className="min-w-0">
-                          <span className="text-[10px] uppercase font-extrabold text-stone-500 block leading-tight">
-                            {shiftInfo.fundStr ? "Fondo Inicial en Caja:" : "Estatus:"}
-                          </span>
-                          <span className="text-xs sm:text-sm font-mono font-black text-amber-950 block">
-                            {shiftInfo.fundStr || "Caja Operativa Activa"}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Barra de Confirmación en Vivo */}
-                    <div className="bg-emerald-100/95 border border-emerald-300 px-3 py-1.5 rounded-xl flex items-center justify-between text-xs font-black text-emerald-950 shadow-2xs">
-                      <span className="flex items-center gap-1.5">
-                        <Check className="w-4 h-4 text-emerald-700 stroke-[3]" />
-                        <span>Puesto en caja registrado y activo</span>
-                      </span>
-                      <span className="text-[11px] font-bold text-emerald-900 bg-white/70 px-2 py-0.5 rounded-md">
-                        {shiftInfo.shiftLabel}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Botón de Acción Naranja Grande */}
-                  <div className="pt-0.5">
-                    <Link
-                      href={notif.actionLink || "/caja"}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        markAsRead(notif.id);
-                        onCloseDropdown();
-                      }}
-                      className="w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-amber-600 via-orange-600 to-amber-700 hover:from-amber-700 hover:to-orange-700 text-white font-black text-xs sm:text-sm flex items-center justify-center gap-2 shadow-md hover:shadow-lg transition-all hover:scale-[1.01] active:scale-95"
-                    >
-                      <span>Ver Control de Caja</span>
-                      <ArrowRight className="w-4 h-4" />
-                    </Link>
-                  </div>
-                </div>
-              );
-            })()
+            <div className="space-y-1">
+              <h5 className="text-xs sm:text-sm font-black text-emerald-950 leading-snug">
+                {notif.title}
+              </h5>
+              <p className="text-[11px] font-bold text-emerald-800">
+                {notif.highlightText}
+              </p>
+              <p className="text-xs text-stone-700 leading-relaxed">
+                {notif.description}
+              </p>
+            </div>
           ) : isShiftCut ? (
             <div className="space-y-1">
               <div className="flex items-center gap-1.5 flex-wrap">
