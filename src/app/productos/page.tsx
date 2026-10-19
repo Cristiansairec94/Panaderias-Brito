@@ -1346,24 +1346,6 @@ export default function ProductosPage() {
                 </div>
               )}
 
-              {/* Stock Actual */}
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-stone-700 flex items-center justify-between">
-                  <span>Stock Actual</span>
-                  <span className="text-[10px] text-stone-500 font-normal">Existencias en inventario</span>
-                </label>
-                <div className="relative">
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    value={formData.stock}
-                    onKeyDown={(e) => onlyNumbersKeyDown(e, false)}
-                    onChange={(e) => setFormData({ ...formData, stock: e.target.value.replace(/\D/g, "") })}
-                    placeholder="50"
-                    className="w-full px-3.5 py-2.5 bg-stone-50 rounded-xl border border-stone-200 text-xs font-bold focus:ring-2 focus:ring-amber-500 focus:outline-none"
-                  />
-                </div>
-              </div>
 
               {/* Apartado de Unidad (solo para Abarrotes y Materia Prima) */}
               {(formData.category === "abarrotes" || formData.category === "materia_prima") && (
