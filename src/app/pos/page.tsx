@@ -2331,13 +2331,6 @@ export default function POSPage() {
       items: currentItems,
       total: currentTotal,
       paymentMethod: currentPaymentMethod,
-      transferAccount: currentPaymentMethod === "transferencia" && selectedTransferAccount
-        ? `${selectedTransferAccount.name} (${selectedTransferAccount.bank})`
-        : undefined,
-      cardTerminal: currentPaymentMethod === "tarjeta" && selectedCardTerminal
-        ? `${selectedCardTerminal.name} (${selectedCardTerminal.bank})`
-        : undefined,
-      paymentReference: paymentReference.trim() || undefined,
       cashier: cashierName,
       cashGiven: currentCashGiven,
       change: currentChange,
@@ -2464,9 +2457,9 @@ export default function POSPage() {
             payment_method: currentPaymentMethod,
             cashier: cashierName,
             branch_id: resolveBranchId(activeBranch?.id || user?.assignedBranchId, cashierName),
-            payment_reference: paymentReference.trim() || null,
-            transfer_account: currentPaymentMethod === "transferencia" && selectedTransferAccount ? `${selectedTransferAccount.name} (${selectedTransferAccount.bank})` : null,
-            card_terminal: currentPaymentMethod === "tarjeta" && selectedCardTerminal ? `${selectedCardTerminal.name} (${selectedCardTerminal.bank})` : null,
+            payment_reference: null,
+            transfer_account: null,
+            card_terminal: null,
             cash_given: currentCashGiven || null,
             change: currentChange || null,
           };
@@ -4540,192 +4533,7 @@ export default function POSPage() {
             </div>
           )}
 
-          {/* Manejo de Tarjeta con Despliegue de Cuentas y Terminales a Cobrar */}
-          {paymentMethod === "tarjeta" && (
-            <div className="p-3.5 bg-gradient-to-br from-amber-50/95 via-orange-50/40 to-stone-50 rounded-2xl border-2 border-amber-400/90 space-y-3 animate-in fade-in slide-in-from-top-1 duration-200 shadow-xs">
-              <div className="flex items-center justify-between gap-2 border-b border-amber-200/80 pb-2">
-                <div className="flex items-center gap-2">
-                  <div className="p-2 bg-gradient-to-tr from-amber-500 to-orange-500 text-white rounded-xl shadow-xs">
-                    <CreditCard className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <h5 className="text-xs sm:text-sm font-black text-stone-900 leading-tight">
-                      Cobro con Tarjeta (Terminal Bancaria)
-                    </h5>
-                    <p className="text-[11px] text-stone-600 font-bold">
-                      Selecciona la terminal / cuenta de cobro
-                    </p>
-                  </div>
-                </div>
-                <span className="text-xs sm:text-sm font-black text-amber-950 bg-amber-200/80 border border-amber-300 px-3 py-1 rounded-xl shadow-2xs">
-                  {formatCurrency(total)}
-                </span>
-              </div>
 
-              {/* Selector Desplegable de Terminales */}
-              <div className="space-y-1.5">
-                <label className="block text-[11px] font-black text-stone-700 uppercase tracking-wider">
-                  Terminal / Cuenta a Cobrar:
-                </label>
-                <div className="relative">
-                  <select
-                    value={selectedCardTerminalId}
-                    onChange={(e) => setSelectedCardTerminalId(e.target.value)}
-                    className="w-full px-3.5 py-2.5 bg-white text-stone-900 rounded-xl border-2 border-amber-400 focus:border-amber-600 font-black text-xs sm:text-sm focus:outline-none shadow-xs cursor-pointer appearance-none pr-9"
-                  >
-                    {cardTerminals.map((t) => (
-                      <option key={t.id} value={t.id}>
-                        {t.name} — {t.bank}
-                      </option>
-                    ))}
-                  </select>
-                  <ChevronDown className="w-4 h-4 text-stone-600 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                </div>
-              </div>
-
-              {/* Ficha Visual de la Terminal Seleccionada */}
-              {selectedCardTerminal && (
-                <div className="bg-white rounded-xl p-3 border border-amber-200 shadow-2xs space-y-1.5 text-xs">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-stone-500 font-bold">Terminal de Cobro:</span>
-                    <span className="font-black text-stone-900">{selectedCardTerminal.name}</span>
-                  </div>
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-stone-500 font-bold">Banco / Plataforma:</span>
-                    <span className="font-extrabold text-amber-900 bg-amber-50 px-2 py-0.5 rounded-lg border border-amber-200">
-                      {selectedCardTerminal.bank}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between text-xs pt-1 border-t border-stone-100">
-                    <span className="text-stone-500 font-bold">Abono a Cuenta:</span>
-                    <span className="font-bold text-stone-800">{selectedCardTerminal.accountDestination}</span>
-                  </div>
-                </div>
-              )}
-
-              {/* Campo opcional de No. de Autorización / Voucher */}
-              <div className="pt-0.5">
-                <label className="block text-[10px] font-bold text-stone-600 mb-1">
-                  No. de Autorización / Voucher / Últimos 4 dígitos (Opcional):
-                </label>
-                <input
-                  type="text"
-                  placeholder="Ej. AUTH-4912 o 5519"
-                  value={paymentReference}
-                  onChange={(e) => setPaymentReference(e.target.value)}
-                  className="w-full px-3 py-2 bg-white rounded-xl border border-stone-300 focus:border-amber-500 text-xs font-mono font-bold text-stone-900 focus:outline-none placeholder:font-normal placeholder:text-stone-400"
-                />
-              </div>
-            </div>
-          )}
-
-          {/* Manejo de Transferencia con Selector Desplegable de Cuentas */}
-          {paymentMethod === "transferencia" && (
-            <div className="p-3.5 bg-gradient-to-br from-amber-50/95 via-orange-50/40 to-stone-50 rounded-2xl border-2 border-amber-400/90 space-y-3 animate-in fade-in slide-in-from-top-1 duration-200 shadow-xs">
-              <div className="flex items-center justify-between gap-2 border-b border-amber-200/80 pb-2">
-                <div className="flex items-center gap-2">
-                  <div className="p-2 bg-gradient-to-tr from-amber-500 to-orange-500 text-white rounded-xl shadow-xs">
-                    <Send className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <h5 className="text-xs sm:text-sm font-black text-stone-900 leading-tight">
-                      Pago por Transferencia SPEI
-                    </h5>
-                    <p className="text-[11px] text-stone-600 font-bold">
-                      Selecciona la cuenta de depósito
-                    </p>
-                  </div>
-                </div>
-                <span className="text-xs sm:text-sm font-black text-amber-950 bg-amber-200/80 border border-amber-300 px-3 py-1 rounded-xl shadow-2xs">
-                  {formatCurrency(total)}
-                </span>
-              </div>
-
-              {/* Opción Desplegable de Cuentas con Nombres de a Quién Depositar */}
-              <div className="space-y-1.5">
-                <label className="block text-[11px] font-black text-stone-700 uppercase tracking-wider">
-                  ¿A quién va a depositar? (Cuenta / Beneficiario):
-                </label>
-                <div className="relative">
-                  <select
-                    value={selectedTransferAccountId}
-                    onChange={(e) => setSelectedTransferAccountId(e.target.value)}
-                    className="w-full px-3.5 py-2.5 bg-white text-stone-900 rounded-xl border-2 border-amber-400 focus:border-amber-600 font-black text-xs sm:text-sm focus:outline-none shadow-xs cursor-pointer appearance-none pr-9"
-                  >
-                    {transferAccounts.map((acc) => (
-                      <option key={acc.id} value={acc.id}>
-                        {acc.name} — {acc.bank}
-                      </option>
-                    ))}
-                  </select>
-                  <ChevronDown className="w-4 h-4 text-stone-600 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                </div>
-              </div>
-
-              {/* Ficha Visual con Datos de la Cuenta Seleccionada */}
-              {selectedTransferAccount && (
-                <div className="bg-white rounded-xl p-3 border border-amber-200 shadow-2xs space-y-2 text-xs">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-stone-500 font-bold">Depositar a:</span>
-                    <span className="font-black text-stone-900">{selectedTransferAccount.name}</span>
-                  </div>
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-stone-500 font-bold">Banco:</span>
-                    <span className="font-extrabold text-amber-900 bg-amber-50 px-2 py-0.5 rounded-lg border border-amber-200">
-                      {selectedTransferAccount.bank}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between pt-1.5 border-t border-stone-100 gap-2">
-                    <div className="flex-1 min-w-0">
-                      <span className="text-stone-600 font-bold block text-[11px]">CLABE Interbancaria:</span>
-                      <span className="font-mono font-black text-stone-900 bg-stone-100 px-2 py-0.5 rounded-lg border border-stone-200 select-all tracking-wider text-xs block truncate">
-                        {selectedTransferAccount.clabe}
-                      </span>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (typeof navigator !== "undefined" && navigator.clipboard) {
-                          navigator.clipboard.writeText(selectedTransferAccount.clabe.replace(/\s+/g, ""));
-                          setCopiedClabe(true);
-                          setTimeout(() => setCopiedClabe(false), 2000);
-                        }
-                      }}
-                      className={`px-2.5 py-1.5 rounded-lg font-bold text-[11px] flex items-center gap-1 transition-all shrink-0 cursor-pointer ${
-                        copiedClabe
-                          ? "bg-emerald-600 text-white"
-                          : "bg-amber-100 hover:bg-amber-200 text-amber-950 border border-amber-300"
-                      }`}
-                      title="Copiar CLABE al portapapeles"
-                    >
-                      <Copy className="w-3.5 h-3.5" />
-                      <span>{copiedClabe ? "¡Copiada!" : "Copiar"}</span>
-                    </button>
-                  </div>
-                  {selectedTransferAccount.accountNumber && (
-                    <div className="flex items-center justify-between text-[11px] text-stone-500">
-                      <span>No. Cuenta:</span>
-                      <span className="font-mono font-bold text-stone-800">{selectedTransferAccount.accountNumber}</span>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Campo opcional de Folio o Referencia SPEI */}
-              <div className="pt-0.5">
-                <label className="block text-[10px] font-bold text-stone-600 mb-1">
-                  Folio de Rastreo / Referencia SPEI (Opcional):
-                </label>
-                <input
-                  type="text"
-                  placeholder="Ej. SPEI-88219 o nombre de quien transfiere"
-                  value={paymentReference}
-                  onChange={(e) => setPaymentReference(e.target.value)}
-                  className="w-full px-3 py-2 bg-white rounded-xl border border-stone-300 focus:border-amber-500 text-xs font-mono font-bold text-stone-900 focus:outline-none placeholder:font-normal placeholder:text-stone-400"
-                />
-              </div>
-            </div>
-          )}
 
 
 
