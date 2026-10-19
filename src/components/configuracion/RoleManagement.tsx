@@ -50,7 +50,7 @@ export interface RoleConfig {
   description: string;
   isSystemRole?: boolean;
   colorTheme?: string;
-  colorClass: {
+  colorClass?: {
     bg: string;
     border: string;
     text: string;
@@ -163,6 +163,26 @@ const COLOR_THEMES: Record<string, { label: string; preview: string; colors: The
       accent: "from-orange-500 to-amber-600",
     },
   },
+};
+
+export const getRoleColors = (role?: Partial<RoleConfig> | null): ThemeColors => {
+  if (!role) return COLOR_THEMES.amber.colors;
+  if (role.colorClass && typeof role.colorClass === "object" && typeof role.colorClass.badgeBg === "string" && role.colorClass.badgeBg.length > 0) {
+    return role.colorClass as ThemeColors;
+  }
+  if (role.colorTheme && COLOR_THEMES[role.colorTheme]?.colors) {
+    return COLOR_THEMES[role.colorTheme].colors;
+  }
+  return COLOR_THEMES.amber.colors;
+};
+
+export const normalizeRole = (role: RoleConfig): RoleConfig => {
+  const colors = getRoleColors(role);
+  return {
+    ...role,
+    colorTheme: role.colorTheme || "amber",
+    colorClass: colors,
+  };
 };
 
 export const ROLE_ICON_CATEGORIES = [
@@ -561,7 +581,9 @@ export default function RoleManagement() {
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          const activeRoles = parsed.filter((r: RoleConfig) => !deletedIds.includes(r.id));
+          const activeRoles = parsed
+            .filter((r: RoleConfig) => !deletedIds.includes(r.id))
+            .map(normalizeRole);
           if (!activeRoles.some((r: RoleConfig) => r.id === "admin")) {
             activeRoles.unshift(DEFAULT_SYSTEM_ROLES[0]);
           }
@@ -588,7 +610,9 @@ export default function RoleManagement() {
 
             if (Array.isArray(data.roles) && data.roles.length > 0) {
               const serverRoles: RoleConfig[] = data.roles;
-              const activeRoles = serverRoles.filter((r) => !allDeleted.includes(r.id));
+              const activeRoles = serverRoles
+                .filter((r) => !allDeleted.includes(r.id))
+                .map(normalizeRole);
               if (!activeRoles.some((r) => r.id === "admin")) {
                 activeRoles.unshift(DEFAULT_SYSTEM_ROLES[0]);
               }
@@ -638,7 +662,8 @@ export default function RoleManagement() {
 
   // Active role configuration object
   const activeRoleConfig = useMemo(() => {
-    return rolesList.find((r) => r.id === selectedRole) || rolesList[0] || DEFAULT_SYSTEM_ROLES[0];
+    const raw = rolesList.find((r) => r.id === selectedRole) || rolesList[0] || DEFAULT_SYSTEM_ROLES[0];
+    return normalizeRole(raw);
   }, [rolesList, selectedRole]);
 
   // Is selected role the protected master admin?
@@ -1027,7 +1052,7 @@ export default function RoleManagement() {
                 const activeCount = PERMISSION_GROUPS.reduce((acc, g) => {
                   return acc + g.items.filter((item) => Boolean(effectivePerms[item.key])).length;
                 }, 0);
-                const themeColors = role.colorClass || COLOR_THEMES.amber.colors;
+                const themeColors = getRoleColors(role);
 
                 return (
                   <div
@@ -1062,7 +1087,7 @@ export default function RoleManagement() {
                               </span>
                             )}
                           </div>
-                          <span className={`inline-block px-2 py-0.2 rounded-full text-[9px] font-black uppercase border mt-1 ${themeColors.badgeBg}`}>
+                          <span className={`inline-block px-2 py-0.2 rounded-full text-[9px] font-black uppercase border mt-1 ${themeColors?.badgeBg || COLOR_THEMES.amber.colors.badgeBg}`}>
                             {role.badge}
                           </span>
                         </div>
@@ -1178,7 +1203,7 @@ export default function RoleManagement() {
                     <h4 className="font-black text-lg text-stone-900 tracking-tight">
                       {activeRoleConfig.name}
                     </h4>
-                    <span className={`px-2.5 py-0.5 rounded-full font-black text-[10px] uppercase border ${activeRoleConfig.colorClass.badgeBg}`}>
+                    <span className={`px-2.5 py-0.5 rounded-full font-black text-[10px] uppercase border ${(activeRoleConfig?.colorClass?.badgeBg || COLOR_THEMES.amber.colors.badgeBg)}`}>
                       {activeRoleConfig.badge}
                     </span>
                     {!isAdmin && (

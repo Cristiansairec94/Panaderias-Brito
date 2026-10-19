@@ -1216,13 +1216,13 @@ export default function UserRoleManagement() {
                         onClick={() => handleSelectRole(role.id)}
                         className={`p-4 rounded-2xl border-2 transition-all cursor-pointer flex flex-col justify-between space-y-2.5 relative ${
                           isSelected
-                            ? role.colorClass.activeBorder + " " + role.colorClass.activeBg + " shadow-md"
+                            ? (role.colorClass?.activeBorder || "border-amber-500 ring-2 ring-amber-400/50") + " " + (role.colorClass?.activeBg || "bg-amber-500/15") + " shadow-md"
                             : "border-stone-200 hover:border-stone-300 bg-white"
                         }`}
                       >
                         <div className="flex items-center justify-between">
                           <span className="text-2xl">{role.icon}</span>
-                          <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase border ${role.colorClass.badgeBg}`}>
+                          <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase border ${role.colorClass?.badgeBg || "bg-amber-100 text-amber-900 border-amber-300"}`}>
                             {role.badge}
                           </span>
                         </div>

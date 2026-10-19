@@ -1441,7 +1441,7 @@ export default function EmployeeManagement({ onGoToUsersTab }: EmployeeManagemen
                             >
                               <div className="flex items-start justify-between gap-1 mb-1">
                                 <span className="text-xl">{role.icon}</span>
-                                <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-full border ${role.badgeBg}`}>
+                                <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-full border ${role.badgeBg || "bg-amber-100 text-amber-900 border-amber-300"}`}>
                                   {role.badge}
                                 </span>
                               </div>
