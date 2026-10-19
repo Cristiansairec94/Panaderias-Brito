@@ -125,15 +125,22 @@ export function isAllowedNotification(notif: Partial<FBNotification>): boolean {
       Boolean(notif.cutId) ||
       Boolean(notif.shiftCutData) ||
       idStr.startsWith("notif-cut-") ||
+      idStr.startsWith("notif-relevo-") ||
+      idStr.startsWith("notif-shift-") ||
       text.includes("cierre de turno") ||
       text.includes("corte de turno") ||
       text.includes("corte de caja") ||
+      text.includes("relevo") ||
+      text.includes("apertura de turno") ||
+      text.includes("entrada y salida") ||
       (notif.category === "caja" && (
         text.includes("corte") ||
         text.includes("cierre") ||
         text.includes("cuadró") ||
         text.includes("cuadro") ||
-        text.includes("diferencia")
+        text.includes("diferencia") ||
+        text.includes("relevo") ||
+        text.includes("turno")
       ))
     );
 

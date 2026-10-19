@@ -7,6 +7,7 @@ import {
   Plus, 
   Minus, 
   CheckCircle, 
+  AlertCircle,
   Database,
   History,
   DollarSign,
@@ -69,7 +70,7 @@ import {
 import { useAuth } from "@/context/AuthContext";
 import { useBranch } from "@/context/BranchContext";
 import { useSidebar } from "@/context/SidebarContext";
-import { useNotifications } from "@/context/NotificationContext";
+import { useNotifications, FBNotification } from "@/context/NotificationContext";
 import { realtimeHub } from "@/lib/realtime/realtimeHub";
 import { useSync } from "@/context/SyncContext";
 import { markRecordIdsAsSynced } from "@/lib/sync/syncService";
@@ -407,7 +408,7 @@ function CartPriceInput({
 }
 
 export default function POSPage() {
-  const { user, usersList, loginAs } = useAuth();
+  const { user, usersList, loginAs, verifyCredentials } = useAuth();
   const isAdmin = user?.role === "admin" || user?.role === "auxiliar_admin";
   const { branches, currentBranch, switchBranch, updateBranch, registerRealSale, cancelRealSale, cashMovements } = useBranch();
   const { addNotification, openShiftCutDetail } = useNotifications();
@@ -1170,70 +1171,184 @@ export default function POSPage() {
     return initialCashFund;
   }, [initialCashFund]);
 
-  const handleDirectUnlockShift = () => {
-    const bId = activeBranch?.id || "branch-matriz";
-    const effectiveCashier = lastCutInfo?.incomingCashier || activeBranch?.currentShift?.cashier || cashierName;
-    const isAft = isAfternoonShift(lastCutInfo?.nextShift || shiftName, effectiveCashier);
-    const effectiveShift = lastCutInfo?.nextShift || (isAft ? "Turno Vespertino (14:00 - 22:00)" : "Turno Matutino (06:00 - 14:00)");
+  // Relevo & Apertura de Turno: Estado de Autenticación de Cajero Entrante
+  const [incomingSelectedUser, setIncomingSelectedUser] = useState<string>("");
+  const [incomingPassword, setIncomingPassword] = useState<string>("");
+  const [showIncomingPassword, setShowIncomingPassword] = useState<boolean>(false);
+  const [incomingAuthError, setIncomingAuthError] = useState<string>("");
+  const [isVerifyingShiftLogin, setIsVerifyingShiftLogin] = useState<boolean>(false);
 
-    setCashierName(effectiveCashier);
-    setShiftName(effectiveShift);
-    setInitialCashFund(baseShiftFund);
+  useEffect(() => {
+    if (isShiftLocked) {
+      const defaultUser = lastCutInfo?.incomingCashier || activeBranch?.currentShift?.cashier || cashierName || "";
+      if (defaultUser) {
+        setIncomingSelectedUser(defaultUser);
+      }
+      setIncomingPassword("");
+      setIncomingAuthError("");
+    }
+  }, [isShiftLocked, lastCutInfo?.incomingCashier, activeBranch?.currentShift?.cashier, cashierName]);
 
-    try {
-      localStorage.setItem(`brito_pos_initial_fund_${bId}`, baseShiftFund.toString());
-      if (bId === "branch-matriz") {
-        localStorage.setItem("brito_pos_initial_fund", baseShiftFund.toString());
-      }
-      localStorage.removeItem("brito_pos_shift_locked");
-      localStorage.setItem("brito_current_shift_cashier", effectiveCashier);
-      localStorage.setItem(`brito_current_shift_cashier_${bId}`, effectiveCashier);
-      localStorage.setItem("brito_current_shift_name", effectiveShift);
-      localStorage.setItem(`brito_current_shift_name_${bId}`, effectiveShift);
-      if (!localStorage.getItem("brito_pos_current_sales")) {
-        localStorage.setItem("brito_pos_current_sales", "[]");
-      }
-      if (!localStorage.getItem("brito_current_shift_start_timestamp")) {
-        localStorage.setItem("brito_current_shift_start_timestamp", Date.now().toString());
-      }
-      window.dispatchEvent(new Event("brito_shift_cuts_updated"));
-      window.dispatchEvent(new Event("brito_sales_updated"));
-    } catch (e) {}
+  const shiftCoworkerCandidates = useMemo(() => {
+    const branchId = activeBranch?.id;
+    const branchName = (activeBranch?.name || "").toLowerCase();
+    const branchShort = (activeBranch?.shortName || "").toLowerCase();
 
-    updateBranch(bId, {
-      currentShift: {
-        id: `shift-${bId}-${Date.now()}`,
-        name: effectiveShift,
-        cashier: effectiveCashier,
-        openedAt: formatDateTimeSafe(new Date()),
-        initialFund: baseShiftFund,
-        cashSales: 0,
-        cardSales: 0,
-        transferSales: 0,
-        totalSales: 0,
-        ticketCount: 0,
-        status: "abierto",
-      },
-      manager: effectiveCashier,
-      cashInDrawer: baseShiftFund,
-      todaySales: 0,
-      todayTickets: 0,
-      todayDeskSales: 0,
-      todayDeskTickets: 0,
-      todayOrdersDeposit: 0,
-      todayOrdersTotal: 0,
-      todayOrdersCount: 0,
+    const branchUsers = usersList.filter((u) => {
+      if (u.status === "inactivo") return false;
+      const uBranchId = u.assignedBranchId;
+      const uBranchName = (u.assignedBranchName || "").toLowerCase();
+      return (
+        (branchId && uBranchId === branchId) ||
+        (uBranchId && branchId && resolveBranchId(uBranchId) === resolveBranchId(branchId)) ||
+        (branchShort && uBranchName.includes(branchShort)) ||
+        (branchName && branchName.includes(uBranchName))
+      );
     });
 
-    setIsShiftLocked(false);
-    setShiftVersion((v) => v + 1);
+    const otherUsers = usersList.filter((u) => {
+      if (u.status === "inactivo") return false;
+      return !branchUsers.some((bu) => bu.id === u.id);
+    });
 
-    // Si el cajero del relevo tiene perfil y la sesión actual era de otro cajero, vincular sesión de usuario
-    if (effectiveCashier && user && user.role === "cajero" && !matchesCashier(user.name, effectiveCashier)) {
-      const targetUser = usersList.find((u) => matchesCashier(u.name, effectiveCashier) || matchesCashier(u.username, effectiveCashier));
-      if (targetUser && loginAs) {
-        loginAs(targetUser);
+    return { branchUsers, otherUsers };
+  }, [usersList, activeBranch]);
+
+  const handleUnlockShiftWithCredentials = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (isVerifyingShiftLogin) return;
+
+    setIncomingAuthError("");
+
+    const targetCashierName = incomingSelectedUser || lastCutInfo?.incomingCashier || activeBranch?.currentShift?.cashier || cashierName;
+    if (!targetCashierName) {
+      setIncomingAuthError("Por favor selecciona el usuario o compañero que toma el turno.");
+      return;
+    }
+
+    if (!incomingPassword.trim()) {
+      setIncomingAuthError("Por favor ingresa tu contraseña o PIN de acceso.");
+      return;
+    }
+
+    setIsVerifyingShiftLogin(true);
+
+    try {
+      // 1. Verificar credenciales con AuthContext
+      const verification = verifyCredentials(targetCashierName, incomingPassword);
+      if (!verification.success) {
+        setIncomingAuthError(verification.message || "Contraseña o PIN incorrecto. Verifica los datos del compañero.");
+        setIsVerifyingShiftLogin(false);
+        return;
       }
+
+      const validUser = verification.user || usersList.find((u) => matchesCashier(u.name, targetCashierName) || matchesCashier(u.username, targetCashierName));
+      const effectiveCashier = validUser?.name || targetCashierName;
+
+      // 2. Determinar turno
+      const isAft = isAfternoonShift(lastCutInfo?.nextShift || shiftName, effectiveCashier, validUser);
+      const effectiveShift = lastCutInfo?.nextShift || (isAft ? "Turno Vespertino (14:00 - 22:00)" : "Turno Matutino (06:00 - 14:00)");
+      const bId = activeBranch?.id || "branch-matriz";
+
+      // 3. Hora de salida anterior y hora de entrada actual
+      const entryTimeStr = new Date().toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit", hour12: true });
+      const entryDateTimeStr = formatDateTimeSafe(new Date());
+      const outgoingCashierName = lastCutInfo?.outgoingCashier || "Cajero anterior";
+      const exitTimeStr = lastCutInfo?.timestamp ? formatTime24(lastCutInfo.timestamp) : (lastCutInfo?.date || "Turno anterior");
+
+      // 4. Cambiar sesión activa al compañero validado
+      if (validUser && loginAs) {
+        loginAs(validUser);
+      }
+
+      setCashierName(effectiveCashier);
+      setShiftName(effectiveShift);
+      setInitialCashFund(baseShiftFund);
+
+      // 5. Persistir estado de apertura de turno en almacenamiento local
+      try {
+        localStorage.setItem(`brito_pos_initial_fund_${bId}`, baseShiftFund.toString());
+        if (bId === "branch-matriz") {
+          localStorage.setItem("brito_pos_initial_fund", baseShiftFund.toString());
+        }
+        localStorage.removeItem("brito_pos_shift_locked");
+        localStorage.setItem("brito_current_shift_cashier", effectiveCashier);
+        localStorage.setItem(`brito_current_shift_cashier_${bId}`, effectiveCashier);
+        localStorage.setItem("brito_current_shift_name", effectiveShift);
+        localStorage.setItem(`brito_current_shift_name_${bId}`, effectiveShift);
+        localStorage.setItem("brito_current_shift_start_timestamp", Date.now().toString());
+        localStorage.setItem(`brito_shift_start_${bId}`, Date.now().toString());
+        if (!localStorage.getItem("brito_pos_current_sales")) {
+          localStorage.setItem("brito_pos_current_sales", "[]");
+        }
+        window.dispatchEvent(new Event("brito_shift_cuts_updated"));
+        window.dispatchEvent(new Event("brito_sales_updated"));
+        window.dispatchEvent(new Event("brito_branches_updated"));
+      } catch (e) {}
+
+      // 6. Actualizar sucursal en BranchContext
+      updateBranch(bId, {
+        currentShift: {
+          id: `shift-${bId}-${Date.now()}`,
+          name: effectiveShift,
+          cashier: effectiveCashier,
+          openedAt: entryDateTimeStr,
+          initialFund: baseShiftFund,
+          cashSales: 0,
+          cardSales: 0,
+          transferSales: 0,
+          totalSales: 0,
+          ticketCount: 0,
+          status: "abierto",
+        },
+        manager: effectiveCashier,
+        cashInDrawer: baseShiftFund,
+        todaySales: 0,
+        todayTickets: 0,
+        todayDeskSales: 0,
+        todayDeskTickets: 0,
+        todayOrdersDeposit: 0,
+        todayOrdersTotal: 0,
+        todayOrdersCount: 0,
+      });
+
+      // 7. Notificación en tiempo real a los perfiles administrativos (Don Toño, Paulina, etc.)
+      const branchLabel = activeBranch?.shortName || activeBranch?.name || "Sucursal";
+      const relevoNotif: FBNotification = {
+        id: `notif-relevo-${Date.now()}`,
+        senderName: `🤝 Relevo en ${branchLabel}`,
+        senderAvatar: validUser?.avatar || "👩‍🍳",
+        badgeIcon: "dinero",
+        category: "caja",
+        title: "Relevo de Turno: Entrada & Salida",
+        highlightText: `Salida: ${outgoingCashierName} (${exitTimeStr}) ➔ Entrada: ${effectiveCashier} (${entryTimeStr})`,
+        description: `Sucursal ${activeBranch?.name || branchLabel}: ${outgoingCashierName} entregó el turno a las ${exitTimeStr} y ${effectiveCashier} acaba de ingresar a las ${entryTimeStr} (${effectiveShift}). Fondo inicial en caja: ${formatCurrency(baseShiftFund)}. Folio corte: ${lastCutInfo?.id || "CORTE"}.`,
+        timeAgo: "Hace un momento",
+        group: "recientes",
+        read: false,
+        timestamp: Date.now(),
+        createdAt: new Date().toISOString(),
+        branchId: activeBranch?.id,
+        branchName: activeBranch?.name,
+        operatingBranchId: activeBranch?.id,
+        operatingBranchName: activeBranch?.name,
+      };
+
+      addNotification(relevoNotif);
+      if (realtimeHub?.broadcastNotification) {
+        realtimeHub.broadcastNotification(relevoNotif);
+      }
+
+      // 8. Desbloquear pantalla
+      setIsShiftLocked(false);
+      setShiftVersion((v) => v + 1);
+      setIncomingPassword("");
+      setIncomingAuthError("");
+    } catch (err: any) {
+      console.error("Error al desbloquear turno con autenticación:", err);
+      setIncomingAuthError("Ocurrió un error al verificar credenciales. Intenta de nuevo.");
+    } finally {
+      setIsVerifyingShiftLogin(false);
     }
   };
 
@@ -1731,10 +1846,7 @@ export default function POSPage() {
 
   const addToCart = (product: Product) => {
     if (isShiftLocked) {
-      setIsShiftLocked(false);
-      try {
-        localStorage.removeItem("brito_pos_shift_locked");
-      } catch (e) {}
+      return;
     }
 
     // Piezas de pan sin límites: se permite agregar libremente cualquier cantidad
@@ -1773,10 +1885,7 @@ export default function POSPage() {
     if (!code) return;
 
     if (isShiftLocked) {
-      setIsShiftLocked(false);
-      try {
-        localStorage.removeItem("brito_pos_shift_locked");
-      } catch (e) {}
+      return;
     }
 
     // Consulta en tiempo real al catálogo guardado en productos y en memoria
@@ -1920,10 +2029,7 @@ export default function POSPage() {
   const addMultipleToCart = (product: Product, count: number, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
     if (isShiftLocked) {
-      setIsShiftLocked(false);
-      try {
-        localStorage.removeItem("brito_pos_shift_locked");
-      } catch (e) {}
+      return;
     }
 
     // Sin límites: se permite sumar cualquier cantidad de piezas
@@ -2878,44 +2984,124 @@ export default function POSPage() {
                 </div>
               </div>
 
-              {/* 3. RELEVO DE QUIÉN TOMA EL TURNO */}
+              {/* 3. RELEVO DE QUIÉN TOMA EL TURNO & AUTENTICACIÓN CON CONTRASEÑA */}
               {(() => {
-                const incomingCashierName = lastCutInfo?.incomingCashier || activeBranch?.currentShift?.cashier || cashierName;
+                const incomingCashierName = incomingSelectedUser || lastCutInfo?.incomingCashier || activeBranch?.currentShift?.cashier || cashierName;
                 const isAft = isAfternoonShift(lastCutInfo?.nextShift || shiftName, incomingCashierName);
                 const incomingShiftDisplay = lastCutInfo?.nextShift || (isAft ? "Turno Vespertino" : "Turno Matutino");
                 const matchedUser = usersList.find((u) => matchesCashier(u.name, incomingCashierName) || matchesCashier(u.username, incomingCashierName));
 
                 return (
-                  <div className="flex items-center justify-between p-3.5 bg-gradient-to-r from-emerald-950/80 to-stone-900 border border-emerald-500/40 rounded-2xl">
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <div className="w-9 h-9 bg-emerald-600/30 rounded-xl border border-emerald-400/40 flex items-center justify-center text-lg shrink-0">
-                        {getEffectiveAvatar(matchedUser, incomingCashierName)}
-                      </div>
-                      <div className="min-w-0">
-                        <span className="text-[10px] text-emerald-400 uppercase font-black tracking-wider block">
-                          Toma el turno ahora:
+                  <form onSubmit={handleUnlockShiftWithCredentials} className="space-y-3">
+                    <div className="p-3.5 sm:p-4 bg-gradient-to-r from-emerald-950/80 to-stone-900 border-2 border-emerald-500/50 rounded-2xl space-y-3 shadow-lg">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] sm:text-xs text-emerald-400 uppercase font-black tracking-wider flex items-center gap-1.5">
+                          <span>👤</span> Toma el turno ahora (Usuario):
                         </span>
-                        <span className="text-sm font-black text-white truncate block">
-                          {incomingCashierName}
+                        <span className="text-[11px] font-bold text-emerald-300 bg-emerald-900/80 px-2.5 py-0.5 rounded-lg border border-emerald-500/40 shrink-0">
+                          {incomingShiftDisplay.split(" ")[0]} {incomingShiftDisplay.split(" ")[1] || ""}
                         </span>
                       </div>
+
+                      {/* Selector de Compañero */}
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-10 h-10 bg-emerald-600/30 rounded-xl border border-emerald-400/40 flex items-center justify-center text-xl shrink-0 shadow-inner">
+                          {getEffectiveAvatar(matchedUser, incomingCashierName)}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <label htmlFor="incoming-cashier-shift-select" className="sr-only">Seleccionar cajero entrante</label>
+                          <select
+                            id="incoming-cashier-shift-select"
+                            value={incomingCashierName}
+                            onChange={(e) => {
+                              setIncomingSelectedUser(e.target.value);
+                              setIncomingAuthError("");
+                            }}
+                            className="w-full bg-stone-950 border-2 border-emerald-500/60 text-white rounded-xl px-3 py-2 text-xs sm:text-sm font-black focus:ring-2 focus:ring-emerald-400 focus:outline-none cursor-pointer"
+                          >
+                            <optgroup label={`Compañeros de ${activeBranch?.shortName || "esta Sucursal"}`}>
+                              {shiftCoworkerCandidates.branchUsers.map((u) => (
+                                <option key={u.id} value={u.name}>
+                                  {u.avatar || "👤"} {u.name} — {u.shiftName || u.jobTitle || "Cajero"}
+                                </option>
+                              ))}
+                            </optgroup>
+                            {shiftCoworkerCandidates.otherUsers.length > 0 && (
+                              <optgroup label="Otros compañeros de la empresa">
+                                {shiftCoworkerCandidates.otherUsers.map((u) => (
+                                  <option key={u.id} value={u.name}>
+                                    {u.avatar || "👤"} {u.name} ({u.assignedBranchName || "General"})
+                                  </option>
+                                ))}
+                              </optgroup>
+                            )}
+                          </select>
+                        </div>
+                      </div>
+
+                      {/* Campo de Contraseña / PIN */}
+                      <div className="pt-1 space-y-1.5 border-t border-emerald-500/20">
+                        <label className="text-[11px] font-black text-emerald-300 flex items-center justify-between">
+                          <span className="flex items-center gap-1.5">
+                            <Lock className="w-3.5 h-3.5 text-emerald-400" />
+                            <span>Contraseña o PIN de {incomingCashierName}:</span>
+                          </span>
+                          <span className="text-[10px] text-amber-300/80 font-semibold">* Requerido para acceder</span>
+                        </label>
+                        <div className="relative">
+                          <input
+                            type={showIncomingPassword ? "text" : "password"}
+                            placeholder="Ingresa tu contraseña o PIN de acceso..."
+                            value={incomingPassword}
+                            onChange={(e) => {
+                              setIncomingPassword(e.target.value);
+                              setIncomingAuthError("");
+                            }}
+                            className="w-full pl-3.5 pr-10 py-2.5 bg-black/70 border-2 border-emerald-500/50 rounded-xl text-white font-mono text-sm placeholder:font-sans placeholder:text-xs placeholder:text-stone-500 focus:outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-400/40 transition-all shadow-inner"
+                            autoComplete="current-password"
+                            autoFocus
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowIncomingPassword(!showIncomingPassword)}
+                            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-stone-400 hover:text-white p-1 transition-colors"
+                            title={showIncomingPassword ? "Ocultar contraseña" : "Ver contraseña"}
+                          >
+                            {showIncomingPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Alerta de Error de Contraseña */}
+                      {incomingAuthError && (
+                        <div className="p-2.5 rounded-xl bg-rose-950/90 border border-rose-500 text-rose-200 text-xs font-bold flex items-center gap-2 animate-in fade-in">
+                          <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+                          <span>{incomingAuthError}</span>
+                        </div>
+                      )}
                     </div>
-                    <span className="text-[11px] font-bold text-emerald-300 bg-emerald-900/60 px-2.5 py-1 rounded-lg border border-emerald-500/30 shrink-0">
-                      {incomingShiftDisplay.split(" ")[0]} {incomingShiftDisplay.split(" ")[1] || ""}
-                    </span>
-                  </div>
+
+                    {/* 4. BOTÓN DE ACCESO Y DESBLOQUEO */}
+                    <button
+                      type="submit"
+                      disabled={isVerifyingShiftLogin}
+                      className="w-full py-4.5 sm:py-5 bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-600 hover:to-orange-600 text-stone-950 font-black rounded-2xl text-base sm:text-lg flex items-center justify-center gap-2.5 shadow-2xl shadow-amber-500/40 active:scale-95 transition-all hover:scale-[1.01] cursor-pointer"
+                    >
+                      {isVerifyingShiftLogin ? (
+                        <>
+                          <RefreshCw className="w-5 h-5 animate-spin" />
+                          <span>VERIFICANDO ACCESO...</span>
+                        </>
+                      ) : (
+                        <>
+                          <span>🔐</span>
+                          <span>TOMAR TURNO Y COMENZAR A COBRAR ➔</span>
+                        </>
+                      )}
+                    </button>
+                  </form>
                 );
               })()}
-
-              {/* 4. BOTÓN DIRECTO DE 1 SOLO TOQUE PARA COMENZAR INMEDIATAMENTE (SIN CONTRASEÑAS) */}
-              <button
-                type="button"
-                onClick={handleDirectUnlockShift}
-                className="w-full py-4.5 sm:py-5 bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-600 hover:to-orange-600 text-stone-950 font-black rounded-2xl text-base sm:text-lg flex items-center justify-center gap-2.5 shadow-2xl shadow-amber-500/30 active:scale-95 transition-all hover:scale-[1.02] cursor-pointer animate-pulse"
-              >
-                <span>🚀</span>
-                <span>TOMAR TURNO Y COMENZAR A COBRAR ➔</span>
-              </button>
             </div>
 
             <div className="text-center text-[11px] text-stone-500 font-medium">
