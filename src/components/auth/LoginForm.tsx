@@ -5,11 +5,13 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { Lock, User as UserIcon, ArrowRight, Eye, EyeOff, AlertCircle, Sparkles, ShieldCheck, ShieldAlert } from "lucide-react";
 import { useAuth, getFriendlyName, User } from "@/context/AuthContext";
-import { getEffectiveAvatar } from "@/lib/utils";
+import { useNotifications } from "@/context/NotificationContext";
+import { getEffectiveAvatar, isAdminCashier, isAfternoonShift } from "@/lib/utils";
 
 export default function LoginForm() {
   const router = useRouter();
   const { login, verifyCredentials, getDefaultRouteForUser, canAccessRoute, usersList } = useAuth();
+  const { addNotification } = useNotifications();
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -101,6 +103,47 @@ export default function LoginForm() {
 
         setWelcomeUser(res.user);
         const destination = getDefaultRouteForUser(res.user);
+
+        // Si un cajero/operador inicia sesión para entrar a su turno (y no hay candado pendiente de relevo),
+        // enviar notificación directa a los perfiles administrativos: "[Nombre] ha comenzado su turno"
+        try {
+          const u = res.user;
+          const isOperationalCashier = u.role !== "admin" && u.role !== "auxiliar_admin" && !isAdminCashier(u.name);
+          const isLocked = typeof window !== "undefined" && localStorage.getItem("brito_pos_shift_locked") === "true";
+          if (isOperationalCashier && !isLocked) {
+            const lastKey = typeof window !== "undefined" ? sessionStorage.getItem("brito_last_shift_start_notif") || "" : "";
+            const [lastCashier, lastTsStr] = lastKey.split("_");
+            const recentlyNotified =
+              lastCashier === u.name.toLowerCase().trim() &&
+              Date.now() - (parseInt(lastTsStr || "0", 10) || 0) < 60000;
+
+            if (!recentlyNotified) {
+              const entryTimeStr = new Date().toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit", hour12: true });
+              const isAft = isAfternoonShift(u.shiftName || u.shift, u.name, u);
+              const shiftShortLabel = isAft ? "Turno Vespertino (Tarde)" : "Turno Matutino (Mañana)";
+              const branchLabel = u.assignedBranchName || "Sucursal";
+              if (typeof window !== "undefined") {
+                sessionStorage.setItem("brito_last_shift_start_notif", `${u.name.toLowerCase().trim()}_${Date.now()}`);
+              }
+              addNotification({
+                id: `notif-turno-${Date.now()}`,
+                senderName: `🟢 Inicio de Turno (${branchLabel})`,
+                senderAvatar: getEffectiveAvatar(u, u.name),
+                badgeIcon: "dinero",
+                category: "caja",
+                title: `${u.name} ha comenzado su turno`,
+                highlightText: `${u.name} • ${shiftShortLabel} • ${branchLabel}`,
+                description: `${u.name} ha comenzado su turno en ${branchLabel} a las ${entryTimeStr} (${shiftShortLabel}).`,
+                branchId: u.assignedBranchId,
+                branchName: branchLabel,
+                operatingBranchId: u.assignedBranchId,
+                operatingBranchName: branchLabel,
+                actionLabel: "Ver Control de Caja",
+                actionLink: "/caja",
+              });
+            }
+          }
+        } catch {}
 
         // Mostrar el mensaje de bienvenida y luego ingresar a la app
         setTimeout(() => {

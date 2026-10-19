@@ -830,8 +830,17 @@ function NotificationCardItem({
     notif.title.toLowerCase().includes("pedido") ||
     /PED-\d+/i.test(`${notif.title} ${notif.highlightText} ${notif.description}`);
 
+  const isShiftStart =
+    !isOrder &&
+    (Boolean(notif.id && (notif.id.startsWith("notif-turno-") || notif.id.startsWith("notif-relevo-"))) ||
+      notif.title.toLowerCase().includes("ha comenzado su turno") ||
+      notif.title.toLowerCase().includes("inicio de turno") ||
+      notif.title.toLowerCase().includes("apertura de turno") ||
+      notif.title.toLowerCase().includes("relevo de turno"));
+
   const isShiftCut =
     !isOrder &&
+    !isShiftStart &&
     (notif.category === "caja" ||
       Boolean(notif.cutId) ||
       Boolean(notif.shiftCutData) ||
@@ -887,12 +896,27 @@ function NotificationCardItem({
           ? "bg-rose-50/95 border-rose-300 ring-2 ring-rose-200/70 hover:border-rose-400 hover:shadow-md hover:shadow-rose-100"
           : isOrderDelivered
           ? "bg-sky-50/95 border-sky-300 ring-2 ring-sky-200/70 hover:border-sky-400 hover:shadow-md hover:shadow-sky-100"
+          : isShiftStart
+          ? "bg-emerald-50/40 border-emerald-300/90 hover:border-emerald-400 hover:shadow-md"
           : "bg-white/95 border-[#e8ded2] hover:border-amber-400 hover:shadow-md"
       }`}
     >
       {/* Top Header Tag: Status Pill + Cross-Branch Route + Time */}
       <div className="flex items-center justify-between gap-1.5 flex-wrap pb-2 border-b border-amber-900/10">
         <div className="flex items-center gap-1.5 flex-wrap">
+          {isShiftStart && (
+            <>
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-900 border border-emerald-300 shadow-2xs">
+                🟢 INICIO DE TURNO
+              </span>
+              {notif.branchName && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-stone-100 text-stone-700 border border-stone-200 shadow-2xs">
+                  🏬 {notif.branchName}
+                </span>
+              )}
+            </>
+          )}
+
           {isShiftCut && (
             <>
               {isSquare ? (
@@ -988,6 +1012,8 @@ function NotificationCardItem({
               ? "bg-gradient-to-br from-rose-100 via-rose-50 to-red-100 border-rose-300"
               : isOrderDelivered
               ? "bg-gradient-to-br from-sky-100 via-sky-50 to-blue-100 border-sky-300"
+              : isShiftStart
+              ? "bg-gradient-to-br from-emerald-100 via-emerald-50 to-teal-100 border-emerald-300"
               : "bg-gradient-to-br from-amber-100/90 via-orange-50 to-pink-50 border-amber-200/80"
           }`}>
             {notif.badgeIcon === "harina" ? (
@@ -1005,12 +1031,16 @@ function NotificationCardItem({
               ? "bg-rose-600"
               : isOrderDelivered
               ? "bg-sky-600"
+              : isShiftStart
+              ? "bg-emerald-600"
               : "bg-gradient-to-br from-[#c25425] to-[#a83d12]"
           }`}>
             {isOrderCancelled ? (
               <XCircle className="w-3 h-3" />
             ) : isOrderDelivered ? (
               <PackageCheck className="w-3 h-3" />
+            ) : isShiftStart ? (
+              <Check className="w-3 h-3 stroke-[3]" />
             ) : (
               getBadgeIcon(notif.badgeIcon)
             )}
@@ -1159,6 +1189,18 @@ function NotificationCardItem({
                 </div>
               )}
             </>
+          ) : isShiftStart ? (
+            <div className="space-y-1">
+              <h5 className="text-xs sm:text-sm font-black text-emerald-950 leading-snug">
+                {notif.title}
+              </h5>
+              <p className="text-[11px] font-bold text-emerald-800">
+                {notif.highlightText}
+              </p>
+              <p className="text-xs text-stone-700 leading-relaxed">
+                {notif.description}
+              </p>
+            </div>
           ) : isShiftCut ? (
             <div className="space-y-1">
               <div className="flex items-center gap-1.5 flex-wrap">

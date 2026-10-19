@@ -113,7 +113,7 @@ export function isAllowedNotification(notif: Partial<FBNotification>): boolean {
     return false;
   }
 
-  // 2. Permitir exclusivamente Cierres de Turno / Cortes de Caja reales (nunca confundir pagos de pedidos con cortes)
+  // 2. Permitir exclusivamente Cierres de Turno, Aperturas/Inicios de Turno y Cortes de Caja reales (nunca confundir pagos de pedidos con cortes)
   const isCierreTurno =
     !isPedido &&
     !text.includes("pedido") &&
@@ -126,10 +126,13 @@ export function isAllowedNotification(notif: Partial<FBNotification>): boolean {
       Boolean(notif.shiftCutData) ||
       idStr.startsWith("notif-cut-") ||
       idStr.startsWith("notif-relevo-") ||
+      idStr.startsWith("notif-turno-") ||
       idStr.startsWith("notif-shift-") ||
       text.includes("cierre de turno") ||
       text.includes("corte de turno") ||
       text.includes("corte de caja") ||
+      text.includes("ha comenzado su turno") ||
+      text.includes("inicio de turno") ||
       text.includes("relevo") ||
       text.includes("apertura de turno") ||
       text.includes("entrada y salida") ||
@@ -884,6 +887,20 @@ export function findOrderForNotification(notif: FBNotification): CustomOrder | n
 
 export function findShiftCutForNotification(notif: FBNotification): ShiftCutRecord | null {
   try {
+    // 0. Si es una notificación de Inicio / Apertura de Turno ("ha comenzado su turno"), NO es un corte cerrado
+    const idLower = (notif.id || "").toLowerCase();
+    const titleLower = (notif.title || "").toLowerCase();
+    if (
+      idLower.startsWith("notif-turno-") ||
+      idLower.startsWith("notif-relevo-") ||
+      titleLower.includes("ha comenzado su turno") ||
+      titleLower.includes("inicio de turno") ||
+      titleLower.includes("apertura de turno") ||
+      titleLower.includes("relevo de turno")
+    ) {
+      return null;
+    }
+
     // 1. Si la notificación ya contiene los datos completos estructurados
     if (notif.shiftCutData) {
       return notif.shiftCutData;
@@ -2482,8 +2499,15 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       {activeToast && (
         <div
           onClick={() => {
+            const isShiftStartToast =
+              Boolean(activeToast.id && (activeToast.id.startsWith("notif-turno-") || activeToast.id.startsWith("notif-relevo-"))) ||
+              activeToast.title.toLowerCase().includes("ha comenzado su turno") ||
+              activeToast.title.toLowerCase().includes("inicio de turno");
             if (activeToast.category === "pedidos" || activeToast.title.toLowerCase().includes("pedido")) {
               openOrderDetail(activeToast);
+              setActiveToast(null);
+            } else if (isShiftStartToast) {
+              markAsRead(activeToast.id);
               setActiveToast(null);
             } else if (
               activeToast.category === "caja" ||
@@ -2538,6 +2562,12 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
             {activeToast.category === "pedidos" || activeToast.title.toLowerCase().includes("pedido") ? (
               <span className="inline-block mt-1 text-[10px] text-amber-400 font-bold underline">
                 Toca para ver detalle completo →
+              </span>
+            ) : Boolean(activeToast.id && (activeToast.id.startsWith("notif-turno-") || activeToast.id.startsWith("notif-relevo-"))) ||
+              activeToast.title.toLowerCase().includes("ha comenzado su turno") ||
+              activeToast.title.toLowerCase().includes("inicio de turno") ? (
+              <span className="inline-block mt-1 text-[10px] text-emerald-400 font-bold">
+                🟢 Turno activo en sucursal
               </span>
             ) : activeToast.category === "caja" ||
               activeToast.title.toLowerCase().includes("corte") ||
