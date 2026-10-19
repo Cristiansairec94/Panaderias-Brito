@@ -1238,13 +1238,13 @@ export default function POSPage() {
       const fullBranchName = activeBranch?.name || branchLabel;
       const relevoNotif: FBNotification = {
         id: `notif-turno-${Date.now()}`,
-        senderName: `🟢 Inicio de Turno (${branchLabel})`,
+        senderName: `🟢 Turno en Caja (${branchLabel})`,
         senderAvatar: getEffectiveAvatar(validUser, effectiveCashier),
         badgeIcon: "dinero",
         category: "caja",
-        title: `${effectiveCashier} ha comenzado su turno`,
+        title: `${effectiveCashier} ha tomado su puesto en la caja`,
         highlightText: `${effectiveCashier} • ${shiftShortLabel} • ${fullBranchName}`,
-        description: `${effectiveCashier} ha comenzado su turno en ${fullBranchName} a las ${entryTimeStr} (relevo de ${outgoingCashierName}, salida: ${exitTimeStr}). Fondo inicial en caja: ${formatCurrency(baseShiftFund)}.`,
+        description: `${effectiveCashier} tomó su puesto en la caja de ${fullBranchName} a las ${entryTimeStr} (${shiftShortLabel}, relevo de ${outgoingCashierName}, salida: ${exitTimeStr}). Fondo inicial en caja: ${formatCurrency(baseShiftFund)}.`,
         timeAgo: "Hace un momento",
         group: "recientes",
         read: false,
@@ -1464,6 +1464,41 @@ export default function POSPage() {
       localStorage.setItem("brito_current_shift_cashier", newCashier);
       localStorage.setItem(`brito_current_shift_cashier_${bId}`, newCashier);
       window.dispatchEvent(new Event("brito_shift_cuts_updated"));
+
+      const lastKey = sessionStorage.getItem("brito_last_shift_start_notif") || "";
+      const [lastCashier, lastTsStr] = lastKey.split("_");
+      const recentlyNotified =
+        lastCashier === newCashier.toLowerCase().trim() &&
+        Date.now() - (parseInt(lastTsStr || "0", 10) || 0) < 15000;
+
+      if (!recentlyNotified && newCashier) {
+        sessionStorage.setItem("brito_last_shift_start_notif", `${newCashier.toLowerCase().trim()}_${Date.now()}`);
+        const fullBranchName = activeBranch?.name || "Sucursal Matriz";
+        const branchLabel = fullBranchName.replace(/^Sucursal\s+/i, "");
+        const entryTimeStr = new Date().toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit", hour12: true });
+        const matchedUser = usersList.find((u) => matchesCashier(u.name, newCashier) || matchesCashier(u.username, newCashier));
+        const avatar = getEffectiveAvatar(matchedUser, newCashier);
+
+        addNotification({
+          id: `notif-turno-${Date.now()}`,
+          senderName: `🟢 Turno en Caja (${branchLabel})`,
+          senderAvatar: avatar,
+          badgeIcon: "dinero",
+          category: "caja",
+          title: `${newCashier} ha tomado su puesto en la caja`,
+          highlightText: `${newCashier} • ${shiftName || "Turno Activo"} • ${fullBranchName}`,
+          description: `${newCashier} tomó su puesto en la caja de ${fullBranchName} a las ${entryTimeStr} (${shiftName || "Turno Activo"}). Fondo inicial en caja: ${formatCurrency(initialCashFund)}.`,
+          branchId: activeBranch?.id,
+          branchName: fullBranchName,
+          operatingBranchId: activeBranch?.id,
+          operatingBranchName: fullBranchName,
+          timeAgo: "Hace un momento",
+          timestamp: Date.now(),
+          createdAt: new Date().toISOString(),
+          actionLabel: "Ver Control de Caja",
+          actionLink: "/caja",
+        });
+      }
     } catch (e) {}
     setShiftVersion((v) => v + 1);
   };

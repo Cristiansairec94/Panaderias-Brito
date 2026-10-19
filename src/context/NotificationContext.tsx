@@ -132,6 +132,11 @@ export function isAllowedNotification(notif: Partial<FBNotification>): boolean {
       text.includes("corte de turno") ||
       text.includes("corte de caja") ||
       text.includes("ha comenzado su turno") ||
+      text.includes("ha tomado su puesto") ||
+      text.includes("tomó su puesto") ||
+      text.includes("tomo su puesto") ||
+      text.includes("toma de puesto") ||
+      text.includes("puesto en la caja") ||
       text.includes("inicio de turno") ||
       text.includes("relevo") ||
       text.includes("apertura de turno") ||
@@ -894,6 +899,10 @@ export function findShiftCutForNotification(notif: FBNotification): ShiftCutReco
       idLower.startsWith("notif-turno-") ||
       idLower.startsWith("notif-relevo-") ||
       titleLower.includes("ha comenzado su turno") ||
+      titleLower.includes("ha tomado su puesto") ||
+      titleLower.includes("tomó su puesto") ||
+      titleLower.includes("tomo su puesto") ||
+      titleLower.includes("toma de puesto") ||
       titleLower.includes("inicio de turno") ||
       titleLower.includes("apertura de turno") ||
       titleLower.includes("relevo de turno")
@@ -2502,6 +2511,10 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
             const isShiftStartToast =
               Boolean(activeToast.id && (activeToast.id.startsWith("notif-turno-") || activeToast.id.startsWith("notif-relevo-"))) ||
               activeToast.title.toLowerCase().includes("ha comenzado su turno") ||
+              activeToast.title.toLowerCase().includes("ha tomado su puesto") ||
+              activeToast.title.toLowerCase().includes("tomó su puesto") ||
+              activeToast.title.toLowerCase().includes("tomo su puesto") ||
+              activeToast.title.toLowerCase().includes("puesto en la caja") ||
               activeToast.title.toLowerCase().includes("inicio de turno");
             if (activeToast.category === "pedidos" || activeToast.title.toLowerCase().includes("pedido")) {
               openOrderDetail(activeToast);
@@ -2565,9 +2578,13 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
               </span>
             ) : Boolean(activeToast.id && (activeToast.id.startsWith("notif-turno-") || activeToast.id.startsWith("notif-relevo-"))) ||
               activeToast.title.toLowerCase().includes("ha comenzado su turno") ||
+              activeToast.title.toLowerCase().includes("ha tomado su puesto") ||
+              activeToast.title.toLowerCase().includes("tomó su puesto") ||
+              activeToast.title.toLowerCase().includes("tomo su puesto") ||
+              activeToast.title.toLowerCase().includes("puesto en la caja") ||
               activeToast.title.toLowerCase().includes("inicio de turno") ? (
               <span className="inline-block mt-1 text-[10px] text-emerald-400 font-bold">
-                🟢 Turno activo en sucursal
+                🟢 Personal en caja • Turno activo
               </span>
             ) : activeToast.category === "caja" ||
               activeToast.title.toLowerCase().includes("corte") ||

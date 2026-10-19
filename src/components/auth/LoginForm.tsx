@@ -127,17 +127,20 @@ export default function LoginForm() {
               }
               addNotification({
                 id: `notif-turno-${Date.now()}`,
-                senderName: `🟢 Inicio de Turno (${branchLabel})`,
+                senderName: `🟢 Turno en Caja (${branchLabel})`,
                 senderAvatar: getEffectiveAvatar(u, u.name),
                 badgeIcon: "dinero",
                 category: "caja",
-                title: `${u.name} ha comenzado su turno`,
+                title: `${u.name} ha tomado su puesto en la caja`,
                 highlightText: `${u.name} • ${shiftShortLabel} • ${branchLabel}`,
-                description: `${u.name} ha comenzado su turno en ${branchLabel} a las ${entryTimeStr} (${shiftShortLabel}).`,
+                description: `${u.name} tomó su puesto en la caja de ${branchLabel} a las ${entryTimeStr} (${shiftShortLabel}).`,
                 branchId: u.assignedBranchId,
                 branchName: branchLabel,
                 operatingBranchId: u.assignedBranchId,
                 operatingBranchName: branchLabel,
+                timeAgo: "Hace un momento",
+                timestamp: Date.now(),
+                createdAt: new Date().toISOString(),
                 actionLabel: "Ver Control de Caja",
                 actionLink: "/caja",
               });

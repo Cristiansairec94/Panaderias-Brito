@@ -872,6 +872,38 @@ export default function CashDrawerShiftModal({
     onChangeShift(nextShiftName);
     onChangeInitialFund(parsedNextFund);
 
+    // Notificación clara y destacada de que el personal entrante tomó su puesto en la caja
+    const entryTimeStr = new Date().toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit", hour12: true });
+    const fullBranchName = cutRecord.branchName || currentBranch?.name || "Sucursal Matriz";
+    const branchLabel = fullBranchName.replace(/^Sucursal\s+/i, "");
+    const incomingAvatar = incomingProfile?.avatar || findProfile(incomingCashier)?.avatar || "👩‍💼";
+    
+    const takeTurnNotif: FBNotification = {
+      id: `notif-turno-${Date.now() + 10}`,
+      senderName: `🟢 Turno en Caja (${branchLabel})`,
+      senderAvatar: incomingAvatar,
+      badgeIcon: "dinero",
+      category: "caja",
+      title: `${incomingCashier} ha tomado su puesto en la caja`,
+      highlightText: `${incomingCashier} • ${nextShiftName} • ${fullBranchName}`,
+      description: `${incomingCashier} tomó su puesto en la caja de ${fullBranchName} a las ${entryTimeStr} (${nextShiftName}, relevo de ${outgoingCashier}). Fondo inicial en caja: ${formatCurrency(parsedNextFund)}.`,
+      timeAgo: "Hace un momento",
+      group: "recientes",
+      read: false,
+      timestamp: Date.now() + 10,
+      createdAt: new Date().toISOString(),
+      branchId: cutRecord.branchId || currentBranch?.id,
+      branchName: fullBranchName,
+      operatingBranchId: cutRecord.branchId || currentBranch?.id,
+      operatingBranchName: fullBranchName,
+      actionLabel: "Ver Control de Caja",
+      actionLink: "/caja",
+    };
+    addNotification(takeTurnNotif);
+    if (realtimeHub?.broadcastNotification) {
+      realtimeHub.broadcastNotification(takeTurnNotif);
+    }
+
     // Si el perfil entrante existe en la lista de usuarios y quien opera es cajero (o no es admin general), vincular sesión activa
     if (incomingProfile && user && user.role === "cajero" && loginAs) {
       loginAs(incomingProfile);

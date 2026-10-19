@@ -1851,6 +1851,31 @@ export default function CajaPage() {
       cutId: newCut.id,
     });
 
+    const recipientUser = usersList.find((u) => matchesCashier(u.name, recipient) || matchesCashier(u.username, recipient));
+    const fullBranchName = currentBranch?.name || "Sucursal Matriz";
+    const branchLabel = fullBranchName.replace(/^Sucursal\s+/i, "");
+    const recipientTimeStr = new Date().toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit", hour12: true });
+
+    addNotification({
+      id: `notif-turno-${Date.now() + 10}`,
+      senderName: `🟢 Turno en Caja (${branchLabel})`,
+      senderAvatar: recipientUser?.avatar || "👩‍💼",
+      badgeIcon: "dinero",
+      category: "caja",
+      title: `${recipient} ha tomado su puesto en la caja`,
+      highlightText: `${recipient} • ${newCut.nextShift || "Turno Activo"} • ${fullBranchName}`,
+      description: `${recipient} tomó su puesto en la caja de ${fullBranchName} a las ${recipientTimeStr} (${newCut.nextShift || "Turno Activo"}, relevo de ${currentShiftResponsible}). Fondo inicial dejado en caja: ${formatCurrency(parsedNextFund)}.`,
+      branchId: currentBranch?.id,
+      branchName: fullBranchName,
+      operatingBranchId: currentBranch?.id,
+      operatingBranchName: fullBranchName,
+      timeAgo: "Hace un momento",
+      timestamp: Date.now() + 10,
+      createdAt: new Date().toISOString(),
+      actionLabel: "Ver Control de Caja",
+      actionLink: "/caja",
+    });
+
     setIsCorteModalOpen(false);
     setCountedCash("");
     setDeliveryPassword("");
