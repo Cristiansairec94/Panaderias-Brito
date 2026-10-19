@@ -880,6 +880,44 @@ function NotificationCardItem({
     notif.title.includes("🚨");
   const isOver = !isShort && ((cutData && cutData.difference > 0) || fullText.includes("sobrante"));
 
+  // Resolver datos de corte y determinar el perfil que toma el turno
+  const cutDisplay = (() => {
+    if (!isShiftCut) return null;
+    let outgoing = cutData?.outgoingCashier?.trim() || "";
+    let incoming = cutData?.incomingCashier?.trim() || "";
+    let cutFolio = cutData?.id || notif.cutId || "";
+    const shiftRange = cutData?.shiftRange || "";
+
+    const highlight = notif.highlightText || "";
+    if ((!outgoing || !incoming) && highlight.includes("➔")) {
+      const parts = highlight.split("➔");
+      if (!outgoing && parts[0]) {
+        outgoing = parts[0].replace(/^.*?:\s*/, "").replace(/[👤🏁🟢]/g, "").trim();
+      }
+      if (!incoming && parts[1]) {
+        incoming = parts[1].split("•")[0].replace(/[👤🏁🟢]/g, "").trim();
+      }
+    }
+
+    if (!cutFolio) {
+      const m = (notif.description || "").match(/(?:Folio|Corte)\s+([A-Z0-9-]+)/i);
+      if (m && m[1]) cutFolio = m[1];
+    }
+
+    // Quien toma el turno: si hay relevo (entrante), es el entrante; sino el cajero saliente/responsable
+    const takingProfile = (incoming && incoming !== outgoing)
+      ? incoming
+      : (outgoing || incoming || notif.senderName?.replace(/^[🏁🟢\s]+(?:Cierre de Turno|Turno en Caja)\s*\(|\)$/g, "").trim() || "Cajero");
+
+    return {
+      cutFolio,
+      outgoingCashier: outgoing || "Cajero",
+      incomingCashier: incoming,
+      takingProfile,
+      shiftRange: shiftRange || timeInfo.exactTime,
+    };
+  })();
+
   return (
     <div
       onClick={() => {
@@ -945,6 +983,11 @@ function NotificationCardItem({
               ) : (
                 <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-stone-100 text-stone-700 border border-stone-200">
                   🏁 CIERRE DE TURNO
+                </span>
+              )}
+              {cutDisplay?.takingProfile && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100/90 text-amber-950 border border-amber-300 shadow-2xs">
+                  👤 {cutDisplay.takingProfile}
                 </span>
               )}
               {(notif.branchName || cutData?.branchName) && (
@@ -1215,32 +1258,39 @@ function NotificationCardItem({
           ) : isShiftCut ? (
             <div className="space-y-1">
               <div className="flex items-center gap-1.5 flex-wrap">
-                {cutData?.id && (
+                {(cutDisplay?.cutFolio || cutData?.id) && (
                   <span className="text-[10px] font-mono font-black text-amber-900 bg-amber-100/90 border border-amber-300 px-1.5 py-0.2 rounded-md">
-                    {cutData.id}
+                    {cutDisplay?.cutFolio || cutData?.id}
                   </span>
                 )}
                 <h5 className="text-xs sm:text-[13px] font-black text-stone-900 leading-snug">
-                  Cierre de Turno
+                  {cutDisplay?.takingProfile || "Cierre de Turno"}
                 </h5>
+                <span className="text-[11px] font-bold text-stone-500">
+                  • Cierre de Turno
+                </span>
               </div>
 
               {/* Responsable de caja y Horario en formato breve y elegante */}
               <div className="flex items-center gap-2 text-[11px] text-stone-600 font-semibold flex-wrap">
                 <span className="flex items-center gap-1 text-stone-900 font-bold">
                   <User className="w-3.5 h-3.5 text-stone-400 shrink-0" />
-                  <span>{cutData?.outgoingCashier || "Cajero"}</span>
-                  {cutData?.incomingCashier && cutData.incomingCashier !== cutData.outgoingCashier && (
+                  <span>{cutDisplay?.outgoingCashier || cutData?.outgoingCashier || "Cajero"}</span>
+                  {(cutDisplay?.incomingCashier || cutData?.incomingCashier) &&
+                    (cutDisplay?.incomingCashier || cutData?.incomingCashier) !==
+                      (cutDisplay?.outgoingCashier || cutData?.outgoingCashier) && (
                     <>
                       <span className="text-stone-400 font-normal">➔</span>
-                      <span className="text-stone-700 font-medium">{cutData.incomingCashier}</span>
+                      <span className="text-stone-700 font-medium">
+                        {cutDisplay?.incomingCashier || cutData?.incomingCashier}
+                      </span>
                     </>
                   )}
                 </span>
                 <span className="text-stone-300 font-bold">•</span>
                 <span className="flex items-center gap-1 text-stone-600">
                   <Clock className="w-3.5 h-3.5 text-stone-400 shrink-0" />
-                  <span>{cutData?.shiftRange || timeInfo.exactTime}</span>
+                  <span>{cutDisplay?.shiftRange || cutData?.shiftRange || timeInfo.exactTime}</span>
                 </span>
               </div>
             </div>
