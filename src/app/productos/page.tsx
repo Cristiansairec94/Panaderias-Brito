@@ -31,12 +31,11 @@ import {
   Lock
 } from "lucide-react";
 import { Product } from "@/types";
-import { formatCurrency, onlyNumbersKeyDown, cleanDecimalNumbers } from "@/lib/utils";
+import { formatCurrency, onlyNumbersKeyDown, cleanDecimalNumbers, playScanBeep } from "@/lib/utils";
 import { BarcodeCard } from "@/components/productos/BarcodeCard";
 import { PrintBarcodesModal } from "@/components/productos/PrintBarcodesModal";
 import { QuickPriceModal } from "@/components/productos/QuickPriceModal";
 import { ManageCategoriesModal } from "@/components/productos/ManageCategoriesModal";
-import { BarcodeScannerModal } from "@/components/productos/BarcodeScannerModal";
 import { 
   getStoredProducts, 
   createProduct, 
@@ -46,6 +45,7 @@ import {
   generateProductBarcode,
   getStoredCategories,
   fetchProductsFromDb,
+  findProductByBarcodeOrCode,
   ProductCategory
 } from "@/lib/products";
 import { createClient } from "@/lib/supabase/client";
@@ -62,7 +62,6 @@ export default function ProductosPage() {
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [isCategoriesOpen, setIsCategoriesOpen] = useState(true);
   const [isManageCategoriesOpen, setIsManageCategoriesOpen] = useState(false);
-  const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
   const [viewMode, setViewMode] = useState<"grid" | "table">("grid");
 
@@ -215,50 +214,129 @@ export default function ProductosPage() {
     }
   };
 
-  // Handlers para escaneo de empaque con cámara
-  const handleUseScannedCode = (scannedBarcode: string) => {
-    setFormData((prev) => ({
-      ...prev,
-      barcode: scannedBarcode,
-      code: scannedBarcode,
-    }));
-    showToast(`Código de barras "${scannedBarcode}" asignado al formulario.`);
-  };
+  // Abrir modal de creación directamente con código escaneado por el lector físico
+  const handleOpenCreateWithBarcode = (scannedBarcode: string) => {
+    if (!isAdmin) {
+      alert("Acceso restringido: Solo el Administrador puede dar de alta nuevos productos.");
+      return;
+    }
+    setModalMode("create");
+    setEditingId(null);
+    const initialCat = (selectedCategory !== "all" 
+      ? selectedCategory 
+      : (categories[0]?.id || "pan_dulce")) as Product["category"];
+    const isPanDulce = initialCat === "pan_dulce" || initialCat === "pasteleria" || initialCat === "temporada";
+    const isBebida = initialCat === "bebidas";
+    const defaultCatIcon = categories.find((c) => c.id === initialCat)?.icon || (initialCat === "abarrotes" ? "🥫" : initialCat === "materia_prima" ? "🌾" : "🥖");
 
-  const handleDirectSaveFromScanner = (data: {
-    barcode: string;
-    code: string;
-    name: string;
-    price: number;
-    category: string;
-  }) => {
-    const catObj = categories.find((c) => c.id === data.category);
-    createProduct({
-      code: data.code,
-      barcode: data.barcode,
-      name: data.name,
-      price: data.price,
-      category: data.category as any,
-      unit: data.category === "materia_prima" ? "kg" : "pieza",
-      icon: catObj?.icon || (data.category === "abarrotes" ? "🥫" : "🥖"),
-      stock: 0,
+    setFormData({
+      code: scannedBarcode,
+      barcode: scannedBarcode,
+      name: "",
+      price: "",
+      cost: "",
+      stock: "50",
+      category: initialCat,
+      unit: initialCat === "materia_prima" ? "kg" : "pieza",
       description: "",
       image: "",
-      hasIva: false,
-      ivaRate: 0,
-      hasIeps: false,
-      iepsRate: 0,
+      icon: defaultCatIcon,
+      hasIva: isBebida,
+      ivaRate: isBebida ? "16" : "0",
+      hasIeps: isPanDulce,
+      iepsRate: isPanDulce ? "8" : "0",
       taxIncluded: true,
     });
-
-    setProducts(getStoredProducts());
-    showToast(`¡Producto "${data.name}" agregado a la base de datos!`);
-    setIsModalOpen(false);
+    setIsModalOpen(true);
   };
 
-  const handleSelectExistingFromScanner = (existingProduct: Product) => {
-    handleOpenEdit(existingProduct);
-  };
+  // Listener global para lector físico de código de barras USB / Bluetooth (Keyboard Wedge)
+  const keyStrokeBufferRef = useRef<{ buffer: string; lastStrokeTime: number }>({
+    buffer: "",
+    lastStrokeTime: 0,
+  });
+
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      // Ignorar si hay modales secundarios de confirmación o impresión masiva abiertos
+      if (deletingProduct || isPrintModalOpen || isManageCategoriesOpen || isQuickPriceOpen) {
+        return;
+      }
+
+      const now = Date.now();
+      const timeDiff = now - keyStrokeBufferRef.current.lastStrokeTime;
+
+      // Al recibir Enter (fin de transmisión del lector de código de barras)
+      if (e.key === "Enter") {
+        const scanned = keyStrokeBufferRef.current.buffer.trim().toUpperCase();
+        if (scanned.length >= 3) {
+          e.preventDefault();
+          e.stopPropagation();
+
+          if (isModalOpen) {
+            // Asignar directamente al código de barras del producto en edición o alta
+            setFormData((prev) => ({
+              ...prev,
+              barcode: scanned,
+              code: scanned,
+            }));
+            playScanBeep(true);
+            showToast(`¡Código de barras "${scanned}" capturado desde el lector físico!`);
+
+            // Alerta si el código ya existe en otro producto registrado
+            const duplicate = products.find((p) => (p.barcode === scanned || p.code === scanned) && p.id !== editingId);
+            if (duplicate) {
+              showToast(`⚠️ Nota: El código "${scanned}" ya pertenece al producto "${duplicate.name}".`);
+            }
+          } else {
+            // Escaneo desde la pantalla del catálogo: buscar producto o registrar uno nuevo
+            const matched = findProductByBarcodeOrCode(scanned, products) || findProductByBarcodeOrCode(scanned, getStoredProducts());
+            if (matched) {
+              playScanBeep(true);
+              setSearchQuery(scanned);
+              showToast(`¡Producto "${matched.name}" localizado con el lector físico!`);
+              if (isAdmin) {
+                handleOpenEdit(matched);
+              }
+            } else {
+              playScanBeep(true);
+              showToast(`¡Código nuevo "${scanned}" detectado! Abriendo registro...`);
+              if (isAdmin) {
+                handleOpenCreateWithBarcode(scanned);
+              }
+            }
+          }
+        }
+
+        keyStrokeBufferRef.current = { buffer: "", lastStrokeTime: 0 };
+        return;
+      }
+
+      // Los lectores físicos USB/Bluetooth transmiten ráfagas con menos de 85ms entre caracteres
+      if (e.key.length === 1) {
+        if (timeDiff > 85) {
+          keyStrokeBufferRef.current = { buffer: e.key, lastStrokeTime: now };
+        } else {
+          keyStrokeBufferRef.current.buffer += e.key;
+          keyStrokeBufferRef.current.lastStrokeTime = now;
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleGlobalKeyDown, true);
+    return () => window.removeEventListener("keydown", handleGlobalKeyDown, true);
+  }, [
+    isModalOpen,
+    products,
+    editingId,
+    isAdmin,
+    deletingProduct,
+    isPrintModalOpen,
+    isManageCategoriesOpen,
+    isQuickPriceOpen,
+    selectedCategory,
+    categories,
+  ]);
 
   // Filtered products
   const filteredProducts = useMemo(() => {
@@ -1179,7 +1257,9 @@ export default function ProductosPage() {
                   const newBarcode = generateProductBarcode();
                   setFormData({ ...formData, barcode: newBarcode, code: newBarcode });
                 }}
-                onOpenScanner={() => setIsScannerOpen(true)}
+                onOpenScanner={() => {
+                  showToast("🟢 Lector listo: Apunta la pistola al código del empaque y presiona el gatillo.");
+                }}
               />
 
               {/* Categoría */}
@@ -1490,20 +1570,6 @@ export default function ProductosPage() {
           setCategories(getStoredCategories());
           setProducts(getStoredProducts());
         }}
-      />
-
-      {/* Modal de Escaneo de Códigos de Barra de Empaques con Cámara */}
-      <BarcodeScannerModal
-        isOpen={isScannerOpen}
-        onClose={() => setIsScannerOpen(false)}
-        products={products}
-        categories={categories}
-        initialName={formData.name}
-        initialPrice={formData.price}
-        initialCategory={formData.category}
-        onUseCode={handleUseScannedCode}
-        onSaveDirect={handleDirectSaveFromScanner}
-        onSelectExistingProduct={handleSelectExistingFromScanner}
       />
     </div>
   );

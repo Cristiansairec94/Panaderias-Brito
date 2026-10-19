@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import { 
   Barcode, 
   RefreshCw, 
@@ -9,8 +9,11 @@ import {
   Printer, 
   Scan,
   Sparkles,
-  Camera
+  ScanLine,
+  Zap,
+  CheckCircle2
 } from "lucide-react";
+import { playScanBeep } from "@/lib/utils";
 
 // Standard EAN-13 patterns
 const L_PATTERNS = [
@@ -394,8 +397,25 @@ export function BarcodeCard({
 }: BarcodeCardProps) {
   const [copied, setCopied] = useState(false);
   const [isManualEditOpen, setIsManualEditOpen] = useState(false);
+  const [isWaitingForScan, setIsWaitingForScan] = useState(false);
+  const [scanFeedback, setScanFeedback] = useState<string | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const displayBarcode = barcode ? buildEAN13(barcode) : "7501000100011";
+
+  const handleActivateScanner = () => {
+    setIsManualEditOpen(true);
+    setIsWaitingForScan(true);
+    setTimeout(() => {
+      if (inputRef.current) {
+        inputRef.current.focus();
+        inputRef.current.select();
+      }
+    }, 60);
+    if (onOpenScanner) {
+      onOpenScanner();
+    }
+  };
 
   const handleCopy = () => {
     if (!displayBarcode) return;
@@ -514,17 +534,19 @@ export function BarcodeCard({
 
         {/* Quick Actions */}
         <div className="flex items-center gap-1.5 flex-wrap justify-end">
-          {onOpenScanner && (
-            <button
-              type="button"
-              onClick={onOpenScanner}
-              className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-[10px] font-black rounded-lg transition-all flex items-center gap-1 cursor-pointer shadow-xs hover:scale-102"
-              title="Escanear el código de barras que trae el empaque con la cámara"
-            >
-              <Camera className="w-3 h-3 stroke-[2.5]" />
-              <span>Escanear Empaque</span>
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={handleActivateScanner}
+            className={`px-2.5 py-1 text-white text-[10px] font-black rounded-lg transition-all flex items-center gap-1.5 cursor-pointer shadow-xs active:scale-95 ${
+              isWaitingForScan
+                ? "bg-emerald-600 ring-2 ring-emerald-400 ring-offset-1 animate-pulse"
+                : "bg-emerald-600 hover:bg-emerald-700 hover:scale-102"
+            }`}
+            title="Activar escaneo con lector físico de código de barras (pistola USB / Bluetooth)"
+          >
+            <ScanLine className="w-3.5 h-3.5 stroke-[2.5]" />
+            <span>{isWaitingForScan ? "Lector Activo..." : "Escanear con Lector"}</span>
+          </button>
 
           <button
             type="button"
@@ -547,6 +569,36 @@ export function BarcodeCard({
           </button>
         </div>
       </div>
+
+      {/* Banner de Estado del Lector Físico */}
+      {isWaitingForScan && (
+        <div className="p-2.5 bg-emerald-50 border-2 border-emerald-500/40 rounded-xl flex items-center justify-between gap-2 animate-in fade-in duration-150">
+          <div className="flex items-center gap-2">
+            <span className="relative flex h-2.5 w-2.5 flex-shrink-0">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-600"></span>
+            </span>
+            <div className="text-[11px] text-emerald-950 font-bold leading-tight">
+              <span>Lector USB conectado y listo: </span>
+              <span className="font-normal text-emerald-800">Apunta la pistola al código del empaque y presiona el gatillo.</span>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setIsWaitingForScan(false)}
+            className="text-[10px] font-black text-emerald-800 hover:text-emerald-950 px-2 py-0.5 rounded bg-emerald-100 hover:bg-emerald-200 cursor-pointer flex-shrink-0"
+          >
+            Listo
+          </button>
+        </div>
+      )}
+
+      {scanFeedback && (
+        <div className="p-2 bg-emerald-100 border border-emerald-300 rounded-xl flex items-center gap-2 text-xs font-bold text-emerald-900 animate-in fade-in">
+          <CheckCircle2 className="w-4 h-4 text-emerald-700 flex-shrink-0" />
+          <span>{scanFeedback}</span>
+        </div>
+      )}
 
       {/* Barcode Visual Graphic Card */}
       <div 
@@ -580,17 +632,15 @@ export function BarcodeCard({
       <div className="space-y-2">
         <div className="flex items-center justify-between text-[11px] gap-2 flex-wrap">
           <div className="flex items-center gap-2.5">
-            {onOpenScanner && (
-              <button
-                type="button"
-                onClick={onOpenScanner}
-                className="text-emerald-700 hover:text-emerald-900 font-black flex items-center gap-1 cursor-pointer transition-colors"
-                title="Abrir cámara para escanear el empaque"
-              >
-                <Camera className="w-3.5 h-3.5 text-emerald-600" />
-                <span>Escanear con cámara</span>
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={handleActivateScanner}
+              className="text-emerald-700 hover:text-emerald-900 font-black flex items-center gap-1 cursor-pointer transition-colors"
+              title="Colocar el cursor listo para la pistola lectora"
+            >
+              <Zap className="w-3.5 h-3.5 text-emerald-600" />
+              <span>{isWaitingForScan ? "Pistola activa" : "Activar lector de pistola"}</span>
+            </button>
 
             <button
               type="button"
@@ -598,7 +648,7 @@ export function BarcodeCard({
               className="text-stone-600 hover:text-stone-950 font-bold flex items-center gap-1 cursor-pointer transition-colors"
             >
               <Scan className="w-3.5 h-3.5 text-amber-600" />
-              <span>{isManualEditOpen ? "Ocultar casilla manual" : "Escanear con pistola o editar número"}</span>
+              <span>{isManualEditOpen ? "Ocultar casilla manual" : "Editar número o ver casilla"}</span>
             </button>
           </div>
 
@@ -611,20 +661,37 @@ export function BarcodeCard({
           <div className="p-2.5 bg-white rounded-xl border border-stone-200 space-y-1.5 animate-in fade-in slide-in-from-top-1 duration-150">
             <label className="text-[10px] font-bold text-stone-700 flex items-center justify-between">
               <span>Número de Código de Barras (EAN-13 o comercial):</span>
-              <span className="text-amber-700 font-medium">Soporta pistola lectora USB / Bluetooth</span>
+              <span className="text-emerald-700 font-bold flex items-center gap-1">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                Lector USB / Pistola compatible
+              </span>
             </label>
             <div className="relative">
               <input
+                ref={inputRef}
                 type="text"
                 required
                 value={barcode}
                 onChange={(e) => onChangeBarcode(e.target.value.trim().toUpperCase())}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    playScanBeep(true);
+                    setScanFeedback(`¡Código "${barcode}" asignado correctamente!`);
+                    setIsWaitingForScan(false);
+                    setTimeout(() => setScanFeedback(null), 3000);
+                  }
+                }}
                 placeholder="750100010001"
-                className="w-full px-3 py-2 bg-stone-50 rounded-lg border border-stone-300 text-xs font-mono font-black text-stone-900 focus:bg-white focus:ring-2 focus:ring-amber-500 focus:outline-none tracking-wider"
+                className={`w-full px-3 py-2 rounded-lg border text-xs font-mono font-black text-stone-900 tracking-wider transition-all focus:outline-none ${
+                  isWaitingForScan 
+                    ? "bg-emerald-50/50 border-emerald-500 ring-2 ring-emerald-500/30" 
+                    : "bg-stone-50 border-stone-300 focus:bg-white focus:ring-2 focus:ring-amber-500"
+                }`}
               />
             </div>
             <p className="text-[10px] text-stone-500">
-              Al conectar un lector de código de barras físico puedes disparar directamente en este campo.
+              Al conectar un lector de código de barras físico (pistola USB o Bluetooth) puedes disparar directamente al empaque en este campo sin necesidad de usar cámara.
             </p>
           </div>
         )}
