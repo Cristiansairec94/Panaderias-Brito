@@ -1189,30 +1189,6 @@ export default function POSPage() {
     }
   }, [isShiftLocked, lastCutInfo?.incomingCashier, activeBranch?.currentShift?.cashier, cashierName]);
 
-  const shiftCoworkerCandidates = useMemo(() => {
-    const branchId = activeBranch?.id;
-    const branchName = (activeBranch?.name || "").toLowerCase();
-    const branchShort = (activeBranch?.shortName || "").toLowerCase();
-
-    const branchUsers = usersList.filter((u) => {
-      if (u.status === "inactivo") return false;
-      const uBranchId = u.assignedBranchId;
-      const uBranchName = (u.assignedBranchName || "").toLowerCase();
-      return (
-        (branchId && uBranchId === branchId) ||
-        (uBranchId && branchId && resolveBranchId(uBranchId) === resolveBranchId(branchId)) ||
-        (branchShort && uBranchName.includes(branchShort)) ||
-        (branchName && uBranchName && branchName.includes(uBranchName))
-      );
-    });
-
-    const otherUsers = usersList.filter((u) => {
-      if (u.status === "inactivo") return false;
-      return !branchUsers.some((bu) => bu.id === u.id);
-    });
-
-    return { branchUsers, otherUsers };
-  }, [usersList, activeBranch]);
 
   const handleUnlockShiftWithCredentials = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -3026,39 +3002,18 @@ export default function POSPage() {
                         </span>
                       </div>
 
-                      {/* Selector de Compañero */}
-                      <div className="flex items-center gap-2.5">
+                      {/* Nombre Fijo de Quien Toma el Turno (Sin opciones ni desplegable) */}
+                      <div className="flex items-center gap-3 bg-stone-950 border-2 border-emerald-500/60 rounded-xl px-3.5 py-2.5 shadow-inner">
                         <div className="w-10 h-10 bg-emerald-600/30 rounded-xl border border-emerald-400/40 flex items-center justify-center text-xl shrink-0 shadow-inner">
                           {getEffectiveAvatar(matchedUser, incomingCashierName)}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <label htmlFor="incoming-cashier-shift-select" className="sr-only">Seleccionar cajero entrante</label>
-                          <select
-                            id="incoming-cashier-shift-select"
-                            value={incomingCashierName}
-                            onChange={(e) => {
-                              setIncomingSelectedUser(e.target.value);
-                              setIncomingAuthError("");
-                            }}
-                            className="w-full bg-stone-950 border-2 border-emerald-500/60 text-white rounded-xl px-3 py-2 text-xs sm:text-sm font-black focus:ring-2 focus:ring-emerald-400 focus:outline-none cursor-pointer"
-                          >
-                            <optgroup label={`Compañeros de ${activeBranch?.shortName || "esta Sucursal"}`}>
-                              {shiftCoworkerCandidates.branchUsers.map((u) => (
-                                <option key={u.id} value={u.name}>
-                                  {u.avatar || "👤"} {u.name} — {u.shiftName || u.jobTitle || "Cajero"}
-                                </option>
-                              ))}
-                            </optgroup>
-                            {shiftCoworkerCandidates.otherUsers.length > 0 && (
-                              <optgroup label="Otros compañeros de la empresa">
-                                {shiftCoworkerCandidates.otherUsers.map((u) => (
-                                  <option key={u.id} value={u.name}>
-                                    {u.avatar || "👤"} {u.name} ({u.assignedBranchName || "General"})
-                                  </option>
-                                ))}
-                              </optgroup>
-                            )}
-                          </select>
+                          <span className="text-white text-sm sm:text-base font-black truncate block">
+                            {incomingCashierName}
+                          </span>
+                          <span className="text-[11px] text-emerald-400 font-semibold block truncate">
+                            {matchedUser?.shiftName || matchedUser?.jobTitle || incomingShiftDisplay}
+                          </span>
                         </div>
                       </div>
 
