@@ -1,7 +1,7 @@
 import { SyncItem, SyncType } from "@/types";
 import { createClient } from "@/lib/supabase/client";
 import { DEFAULT_PRODUCTS, getStoredProducts, saveStoredProducts } from "@/lib/products";
-import { DEFAULT_GENERAL_CUSTOMER, getStoredCustomers, saveStoredCustomers } from "@/lib/customers";
+import { DEFAULT_GENERAL_CUSTOMER, getStoredCustomers, saveStoredCustomers, CUSTOMERS_CLEAN_SLATE_EPOCH, getCustomerTimestamp } from "@/lib/customers";
 import { playSyncSuccessSound } from "@/lib/sound";
 import { CLEAN_SLATE_EPOCH } from "@/lib/wipeOperationalData";
 import { parseDateTimeSafe, isOrderSale } from "@/lib/utils";
@@ -613,33 +613,38 @@ export async function syncAllLocalDataToSupabase(): Promise<{
   let ordersSynced = 0;
   const errors: string[] = [...queueRes.errors];
 
-  // 1. Sincronizar Clientes Locales (en lote, solo no sincronizados)
+  // 1. Sincronizar Clientes Locales (en lote, solo no sincronizados y posteriores al corte limpio)
   try {
-    const rawCust = localStorage.getItem("brito_customers");
-    if (rawCust) {
-      const custs = JSON.parse(rawCust);
-      if (Array.isArray(custs)) {
-        const unsyncedCusts = custs.filter((c) => c.id && c.id !== "cli-0" && c.name !== "Público en General" && !syncedIds.has(c.id));
-        if (unsyncedCusts.length > 0) {
-          const custPayloads = unsyncedCusts.map((c) => ({
-            id: c.id,
-            name: c.name,
-            phone: c.phone && c.phone !== "N/A" ? c.phone : null,
-            email: c.email || null,
-            address: c.address || null,
-            type: c.type || "frecuente",
-            credit_limit: Number(c.creditLimit) || 0,
-            current_debt: Number(c.currentDebt) || 0,
-            total_purchases: Number(c.totalPurchases) || 0,
-            notes: c.notes || null,
-          }));
-          const { error: cErr } = await supabase.from("customers").upsert(custPayloads, { onConflict: "id" });
-          if (!cErr) {
-            customersSynced = unsyncedCusts.length;
-            markRecordIdsAsSynced(unsyncedCusts.map((c) => c.id));
-          } else {
-            errors.push("Clientes: " + cErr.message);
-          }
+    const custs = getStoredCustomers();
+    if (Array.isArray(custs) && custs.length > 0) {
+      const unsyncedCusts = custs.filter(
+        (c) =>
+          c &&
+          c.id &&
+          c.id !== "cli-0" &&
+          c.name !== "Público en General" &&
+          !syncedIds.has(c.id) &&
+          getCustomerTimestamp(c) >= CUSTOMERS_CLEAN_SLATE_EPOCH
+      );
+      if (unsyncedCusts.length > 0) {
+        const custPayloads = unsyncedCusts.map((c) => ({
+          id: c.id,
+          name: c.name,
+          phone: c.phone && c.phone !== "N/A" ? c.phone : null,
+          email: c.email || null,
+          address: c.address || null,
+          type: c.type || "frecuente",
+          credit_limit: Number(c.creditLimit) || 0,
+          current_debt: Number(c.currentDebt) || 0,
+          total_purchases: Number(c.totalPurchases) || 0,
+          notes: c.notes || null,
+        }));
+        const { error: cErr } = await supabase.from("customers").upsert(custPayloads, { onConflict: "id" });
+        if (!cErr) {
+          customersSynced = unsyncedCusts.length;
+          markRecordIdsAsSynced(unsyncedCusts.map((c) => c.id));
+        } else {
+          errors.push("Clientes: " + cErr.message);
         }
       }
     }

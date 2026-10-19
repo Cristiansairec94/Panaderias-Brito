@@ -39,6 +39,7 @@ export function normalizeCustomerName(name: string): string {
  */
 export function purgeDuplicateCustomers(): { totalBefore: number; totalAfter: number; removedCount: number } {
   if (typeof window === "undefined") return { totalBefore: 0, totalAfter: 0, removedCount: 0 };
+  ensureCustomersCleanSlate();
   try {
     const raw = localStorage.getItem(STORAGE_CUSTOMERS_KEY);
     if (!raw) return { totalBefore: 0, totalAfter: 0, removedCount: 0 };
@@ -50,6 +51,7 @@ export function purgeDuplicateCustomers(): { totalBefore: number; totalAfter: nu
 
     for (const c of parsed) {
       if (!c || c.id === "cli-0" || c.type === "general") continue;
+      if (getCustomerTimestamp(c) < CUSTOMERS_CLEAN_SLATE_EPOCH) continue;
       const norm = normalizeCustomerName(c.name);
       if (!norm) continue;
 
@@ -103,6 +105,46 @@ const RETIRED_DEMO_CUSTOMER_NAMES = new Set([
   "familia ramirez (vecinos)",
 ]);
 
+// Epoch de limpieza total del módulo de clientes: descarta cualquier cliente cargado antes de este corte
+export const CUSTOMERS_CLEAN_SLATE_EPOCH = 1792451100000; // 2026-10-19T23:05:00.000Z
+export const CUSTOMERS_WIPE_VERSION_KEY = `brito_customers_clean_slate_${CUSTOMERS_CLEAN_SLATE_EPOCH}`;
+
+export function getCustomerTimestamp(c: {
+  id?: string;
+  createdAt?: number;
+  registeredAt?: string;
+  created_at?: string;
+}): number {
+  if (typeof c.createdAt === "number" && c.createdAt > 0) return c.createdAt;
+  if (c.id && c.id.startsWith("cli-")) {
+    const num = Number(c.id.replace("cli-", ""));
+    if (!isNaN(num) && num > 1000000000000) return num;
+  }
+  const dateStr = c.created_at || c.registeredAt;
+  if (dateStr) {
+    const parsed = Date.parse(dateStr);
+    if (!isNaN(parsed) && parsed > 0) return parsed;
+  }
+  return 0;
+}
+
+export function ensureCustomersCleanSlate(): void {
+  if (typeof window === "undefined") return;
+  try {
+    if (localStorage.getItem(CUSTOMERS_WIPE_VERSION_KEY) !== "true") {
+      localStorage.setItem(STORAGE_CUSTOMERS_KEY, "[]");
+      localStorage.removeItem("brito_customers_cache");
+      localStorage.setItem("brito_customers_initialized", "true");
+      localStorage.setItem(CUSTOMERS_WIPE_VERSION_KEY, "true");
+      window.dispatchEvent(new Event("brito_customers_updated"));
+    }
+  } catch {}
+}
+
+if (typeof window !== "undefined") {
+  ensureCustomersCleanSlate();
+}
+
 export function getDeletedCustomerIds(): Set<string> {
   const set = new Set<string>(RETIRED_DEMO_CUSTOMER_IDS);
   if (typeof window === "undefined") return set;
@@ -127,6 +169,7 @@ export function markCustomerIdAsDeleted(id: string): void {
 
 export function getStoredCustomers(): Customer[] {
   if (typeof window === "undefined") return [];
+  ensureCustomersCleanSlate();
   try {
     const raw = localStorage.getItem(STORAGE_CUSTOMERS_KEY);
     if (!raw) return [];
@@ -134,14 +177,15 @@ export function getStoredCustomers(): Customer[] {
     if (!Array.isArray(parsed) || parsed.length === 0) return [];
 
     const deletedIds = getDeletedCustomerIds();
-    // Depurar y eliminar cualquier cliente virtual de mostrador (cli-0 / general), clientes demo retirados y clientes eliminados
+    // Depurar y eliminar cualquier cliente virtual de mostrador (cli-0 / general), clientes demo retirados, anteriores al corte y clientes eliminados
     const cleaned = parsed.filter(
       (c: Customer) =>
         c &&
         c.id !== "cli-0" &&
         c.type !== "general" &&
         !deletedIds.has(c.id) &&
-        !RETIRED_DEMO_CUSTOMER_NAMES.has(normalizeCustomerName(c.name))
+        !RETIRED_DEMO_CUSTOMER_NAMES.has(normalizeCustomerName(c.name)) &&
+        getCustomerTimestamp(c) >= CUSTOMERS_CLEAN_SLATE_EPOCH
     );
 
     // Desduplicar clientes existentes por nombre normalizado (sin acentos, minúsculas, espacios colapsados)
@@ -540,6 +584,7 @@ export function revertCustomerSale(
  * Si la consulta es exitosa, fusiona y sincroniza con localStorage.
  */
 export async function fetchCustomersFromDb(): Promise<{ customers: Customer[]; fromDb: boolean }> {
+  ensureCustomersCleanSlate();
   const local = getStoredCustomers();
   if (typeof window === "undefined") {
     return { customers: local, fromDb: false };
@@ -553,73 +598,76 @@ export async function fetchCustomersFromDb(): Promise<{ customers: Customer[]; f
       .order("created_at", { ascending: false });
 
     if (!error && Array.isArray(data)) {
-      const isCustInit = typeof window !== "undefined" && localStorage.getItem("brito_customers_initialized") === "true";
-      if (data.length === 0 && isCustInit) {
-        saveStoredCustomers([]);
-        return { customers: [], fromDb: true };
+      const deletedIds = getDeletedCustomerIds();
+      const seenNames = new Map<string, Customer>();
+      const dbMapped: Customer[] = [];
+      const staleIdsToDelete: string[] = [];
+
+      for (const row of data) {
+        if (!row || row.id === "cli-0" || row.type === "general" || deletedIds.has(row.id)) continue;
+        const rowTs = getCustomerTimestamp(row);
+        if (rowTs < CUSTOMERS_CLEAN_SLATE_EPOCH) {
+          staleIdsToDelete.push(row.id);
+          continue;
+        }
+        const normName = (row.name || "").trim().toLowerCase();
+        if (!normName) continue;
+
+        const localMatch = local.find(
+          (c) => c.id === row.id || c.name.trim().toLowerCase() === normName
+        );
+
+        if (!seenNames.has(normName)) {
+          const item: Customer = {
+            id: row.id,
+            name: (row.name || "").trim(),
+            phone: row.phone || localMatch?.phone || "N/A",
+            email: row.email || localMatch?.email || undefined,
+            address: row.address || localMatch?.address || undefined,
+            type: (row.type as Customer["type"]) || localMatch?.type || "frecuente",
+            creditLimit: Number(row.credit_limit || localMatch?.creditLimit || 0),
+            currentDebt: Number(row.current_debt || localMatch?.currentDebt || 0),
+            totalPurchases: Number(row.total_purchases || localMatch?.totalPurchases || 0),
+            notes: row.notes || localMatch?.notes || undefined,
+            registeredAt: row.created_at || localMatch?.registeredAt || new Date().toISOString(),
+            createdAt: rowTs || localMatch?.createdAt || Date.now(),
+            favoriteProduct: localMatch?.favoriteProduct,
+            purchaseCounts: localMatch?.purchaseCounts || {},
+            purchaseHistory: localMatch?.purchaseHistory || [],
+          };
+          seenNames.set(normName, item);
+          dbMapped.push(item);
+        } else {
+          // Si Supabase devuelve registros duplicados para el mismo nombre, consolidar datos
+          const existing = seenNames.get(normName)!;
+          if ((!existing.phone || existing.phone === "N/A" || existing.phone === "Sin teléfono") && row.phone && row.phone !== "N/A" && row.phone !== "Sin teléfono") {
+            existing.phone = row.phone;
+          }
+          if (!existing.notes && row.notes) existing.notes = row.notes;
+          if (!existing.address && row.address) existing.address = row.address;
+          if (!existing.email && row.email) existing.email = row.email;
+          existing.totalPurchases = Math.max(existing.totalPurchases || 0, Number(row.total_purchases || 0));
+        }
       }
 
-      if (data.length > 0) {
-        const deletedIds = getDeletedCustomerIds();
-        const seenNames = new Map<string, Customer>();
-        const dbMapped: Customer[] = [];
-
-        for (const row of data) {
-          if (row.id === "cli-0" || row.type === "general" || deletedIds.has(row.id)) continue;
-          const normName = (row.name || "").trim().toLowerCase();
-          if (!normName) continue;
-
-          const localMatch = local.find(
-            (c) => c.id === row.id || c.name.trim().toLowerCase() === normName
-          );
-
-          if (!seenNames.has(normName)) {
-            const item: Customer = {
-              id: row.id,
-              name: (row.name || "").trim(),
-              phone: row.phone || localMatch?.phone || "N/A",
-              email: row.email || localMatch?.email || undefined,
-              address: row.address || localMatch?.address || undefined,
-              type: (row.type as Customer["type"]) || localMatch?.type || "frecuente",
-              creditLimit: Number(row.credit_limit || localMatch?.creditLimit || 0),
-              currentDebt: Number(row.current_debt || localMatch?.currentDebt || 0),
-              totalPurchases: Number(row.total_purchases || localMatch?.totalPurchases || 0),
-              notes: row.notes || localMatch?.notes || undefined,
-              registeredAt: row.created_at || localMatch?.registeredAt || new Date().toISOString(),
-              createdAt: row.created_at ? new Date(row.created_at).getTime() : localMatch?.createdAt || Date.now(),
-              favoriteProduct: localMatch?.favoriteProduct,
-              purchaseCounts: localMatch?.purchaseCounts || {},
-              purchaseHistory: localMatch?.purchaseHistory || [],
-            };
-            seenNames.set(normName, item);
-            dbMapped.push(item);
-          } else {
-            // Si Supabase devuelve registros duplicados para el mismo nombre, consolidar datos
-            const existing = seenNames.get(normName)!;
-            if ((!existing.phone || existing.phone === "N/A" || existing.phone === "Sin teléfono") && row.phone && row.phone !== "N/A" && row.phone !== "Sin teléfono") {
-              existing.phone = row.phone;
-            }
-            if (!existing.notes && row.notes) existing.notes = row.notes;
-            if (!existing.address && row.address) existing.address = row.address;
-            if (!existing.email && row.email) existing.email = row.email;
-            existing.totalPurchases = Math.max(existing.totalPurchases || 0, Number(row.total_purchases || 0));
-          }
-        }
-
-        // Conservar clientes locales que aún no se hayan sincronizado (excepto eliminados)
-        const dbIds = new Set(dbMapped.map((c) => c.id));
-        for (const loc of local) {
-          if (deletedIds.has(loc.id)) continue;
-          const normLocName = (loc.name || "").trim().toLowerCase();
-          if (!dbIds.has(loc.id) && !seenNames.has(normLocName)) {
-            seenNames.set(normLocName, loc);
-            dbMapped.push(loc);
-          }
-        }
-
-        saveStoredCustomers(dbMapped);
-        return { customers: dbMapped, fromDb: true };
+      if (staleIdsToDelete.length > 0) {
+        void supabase.from("customers").delete().in("id", staleIdsToDelete);
       }
+
+      // Conservar clientes locales recientes (posteriores al corte) que aún no se hayan sincronizado
+      const dbIds = new Set(dbMapped.map((c) => c.id));
+      for (const loc of local) {
+        if (deletedIds.has(loc.id)) continue;
+        if (getCustomerTimestamp(loc) < CUSTOMERS_CLEAN_SLATE_EPOCH) continue;
+        const normLocName = (loc.name || "").trim().toLowerCase();
+        if (!dbIds.has(loc.id) && !seenNames.has(normLocName)) {
+          seenNames.set(normLocName, loc);
+          dbMapped.push(loc);
+        }
+      }
+
+      saveStoredCustomers(dbMapped);
+      return { customers: dbMapped, fromDb: true };
     }
   } catch (err) {
     console.warn("Supabase fetchCustomers error, using local data:", err);

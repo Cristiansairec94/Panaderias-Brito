@@ -89,6 +89,8 @@ export default function ProductosPage() {
     barcode: "",
     name: "",
     price: "",
+    cost: "",
+    stock: "50",
     category: "pan_dulce" as Product["category"],
     unit: "pieza" as "pieza" | "kg" | "g",
     description: "",
@@ -295,6 +297,8 @@ export default function ProductosPage() {
       barcode: autoBarcode,
       name: "",
       price: "",
+      cost: "",
+      stock: "50",
       category: initialCat,
       unit: initialCat === "materia_prima" ? "kg" : "pieza",
       description: "",
@@ -323,6 +327,8 @@ export default function ProductosPage() {
       barcode: initialBarcode,
       name: product.name,
       price: product.price.toString(),
+      cost: product.cost !== undefined && product.cost !== null ? product.cost.toString() : "",
+      stock: product.stock !== undefined && product.stock !== null ? product.stock.toString() : "50",
       category: product.category,
       unit: (product.unit as "pieza" | "kg" | "g") || (product.category === "materia_prima" ? "kg" : "pieza"),
       description: product.description || "",
@@ -381,6 +387,8 @@ export default function ProductosPage() {
     const finalBarcode = formData.barcode.trim() || formData.code.trim() || generateProductBarcode();
     const parsedIvaRate = formData.hasIva ? Math.max(0, parseFloat(formData.ivaRate) || 0) : 0;
     const parsedIepsRate = formData.hasIeps ? Math.max(0, parseFloat(formData.iepsRate) || 0) : 0;
+    const costNum = formData.cost ? Math.max(0, parseFloat(formData.cost) || 0) : undefined;
+    const stockNum = formData.stock ? Math.max(0, parseInt(formData.stock, 10) || 0) : 0;
 
     if (modalMode === "create") {
       const created = createProduct({
@@ -388,9 +396,10 @@ export default function ProductosPage() {
         barcode: finalBarcode,
         name: formData.name.trim(),
         price: priceNum,
+        cost: costNum,
         category: formData.category,
         unit: selectedUnit,
-        stock: 50,
+        stock: stockNum,
         description: formData.description.trim() || undefined,
         image: formData.image.trim() || undefined,
         icon: formData.icon || (formData.category === "abarrotes" ? "🥫" : formData.category === "materia_prima" ? "🌾" : "🥖"),
@@ -409,6 +418,8 @@ export default function ProductosPage() {
         barcode: finalBarcode,
         name: formData.name.trim(),
         price: priceNum,
+        cost: costNum,
+        stock: stockNum,
         category: formData.category,
         unit: selectedUnit,
         description: formData.description.trim() || undefined,
@@ -1171,34 +1182,37 @@ export default function ProductosPage() {
                 onOpenScanner={() => setIsScannerOpen(true)}
               />
 
-              {/* Categoría & Precio */}
+              {/* Categoría */}
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-stone-700">Categoría *</label>
+                <select
+                  value={formData.category}
+                  onChange={(e) => {
+                    const newCat = e.target.value as any;
+                    const catObj = categories.find((c) => c.id === newCat);
+                    setFormData({ 
+                      ...formData, 
+                      category: newCat,
+                      icon: catObj?.icon || formData.icon,
+                      unit: newCat === "materia_prima" ? "kg" : (formData.unit || "pieza")
+                    });
+                  }}
+                  className="w-full px-3 py-2.5 bg-stone-50 rounded-xl border border-stone-200 text-xs font-medium focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                >
+                  {categories.map((cat) => (
+                    <option key={cat.id} value={cat.id}>
+                      {cat.icon} {cat.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Precios: Precio Venta ($) y Costo ($) */}
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <label className="text-xs font-bold text-stone-700">Categoría *</label>
-                  <select
-                    value={formData.category}
-                    onChange={(e) => {
-                      const newCat = e.target.value as any;
-                      const catObj = categories.find((c) => c.id === newCat);
-                      setFormData({ 
-                        ...formData, 
-                        category: newCat,
-                        icon: catObj?.icon || formData.icon,
-                        unit: newCat === "materia_prima" ? "kg" : (formData.unit || "pieza")
-                      });
-                    }}
-                    className="w-full px-3 py-2.5 bg-stone-50 rounded-xl border border-stone-200 text-xs font-medium focus:ring-2 focus:ring-amber-500 focus:outline-none"
-                  >
-                    {categories.map((cat) => (
-                      <option key={cat.id} value={cat.id}>
-                        {cat.icon} {cat.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-stone-700">Precio ($ MXN) *</label>
+                  <label className="text-xs font-bold text-stone-700 flex items-center justify-between">
+                    <span>Precio Venta ($) *</span>
+                  </label>
                   <div className="relative">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400 font-bold text-xs">$</span>
                     <input
@@ -1208,10 +1222,66 @@ export default function ProductosPage() {
                       value={formData.price}
                       onKeyDown={(e) => onlyNumbersKeyDown(e, true)}
                       onChange={(e) => setFormData({ ...formData, price: cleanDecimalNumbers(e.target.value) })}
-                      placeholder="12.00"
+                      placeholder="150"
                       className="w-full pl-7 pr-3 py-2.5 bg-stone-50 rounded-xl border border-stone-200 text-xs font-bold focus:ring-2 focus:ring-amber-500 focus:outline-none"
                     />
                   </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-stone-700 flex items-center justify-between">
+                    <span>Costo ($)</span>
+                    <span className="text-[10px] text-stone-400 font-normal">Opcional</span>
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400 font-bold text-xs">$</span>
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      value={formData.cost}
+                      onKeyDown={(e) => onlyNumbersKeyDown(e, true)}
+                      onChange={(e) => setFormData({ ...formData, cost: cleanDecimalNumbers(e.target.value) })}
+                      placeholder="90"
+                      className="w-full pl-7 pr-3 py-2.5 bg-stone-50 rounded-xl border border-stone-200 text-xs font-bold focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Margen / Ganancia estimada si hay precio venta y costo */}
+              {parseFloat(formData.price) > 0 && parseFloat(formData.cost) > 0 && (
+                <div className="p-2.5 bg-emerald-50/80 border border-emerald-200 rounded-xl flex items-center justify-between text-xs animate-in fade-in duration-150">
+                  <span className="text-emerald-950 font-bold flex items-center gap-1.5">
+                    <span>📈</span>
+                    <span>Ganancia estimada:</span>
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="font-black text-emerald-800">
+                      +{formatCurrency(Math.max(0, parseFloat(formData.price) - parseFloat(formData.cost)))}
+                    </span>
+                    <span className="text-[10px] font-bold bg-emerald-200 text-emerald-900 px-1.5 py-0.5 rounded">
+                      {(((parseFloat(formData.price) - parseFloat(formData.cost)) / parseFloat(formData.price)) * 100).toFixed(1)}% margen
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {/* Stock Actual */}
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-stone-700 flex items-center justify-between">
+                  <span>Stock Actual</span>
+                  <span className="text-[10px] text-stone-500 font-normal">Existencias en inventario</span>
+                </label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={formData.stock}
+                    onKeyDown={(e) => onlyNumbersKeyDown(e, false)}
+                    onChange={(e) => setFormData({ ...formData, stock: e.target.value.replace(/\D/g, "") })}
+                    placeholder="50"
+                    className="w-full px-3.5 py-2.5 bg-stone-50 rounded-xl border border-stone-200 text-xs font-bold focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                  />
                 </div>
               </div>
 
