@@ -1078,6 +1078,144 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => unsub();
   }, [user]);
 
+  // Sincronización en tiempo real de Roles y Permisos vía RealtimeHub (0ms entre pestañas y <100ms entre computadoras/celulares)
+  useEffect(() => {
+    if (typeof window === "undefined" || !realtimeHub?.onRole) return;
+    const unsub = realtimeHub.onRole((payload) => {
+      if (!payload) return;
+
+      // 1. Actualizar lista de roles eliminados si viene en el payload
+      if (Array.isArray(payload.deletedRoleIds) && payload.deletedRoleIds.length > 0) {
+        try {
+          const rawDel = localStorage.getItem("brito_deleted_role_ids");
+          const localDel: string[] = rawDel ? JSON.parse(rawDel) : [];
+          const mergedDel = Array.from(new Set([...localDel, ...payload.deletedRoleIds]));
+          localStorage.setItem("brito_deleted_role_ids", JSON.stringify(mergedDel));
+        } catch {}
+      }
+
+      // 2. Actualizar lista de roles si viene en el payload
+      if (Array.isArray(payload.roles) && payload.roles.length > 0) {
+        try {
+          localStorage.setItem("brito_custom_system_roles", JSON.stringify(payload.roles));
+        } catch {}
+      }
+
+      // 3. Si es eliminación de un rol
+      if (payload.action === "delete" && payload.role) {
+        const delRole = payload.role;
+        setRolePermissionsMap((prev) => {
+          const next = { ...prev };
+          delete next[delRole];
+          try {
+            localStorage.setItem("brito_role_permissions", JSON.stringify(next));
+          } catch {}
+          return next;
+        });
+      }
+
+      // 4. Actualizar mapa de permisos completo o de un rol individual
+      if (payload.allPermissions && typeof payload.allPermissions === "object") {
+        setRolePermissionsMap((prev) => {
+          const next: Record<string, RolePermissions> = {
+            ...ROLE_PERMISSIONS,
+            ...prev,
+          };
+          Object.keys(payload.allPermissions!).forEach((key) => {
+            const fallback = (ROLE_PERMISSIONS as any)[key] || ROLE_PERMISSIONS.cajero;
+            next[key] = {
+              ...fallback,
+              ...payload.allPermissions![key],
+            };
+          });
+          next.admin = { ...ROLE_PERMISSIONS.admin };
+          if (Array.isArray(payload.deletedRoleIds)) {
+            payload.deletedRoleIds.forEach((delId) => {
+              if (delId !== "admin") delete next[delId];
+            });
+          }
+          try {
+            localStorage.setItem("brito_role_permissions", JSON.stringify(next));
+          } catch {}
+          return next;
+        });
+      } else if (payload.role && payload.permissions) {
+        const roleKey = payload.role;
+        const incomingPerms = payload.permissions;
+        setRolePermissionsMap((prev) => {
+          const fallback = (ROLE_PERMISSIONS as any)[roleKey] || ROLE_PERMISSIONS.cajero;
+          const next = {
+            ...prev,
+            [roleKey]: roleKey === "admin"
+              ? { ...ROLE_PERMISSIONS.admin }
+              : { ...fallback, ...incomingPerms },
+          };
+          try {
+            localStorage.setItem("brito_role_permissions", JSON.stringify(next));
+          } catch {}
+          return next;
+        });
+
+        // Actualizar usuarios y sesión activa que tengan este rol
+        setUsersList((prevUsers) => {
+          const updatedList = prevUsers.map((u) =>
+            u.role === roleKey
+              ? {
+                  ...u,
+                  roleLabel: payload.roleTitle || u.roleLabel,
+                  permissions: { ...incomingPerms },
+                }
+              : u
+          );
+          try {
+            localStorage.setItem("brito_custom_users", JSON.stringify(updatedList));
+          } catch {}
+          return updatedList;
+        });
+
+        setUser((curr) => {
+          if (curr && curr.role === roleKey) {
+            const updatedUser = {
+              ...curr,
+              roleLabel: payload.roleTitle || curr.roleLabel,
+              permissions: { ...incomingPerms },
+            };
+            try {
+              sessionStorage.setItem("brito_user", JSON.stringify(updatedUser));
+            } catch {}
+            return updatedUser;
+          }
+          return curr;
+        });
+      }
+
+      window.dispatchEvent(new CustomEvent("brito_roles_updated", { detail: payload }));
+    });
+
+    const handleStorageRoles = (e: StorageEvent) => {
+      if (
+        e.key === "brito_role_permissions" ||
+        e.key === "brito_custom_system_roles" ||
+        e.key === "brito_deleted_role_ids"
+      ) {
+        try {
+          const savedPerms = localStorage.getItem("brito_role_permissions");
+          if (savedPerms) {
+            const parsed = JSON.parse(savedPerms);
+            setRolePermissionsMap((prev) => ({ ...prev, ...parsed, admin: { ...ROLE_PERMISSIONS.admin } }));
+          }
+        } catch {}
+        window.dispatchEvent(new CustomEvent("brito_roles_updated"));
+      }
+    };
+
+    window.addEventListener("storage", handleStorageRoles);
+    return () => {
+      unsub();
+      window.removeEventListener("storage", handleStorageRoles);
+    };
+  }, []);
+
   // Load saved role permissions from localStorage on mount
   useEffect(() => {
     try {
@@ -1114,7 +1252,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const syncServerData = async () => {
       // 1. Sincronizar roles y permisos del servidor
       try {
-        const rolesRes = await fetch("/api/roles");
+        const rolesRes = await fetch("/api/roles", { cache: "no-store" });
         if (rolesRes.ok) {
           const rolesData = await rolesRes.json();
           if (rolesData && rolesData.permissions && isMounted) {
@@ -1127,18 +1265,45 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 ...serverPerms[key],
               };
               if (key === "admin") {
-                merged[key].canAccessDashboard = true;
+                merged[key] = { ...ROLE_PERMISSIONS.admin };
               }
             });
             if (Array.isArray(rolesData.deletedRoleIds)) {
               rolesData.deletedRoleIds.forEach((delId: string) => {
-                delete merged[delId];
+                if (delId !== "admin") delete merged[delId];
               });
+              try {
+                localStorage.setItem("brito_deleted_role_ids", JSON.stringify(rolesData.deletedRoleIds));
+              } catch {}
+            }
+            if (Array.isArray(rolesData.roles) && rolesData.roles.length > 0) {
+              try {
+                localStorage.setItem("brito_custom_system_roles", JSON.stringify(rolesData.roles));
+              } catch {}
             }
             setRolePermissionsMap(merged);
             try {
               localStorage.setItem("brito_role_permissions", JSON.stringify(merged));
             } catch (e) {}
+
+            // Sincronizar permisos efectivos en el usuario activo de la sesión
+            setUser((curr) => {
+              if (!curr) return null;
+              const rolePerms = curr.role === "admin" ? ROLE_PERMISSIONS.admin : merged[curr.role];
+              if (rolePerms) {
+                const nextUser = {
+                  ...curr,
+                  permissions: { ...rolePerms },
+                };
+                try {
+                  sessionStorage.setItem("brito_user", JSON.stringify(nextUser));
+                } catch {}
+                return nextUser;
+              }
+              return curr;
+            });
+
+            window.dispatchEvent(new CustomEvent("brito_roles_updated", { detail: rolesData }));
           }
         }
       } catch (err) {
@@ -1240,6 +1405,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
     syncServerData();
+    const roleSyncInterval = setInterval(syncServerData, 6000);
 
     // Sincronizar al enfocar la ventana para captar cambios hechos en otras máquinas
     const handleWindowFocus = () => {
@@ -1249,6 +1415,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     window.addEventListener("focus", handleWindowFocus);
     return () => {
       isMounted = false;
+      clearInterval(roleSyncInterval);
       window.removeEventListener("focus", handleWindowFocus);
     };
   }, []);
@@ -1386,11 +1553,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Compute active permissions combining role defaults (dynamically configured) and user overrides
   const permissions: RolePermissions = user
-    ? {
-        ...(rolePermissionsMap[user.role] || ROLE_PERMISSIONS[user.role] || ROLE_PERMISSIONS.cajero),
-        ...(user.permissions || {}),
-        ...(user.role === "admin" ? { canAccessDashboard: true } : {}),
-      }
+    ? user.role === "admin"
+      ? { ...ROLE_PERMISSIONS.admin }
+      : {
+          ...(ROLE_PERMISSIONS[user.role] || ROLE_PERMISSIONS.cajero),
+          ...(user.permissions || {}),
+          ...(rolePermissionsMap[user.role] || {}),
+        }
     : {
         canAccessDashboard: false,
         canAccessPos: false,
@@ -1446,8 +1615,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (u.role === "admin") return "/";
 
       const effective = {
-        ...(rolePermissionsMap[u.role] || ROLE_PERMISSIONS[u.role] || ROLE_PERMISSIONS.cajero),
+        ...(ROLE_PERMISSIONS[u.role] || ROLE_PERMISSIONS.cajero),
         ...(u.permissions || {}),
+        ...(rolePermissionsMap[u.role] || {}),
       };
 
       if (effective.canAccessDashboard) {
@@ -2118,6 +2288,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return curr;
     });
 
+    // Transmitir cambio en tiempo real a todas las pestañas y equipos conectados
+    if (realtimeHub?.broadcastRole) {
+      realtimeHub.broadcastRole({
+        action: "update",
+        role,
+        permissions: newPermissions,
+        roleTitle: roleLabel,
+      });
+    }
+
     // Persistir rol y permisos en el servidor para que todas las demás máquinas lo reciban
     fetch("/api/roles", {
       method: "POST",
@@ -2142,6 +2322,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       return copy;
     });
+
+    if (realtimeHub?.broadcastRole) {
+      realtimeHub.broadcastRole({
+        action: "delete",
+        role,
+      });
+    }
 
     fetch("/api/roles", {
       method: "POST",

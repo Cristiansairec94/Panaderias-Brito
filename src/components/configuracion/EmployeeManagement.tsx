@@ -73,17 +73,6 @@ const SYSTEM_ROLES: SystemRoleOption[] = [
     activeBg: "bg-emerald-50",
   },
   {
-    id: "auxiliar_admin",
-    label: "Auxiliar Administrativo",
-    shortLabel: "Administrativo",
-    badge: "Finanzas & Compras",
-    icon: "💼",
-    description: "Gestión de compras, control de almacén, clientes mayoristas y finanzas.",
-    badgeBg: "bg-blue-100 text-blue-900 border-blue-300",
-    activeBorder: "border-blue-500 ring-2 ring-blue-400/40",
-    activeBg: "bg-blue-50",
-  },
-  {
     id: "admin",
     label: "Administrador General",
     shortLabel: "Administrador",
@@ -117,7 +106,6 @@ function generateRandomPin(): string {
 function suggestRoleFromJobTitle(jobTitle: string): UserRole {
   const lower = jobTitle.toLowerCase();
   if (lower.includes("admin") || lower.includes("dueño") || lower.includes("general")) return "admin";
-  if (lower.includes("auxiliar") || lower.includes("contab") || lower.includes("superv") || lower.includes("gerent")) return "auxiliar_admin";
   return "cajero";
 }
 

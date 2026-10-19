@@ -70,6 +70,15 @@ export async function POST(req: NextRequest) {
         );
       }
     }
+    if (type === "role") {
+      const roleKey = payload?.role;
+      eventsToSave = eventsToSave.filter((e) => {
+        if (e.type !== "role") return true;
+        if (payload?.action === "sync" || payload?.roles) return false;
+        if (roleKey && e.payload?.role === roleKey) return false;
+        return true;
+      });
+    }
     if (type === "notification") {
       const ordId = payload?.orderId || payload?.orderData?.id;
       const notifId = payload?.id;

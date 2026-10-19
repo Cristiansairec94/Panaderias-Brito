@@ -801,12 +801,11 @@ function resolveBranchParam(param: string | null): string | null {
 
           // Sincronizar sucursales eliminadas de Supabase con los tombstones locales
           dbBranches.forEach((dbB: any) => {
+            if (!dbB || !dbB.id || String(dbB.id).startsWith("__SYS_")) return;
             if (
-              dbB &&
-              dbB.id &&
-              (dbB.short_name === "__DELETED__" ||
-                dbB.name === "__DELETED__" ||
-                (dbB.is_active === false && !CANONICAL_BRANCH_IDS.has(dbB.id)))
+              dbB.short_name === "__DELETED__" ||
+              dbB.name === "__DELETED__" ||
+              (dbB.is_active === false && !CANONICAL_BRANCH_IDS.has(dbB.id))
             ) {
               recordDeletedBranchId(dbB.id);
             }

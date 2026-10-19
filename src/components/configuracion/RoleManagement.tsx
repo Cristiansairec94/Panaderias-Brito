@@ -39,6 +39,8 @@ import {
 } from "lucide-react";
 import { useAuth, ROLE_PERMISSIONS } from "@/context/AuthContext";
 import { UserRole, RolePermissions } from "@/types";
+import { realtimeHub } from "@/lib/realtime/realtimeHub";
+import { createClient } from "@/lib/supabase/client";
 
 export interface RoleConfig {
   id: UserRole;
@@ -235,6 +237,8 @@ export const ROLE_ICON_CATEGORIES = [
   },
 ];
 
+const DEFAULT_DELETED_ROLE_IDS: string[] = ["auxiliar_admin", "supervisor", "panadero"];
+
 const DEFAULT_SYSTEM_ROLES: RoleConfig[] = [
   {
     id: "admin",
@@ -249,30 +253,6 @@ const DEFAULT_SYSTEM_ROLES: RoleConfig[] = [
     colorClass: COLOR_THEMES.amber.colors,
   },
   {
-    id: "auxiliar_admin",
-    name: "Auxiliar Administrativo",
-    defaultTitle: "Auxiliar Administrativo",
-    subtitle: "Gestión Operativa & Contable",
-    badge: "Gestión y Finanzas",
-    icon: "💼",
-    isSystemRole: true,
-    description: "Gestión de compras a proveedores, control de almacén, pedidos especiales, clientes mayoristas, registro de gastos y balances.",
-    colorTheme: "blue",
-    colorClass: COLOR_THEMES.blue.colors,
-  },
-  {
-    id: "supervisor",
-    name: "Supervisor de Turno",
-    defaultTitle: "Supervisor de Sucursal",
-    subtitle: "Supervisión Operativa & Turnos",
-    badge: "Auditoría & Tiendas",
-    icon: "🛡️",
-    isSystemRole: true,
-    description: "Supervisión de operaciones de tienda, auditoría de turnos y cortes de caja, seguimiento de pedidos e inventarios.",
-    colorTheme: "purple",
-    colorClass: COLOR_THEMES.purple.colors,
-  },
-  {
     id: "cajero",
     name: "Cajeros o Auxiliares de Tienda",
     defaultTitle: "Cajero / Auxiliar de Tienda",
@@ -283,18 +263,6 @@ const DEFAULT_SYSTEM_ROLES: RoleConfig[] = [
     description: "Cobro rápido de pan en POS, emisión de tickets térmicos, apertura y corte de turnos de efectivo, arqueos y consulta de catálogo.",
     colorTheme: "emerald",
     colorClass: COLOR_THEMES.emerald.colors,
-  },
-  {
-    id: "panadero",
-    name: "Maestro Panadero",
-    defaultTitle: "Jefe de Horno & Producción",
-    subtitle: "Producción, Hornos & Recetas",
-    badge: "Producción & Horno",
-    icon: "🥖",
-    isSystemRole: true,
-    description: "Control de insumos de amasado y horneado, seguimiento de pedidos de panadería y pastelería, y reporte de producción diaria.",
-    colorTheme: "orange",
-    colorClass: COLOR_THEMES.orange.colors,
   },
 ];
 
@@ -561,43 +529,133 @@ export default function RoleManagement() {
     setTimeout(() => setToastMessage(null), 3800);
   };
 
-  // Load custom roles from localStorage and server on mount
+  // Helper to read deleted role IDs from localStorage
+  const getDeletedRoleIds = (): string[] => {
+    try {
+      const raw = localStorage.getItem("brito_deleted_role_ids");
+      const parsed = raw ? JSON.parse(raw) : [];
+      return Array.from(new Set([...DEFAULT_DELETED_ROLE_IDS, ...(Array.isArray(parsed) ? parsed : [])]));
+    } catch {
+      return [...DEFAULT_DELETED_ROLE_IDS];
+    }
+  };
+
+  // Persist complete role & permission state to localStorage, RealtimeHub, /api/roles, and Supabase cloud
+  const syncCompleteRoleState = (params: {
+    roles: RoleConfig[];
+    permissionsMap: Record<string, RolePermissions>;
+    deletedIds?: string[];
+    action?: "update" | "delete" | "sync";
+    changedRole?: string;
+    changedPermissions?: RolePermissions;
+    changedRoleTitle?: string;
+  }) => {
+    const cleanDeleted = Array.from(
+      new Set([...(params.deletedIds || getDeletedRoleIds())])
+    ).filter((id) => !params.roles.some((r) => r.id === id));
+
+    const cleanRoles = params.roles
+      .filter((r) => !cleanDeleted.includes(r.id))
+      .map(normalizeRole);
+    if (!cleanRoles.some((r) => r.id === "admin")) {
+      cleanRoles.unshift(DEFAULT_SYSTEM_ROLES[0]);
+    }
+
+    setRolesList(cleanRoles);
+    try {
+      localStorage.setItem("brito_custom_system_roles", JSON.stringify(cleanRoles));
+      localStorage.setItem("brito_deleted_role_ids", JSON.stringify(cleanDeleted));
+      localStorage.setItem("brito_role_permissions", JSON.stringify(params.permissionsMap));
+    } catch (e) {
+      console.error("Error persisting roles state:", e);
+    }
+
+    // 1. Broadcast inmediato a otras pestañas y equipos conectados (<100ms)
+    if (realtimeHub?.broadcastRole) {
+      realtimeHub.broadcastRole({
+        action: params.action || "sync",
+        role: params.changedRole,
+        permissions: params.changedPermissions,
+        allPermissions: params.permissionsMap,
+        roles: cleanRoles,
+        deletedRoleIds: cleanDeleted,
+        roleTitle: params.changedRoleTitle,
+      });
+    }
+
+    // 2. Persistir en el endpoint del servidor (/api/roles) en una sola petición atómica
+    const payload = {
+      role: params.changedRole,
+      permissions: params.changedPermissions || params.permissionsMap,
+      allPermissions: params.permissionsMap,
+      roleTitle: params.changedRoleTitle,
+      roles: cleanRoles,
+      deletedRoleIds: cleanDeleted,
+      updatedAt: Date.now(),
+    };
+
+    fetch("/api/roles", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    }).catch((err) => console.warn("[RoleManagement] Error guardando roles en servidor:", err));
+
+    // 3. Persistir directamente en Supabase Cloud (tabla branches -> __SYS_ROLES_CONFIG__) para disponibilidad inmediata entre equipos
+    try {
+      const supabase = createClient();
+      supabase
+        .from("branches")
+        .upsert(
+          {
+            id: "__SYS_ROLES_CONFIG__",
+            name: "__DELETED__",
+            short_name: "__DELETED__",
+            is_active: false,
+            address: JSON.stringify({
+              roles: cleanRoles,
+              permissions: params.permissionsMap,
+              deletedRoleIds: cleanDeleted,
+              updatedAt: payload.updatedAt,
+            }),
+          },
+          { onConflict: "id" }
+        )
+        .then(() => {});
+    } catch {}
+  };
+
+  // Load custom roles from localStorage, server, and Supabase on mount + subscribe to realtime updates
   useEffect(() => {
     let isMounted = true;
 
-    const getDeletedRoleIds = (): string[] => {
+    const refreshFromLocal = () => {
       try {
-        const raw = localStorage.getItem("brito_deleted_role_ids");
-        return raw ? JSON.parse(raw) : [];
-      } catch {
-        return [];
+        const deletedIds = getDeletedRoleIds();
+        const saved = localStorage.getItem("brito_custom_system_roles");
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            const activeRoles = parsed
+              .filter((r: RoleConfig) => !deletedIds.includes(r.id))
+              .map(normalizeRole);
+            if (!activeRoles.some((r: RoleConfig) => r.id === "admin")) {
+              activeRoles.unshift(DEFAULT_SYSTEM_ROLES[0]);
+            }
+            setRolesList(activeRoles);
+          }
+        }
+      } catch (e) {
+        console.error("Error loading custom system roles:", e);
       }
     };
 
     // 1. Cargar desde localStorage para despliegue instantáneo
-    try {
-      const deletedIds = getDeletedRoleIds();
-      const saved = localStorage.getItem("brito_custom_system_roles");
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          const activeRoles = parsed
-            .filter((r: RoleConfig) => !deletedIds.includes(r.id))
-            .map(normalizeRole);
-          if (!activeRoles.some((r: RoleConfig) => r.id === "admin")) {
-            activeRoles.unshift(DEFAULT_SYSTEM_ROLES[0]);
-          }
-          setRolesList(activeRoles);
-        }
-      }
-    } catch (e) {
-      console.error("Error loading custom system roles:", e);
-    }
+    refreshFromLocal();
 
-    // 2. Sincronizar con el servidor /api/roles
+    // 2. Sincronizar con el servidor /api/roles y Supabase
     const fetchServerRoles = async () => {
       try {
-        const res = await fetch("/api/roles");
+        const res = await fetch("/api/roles", { cache: "no-store" });
         if (res.ok) {
           const data = await res.json();
           if (data && isMounted) {
@@ -629,35 +687,41 @@ export default function RoleManagement() {
     };
 
     fetchServerRoles();
+
+    const handleRolesUpdatedEvent = (e: Event) => {
+      if (!isMounted) return;
+      const customEvt = e as CustomEvent;
+      if (customEvt?.detail?.roles && Array.isArray(customEvt.detail.roles)) {
+        const delIds = Array.isArray(customEvt.detail.deletedRoleIds)
+          ? customEvt.detail.deletedRoleIds
+          : getDeletedRoleIds();
+        const activeRoles = customEvt.detail.roles
+          .filter((r: RoleConfig) => !delIds.includes(r.id))
+          .map(normalizeRole);
+        if (!activeRoles.some((r: RoleConfig) => r.id === "admin")) {
+          activeRoles.unshift(DEFAULT_SYSTEM_ROLES[0]);
+        }
+        setRolesList(activeRoles);
+      } else {
+        refreshFromLocal();
+      }
+    };
+
+    window.addEventListener("brito_roles_updated", handleRolesUpdatedEvent);
     return () => {
       isMounted = false;
+      window.removeEventListener("brito_roles_updated", handleRolesUpdatedEvent);
     };
   }, []);
 
   // Save custom roles and icon customizations to localStorage and server
   const persistRolesList = (newList: RoleConfig[], deletedIds?: string[]) => {
-    setRolesList(newList);
-    try {
-      localStorage.setItem("brito_custom_system_roles", JSON.stringify(newList));
-    } catch (e) {
-      console.error("Error persisting custom roles:", e);
-    }
-
-    const currentDeleted = deletedIds || (() => {
-      try {
-        const raw = localStorage.getItem("brito_deleted_role_ids");
-        return raw ? JSON.parse(raw) : [];
-      } catch {
-        return [];
-      }
-    })();
-
-    // Persistir lista de roles en el servidor incluyendo roles eliminados
-    fetch("/api/roles", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ roles: newList, deletedRoleIds: currentDeleted }),
-    }).catch((err) => console.warn("[RoleManagement] Error guardando roles en servidor:", err));
+    syncCompleteRoleState({
+      roles: newList,
+      permissionsMap: rolePermissionsMap || ROLE_PERMISSIONS,
+      deletedIds,
+      action: "sync",
+    });
   };
 
   // Active role configuration object
@@ -666,10 +730,17 @@ export default function RoleManagement() {
     return normalizeRole(raw);
   }, [rolesList, selectedRole]);
 
+  // Ensure selectedRole always points to an existing role if the selected one was deleted remotely
+  useEffect(() => {
+    if (rolesList.length > 0 && !rolesList.some((r) => r.id === selectedRole)) {
+      setSelectedRole("admin");
+    }
+  }, [rolesList, selectedRole]);
+
   // Is selected role the protected master admin?
   const isAdmin = selectedRole === "admin";
 
-  // Synchronize local permissions when the selected role changes
+  // Synchronize local permissions when the selected role or global rolePermissionsMap changes
   useEffect(() => {
     if (selectedRole === "admin") {
       setCurrentPermissions({ ...ROLE_PERMISSIONS.admin });
@@ -694,29 +765,54 @@ export default function RoleManagement() {
     return usersList.filter((u) => u.role === roleToDelete.id);
   }, [usersList, roleToDelete]);
 
-  // Toggle single permission switch
+  // Apply and persist permissions immediately (0ms) so every switch/button reflects live across all screens and devices
+  const applyAndPersistPermissions = (nextPerms: RolePermissions, customTitleOverride?: string) => {
+    setCurrentPermissions(nextPerms);
+    setHasChanges(false);
+    const effectiveTitle = (customTitleOverride ?? customRoleTitle).trim() || activeRoleConfig.defaultTitle || activeRoleConfig.name;
+    updateRolePermissions(selectedRole, nextPerms, effectiveTitle);
+
+    const updatedRolesList = rolesList.map((r) =>
+      r.id === selectedRole ? { ...r, defaultTitle: effectiveTitle } : r
+    );
+    const nextPermissionsMap: Record<string, RolePermissions> = {
+      ...(rolePermissionsMap || ROLE_PERMISSIONS),
+      [selectedRole]: nextPerms,
+    };
+
+    syncCompleteRoleState({
+      roles: updatedRolesList,
+      permissionsMap: nextPermissionsMap,
+      action: "update",
+      changedRole: selectedRole,
+      changedPermissions: nextPerms,
+      changedRoleTitle: effectiveTitle,
+    });
+  };
+
+  // Toggle single permission switch (auto-saves immediately)
   const handleTogglePermission = (permKey: keyof RolePermissions) => {
     if (isAdmin) {
       showToast("El rol de Administrador cuenta con acceso total y no puede ser modificado.");
       return;
     }
-    setCurrentPermissions((prev) => ({
-      ...prev,
-      [permKey]: !prev[permKey],
-    }));
-    setHasChanges(true);
+    const nextPerms: RolePermissions = {
+      ...currentPermissions,
+      [permKey]: !currentPermissions[permKey],
+    };
+    applyAndPersistPermissions(nextPerms);
   };
 
-  // Reset to original preset defaults
+  // Reset to original preset defaults (auto-saves immediately)
   const handleResetToDefault = () => {
     if (isAdmin) return;
     const defaultPreset = ROLE_PERMISSIONS[selectedRole] || ROLE_PERMISSIONS.cajero;
-    setCurrentPermissions({ ...defaultPreset });
-    setHasChanges(true);
-    showToast(`Accesos restablecidos a los valores estándar de ${activeRoleConfig.name}.`);
+    const nextPerms = { ...defaultPreset };
+    applyAndPersistPermissions(nextPerms);
+    showToast(`Accesos restablecidos y guardados para ${activeRoleConfig.name}.`);
   };
 
-  // Grant all permissions
+  // Grant all permissions (auto-saves immediately)
   const handleGrantAll = () => {
     if (isAdmin) return;
     const allTrue: RolePermissions = {
@@ -737,11 +833,11 @@ export default function RoleManagement() {
       canManageUsers: true,
       canAccessInventario: true,
     };
-    setCurrentPermissions(allTrue);
-    setHasChanges(true);
+    applyAndPersistPermissions(allTrue);
+    showToast(`Todos los accesos activados y sincronizados para ${activeRoleConfig.name}.`);
   };
 
-  // Revoke all permissions
+  // Revoke all permissions (auto-saves immediately)
   const handleRevokeAll = () => {
     if (isAdmin) {
       showToast("No se pueden revocar los accesos del Administrador.");
@@ -765,54 +861,37 @@ export default function RoleManagement() {
       canManageUsers: false,
       canAccessInventario: false,
     };
-    setCurrentPermissions(allFalse);
-    setHasChanges(true);
+    applyAndPersistPermissions(allFalse);
+    showToast(`Accesos desactivados y sincronizados para ${activeRoleConfig.name}.`);
   };
 
-  // Toggle all items in a single category
+  // Toggle all items in a single category (auto-saves immediately)
   const handleToggleCategory = (group: PermissionGroup, enable: boolean) => {
     if (isAdmin) {
       showToast("El rol de Administrador tiene todos los accesos permanentemente activos.");
       return;
     }
-    setCurrentPermissions((prev) => {
-      const next = { ...prev };
-      group.items.forEach((item) => {
-        next[item.key] = enable;
-      });
-      return next;
+    const nextPerms: RolePermissions = { ...currentPermissions };
+    group.items.forEach((item) => {
+      nextPerms[item.key] = enable;
     });
-    setHasChanges(true);
+    applyAndPersistPermissions(nextPerms);
     showToast(
       enable
-        ? `Accesos de "${group.categoryTitle}" habilitados.`
-        : `Accesos de "${group.categoryTitle}" desactivados.`
+        ? `Accesos de "${group.categoryTitle}" habilitados y sincronizados.`
+        : `Accesos de "${group.categoryTitle}" desactivados y sincronizados.`
     );
   };
 
-  // Save changes
+  // Save changes (explicit button for title or manual confirmation)
   const handleSaveRole = () => {
     if (isAdmin) {
       showToast("El rol de Administrador es el rol maestro del sistema y no requiere guardar cambios.");
       return;
     }
     const newTitle = customRoleTitle.trim() || activeRoleConfig.defaultTitle || activeRoleConfig.name;
-    updateRolePermissions(selectedRole, currentPermissions, newTitle);
-    
-    // Also update name/title in rolesList if edited
-    const updatedRolesList = rolesList.map((r) => {
-      if (r.id === selectedRole) {
-        return {
-          ...r,
-          defaultTitle: newTitle,
-        };
-      }
-      return r;
-    });
-    persistRolesList(updatedRolesList);
-
-    setHasChanges(false);
-    showToast(`¡Rol "${activeRoleConfig.name}" y sus permisos se guardaron exitosamente!`);
+    applyAndPersistPermissions(currentPermissions, newTitle);
+    showToast(`¡Rol "${activeRoleConfig.name}" y sus permisos se guardaron y sincronizaron en todos los equipos!`);
   };
 
   // Open Create Role Modal
@@ -878,16 +957,27 @@ export default function RoleManagement() {
     };
 
     const updatedRoles = [...rolesList, newRoleObj];
-    persistRolesList(updatedRoles);
+    const nextPermissionsMap: Record<string, RolePermissions> = {
+      ...(rolePermissionsMap || ROLE_PERMISSIONS),
+      [roleSlug]: initialPerms,
+    };
 
-    // Register permissions in AuthContext
+    // Register permissions in AuthContext and sync everywhere
     updateRolePermissions(roleSlug, initialPerms, newRoleName.trim());
+    syncCompleteRoleState({
+      roles: updatedRoles,
+      permissionsMap: nextPermissionsMap,
+      action: "update",
+      changedRole: roleSlug,
+      changedPermissions: initialPerms,
+      changedRoleTitle: newRoleName.trim(),
+    });
 
     // Switch selection to new role
     setSelectedRole(roleSlug);
     setIsCreateModalOpen(false);
 
-    showToast(`¡Nuevo rol "${newRoleObj.name}" creado con éxito! Puedes personalizar sus accesos por módulo ahora.`);
+    showToast(`¡Nuevo rol "${newRoleObj.name}" creado y sincronizado con éxito!`);
   };
 
   // Trigger Delete Role
@@ -918,27 +1008,27 @@ export default function RoleManagement() {
     });
 
     // 2. Registrar id eliminado en lista persistente de eliminados
-    const currentDeleted = (() => {
-      try {
-        const raw = localStorage.getItem("brito_deleted_role_ids");
-        return raw ? JSON.parse(raw) : [];
-      } catch {
-        return [];
-      }
-    })();
+    const currentDeleted = getDeletedRoleIds();
     const nextDeleted = Array.from(new Set([...currentDeleted, deletingId]));
     try {
       localStorage.setItem("brito_deleted_role_ids", JSON.stringify(nextDeleted));
     } catch (e) {}
 
-    // 3. Eliminar de rolesList y persistir localmente y en servidor
+    // 3. Eliminar de rolesList y limpiar permisos
     const updatedRoles = rolesList.filter((r) => r.id !== deletingId);
-    persistRolesList(updatedRoles, nextDeleted);
+    const nextPermissionsMap = { ...(rolePermissionsMap || ROLE_PERMISSIONS) };
+    delete nextPermissionsMap[deletingId];
 
-    // 4. Limpiar permisos en AuthContext
     removeRolePermissions(deletingId);
+    syncCompleteRoleState({
+      roles: updatedRoles,
+      permissionsMap: nextPermissionsMap,
+      deletedIds: nextDeleted,
+      action: "delete",
+      changedRole: deletingId,
+    });
 
-    // 5. Notificar explícitamente al endpoint del servidor
+    // 4. Notificar explícitamente al endpoint del servidor con deleteRole
     fetch("/api/roles", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -949,7 +1039,7 @@ export default function RoleManagement() {
       }),
     }).catch(() => {});
 
-    // 6. Resetear selección a admin
+    // 5. Resetear selección a admin
     setSelectedRole("admin");
     setRoleToDelete(null);
     setDeleteConfirmText("");
@@ -1048,7 +1138,9 @@ export default function RoleManagement() {
               {rolesList.map((role) => {
                 const isSelected = selectedRole === role.id;
                 const countUsers = usersList.filter((u) => u.role === role.id).length;
-                const effectivePerms = rolePermissionsMap?.[role.id] || ROLE_PERMISSIONS[role.id] || ROLE_PERMISSIONS.cajero;
+                const effectivePerms = isSelected
+                  ? currentPermissions
+                  : (rolePermissionsMap?.[role.id] || ROLE_PERMISSIONS[role.id] || ROLE_PERMISSIONS.cajero);
                 const activeCount = PERMISSION_GROUPS.reduce((acc, g) => {
                   return acc + g.items.filter((item) => Boolean(effectivePerms[item.key])).length;
                 }, 0);
@@ -1058,9 +1150,6 @@ export default function RoleManagement() {
                   <div
                     key={role.id}
                     onClick={() => {
-                      if (hasChanges) {
-                        if (!confirm("Tienes cambios sin guardar en el rol actual. ¿Deseas cambiar de rol?")) return;
-                      }
                       setSelectedRole(role.id);
                     }}
                     className={`p-3.5 rounded-2xl border-2 transition-all cursor-pointer relative overflow-hidden flex flex-col gap-2 group ${

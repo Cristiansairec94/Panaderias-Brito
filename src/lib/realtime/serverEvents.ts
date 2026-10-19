@@ -12,6 +12,7 @@ export interface StoredRealtimeEvent {
 
 const DATA_DIR = path.join(process.cwd(), "src", "data");
 const EVENTS_FILE = path.join(DATA_DIR, "realtime_events.json");
+const TMP_EVENTS_FILE = "/tmp/brito_realtime_events.json";
 
 // Buffer en memoria y persistente para los últimos 500 eventos del servidor
 export const MAX_EVENTS = 500;
@@ -24,7 +25,7 @@ export function ensureDataDirectory() {
       fs.mkdirSync(DATA_DIR, { recursive: true });
     }
   } catch (err) {
-    console.warn("[API Realtime] No se pudo crear directorio data:", err);
+    // En Vercel el directorio de código es de solo lectura
   }
 }
 
@@ -34,19 +35,18 @@ export function loadStoredEvents(): StoredRealtimeEvent[] {
     return eventBuffer;
   }
 
-  try {
-    ensureDataDirectory();
-    if (fs.existsSync(EVENTS_FILE)) {
-      const content = fs.readFileSync(EVENTS_FILE, "utf-8");
-      const parsed = JSON.parse(content);
-      if (Array.isArray(parsed)) {
-        eventBuffer = parsed.filter((e: any) => (Number(e?.timestamp) || 0) >= CLEAN_SLATE_EPOCH);
-        isInitialized = true;
-        return eventBuffer;
+  for (const filePath of [TMP_EVENTS_FILE, EVENTS_FILE]) {
+    try {
+      if (fs.existsSync(filePath)) {
+        const content = fs.readFileSync(filePath, "utf-8");
+        const parsed = JSON.parse(content);
+        if (Array.isArray(parsed)) {
+          eventBuffer = parsed.filter((e: any) => (Number(e?.timestamp) || 0) >= CLEAN_SLATE_EPOCH);
+          isInitialized = true;
+          return eventBuffer;
+        }
       }
-    }
-  } catch (err) {
-    console.warn("[API Realtime] Error al leer realtime_events.json, usando memoria:", err);
+    } catch {}
   }
 
   isInitialized = true;
@@ -55,14 +55,17 @@ export function loadStoredEvents(): StoredRealtimeEvent[] {
 
 export function saveStoredEvents(events: StoredRealtimeEvent[]): boolean {
   eventBuffer = events;
+  let saved = false;
   try {
     ensureDataDirectory();
     fs.writeFileSync(EVENTS_FILE, JSON.stringify(events, null, 2), "utf-8");
-    return true;
-  } catch (err) {
-    console.warn("[API Realtime] No se pudo escribir en realtime_events.json:", err);
-    return false;
-  }
+    saved = true;
+  } catch {}
+  try {
+    fs.writeFileSync(TMP_EVENTS_FILE, JSON.stringify(events, null, 2), "utf-8");
+    saved = true;
+  } catch {}
+  return saved;
 }
 
 export function recordServerRealtimeEvent(type: string, payload: any, senderDeviceId = "server") {

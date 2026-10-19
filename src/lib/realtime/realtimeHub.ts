@@ -110,6 +110,18 @@ export interface RealtimeUserPayload {
   timestamp: string;
 }
 
+export interface RealtimeRolePayload {
+  action: "update" | "delete" | "sync";
+  role?: string;
+  permissions?: any;
+  allPermissions?: Record<string, any>;
+  roles?: any[];
+  deletedRoleIds?: string[];
+  roleTitle?: string;
+  senderDeviceId: string;
+  timestamp: string;
+}
+
 export interface RealtimeExpensePayload {
   action: "create" | "update" | "delete";
   expense: any;
@@ -152,6 +164,7 @@ type SessionRevokedListener = (payload: RealtimeSessionRevokedPayload) => void;
 type ProductListener = (payload: RealtimeProductPayload) => void;
 type CustomerListener = (payload: RealtimeCustomerPayload) => void;
 type UserListener = (payload: RealtimeUserPayload) => void;
+type RoleListener = (payload: RealtimeRolePayload) => void;
 type ExpenseListener = (payload: RealtimeExpensePayload) => void;
 type IncomeListener = (payload: RealtimeIncomePayload) => void;
 type InventoryListener = (payload: RealtimeInventoryPayload) => void;
@@ -183,6 +196,7 @@ class RealtimeHub {
   private productListeners = new Set<ProductListener>();
   private customerListeners = new Set<CustomerListener>();
   private userListeners = new Set<UserListener>();
+  private roleListeners = new Set<RoleListener>();
   private expenseListeners = new Set<ExpenseListener>();
   private incomeListeners = new Set<IncomeListener>();
   private inventoryListeners = new Set<InventoryListener>();
@@ -257,6 +271,7 @@ class RealtimeHub {
       (payload.order && payload.order.id) ||
       (payload.branch && payload.branch.id) ||
       (payload.user && payload.user.id) ||
+      payload.role ||
       (payload.product && payload.product.id) ||
       (payload.customer && payload.customer.id) ||
       (payload.expense && payload.expense.id) ||
@@ -273,6 +288,7 @@ class RealtimeHub {
       type === "order" ||
       type === "branch" ||
       type === "user" ||
+      type === "role" ||
       type === "product" ||
       type === "customer" ||
       type === "expense" ||
@@ -315,6 +331,8 @@ class RealtimeHub {
       this.customerListeners.forEach((fn) => { try { fn(payload); } catch (err) { console.error(err); } });
     } else if (type === "user") {
       this.userListeners.forEach((fn) => { try { fn(payload); } catch (err) { console.error(err); } });
+    } else if (type === "role") {
+      this.roleListeners.forEach((fn) => { try { fn(payload); } catch (err) { console.error(err); } });
     } else if (type === "expense") {
       this.expenseListeners.forEach((fn) => { try { fn(payload); } catch (err) { console.error(err); } });
     } else if (type === "income") {
@@ -386,6 +404,10 @@ class RealtimeHub {
         .on("broadcast", { event: "user" }, ({ payload }: { payload: any }) => {
           if (payload?.senderTabId && payload.senderTabId === this.tabId) return;
           this.dispatchLocalEvent("user", payload);
+        })
+        .on("broadcast", { event: "role" }, ({ payload }: { payload: any }) => {
+          if (payload?.senderTabId && payload.senderTabId === this.tabId) return;
+          this.dispatchLocalEvent("role", payload);
         })
         .on("broadcast", { event: "expense" }, ({ payload }: { payload: any }) => {
           if (payload?.senderTabId && payload.senderTabId === this.tabId) return;
@@ -835,6 +857,26 @@ class RealtimeHub {
     this.userListeners.add(listener);
     return () => {
       this.userListeners.delete(listener);
+    };
+  }
+
+  public async broadcastRole(params: Omit<RealtimeRolePayload, "senderDeviceId" | "timestamp">) {
+    const payload: RealtimeRolePayload = {
+      ...params,
+      senderDeviceId: this.getDeviceId(),
+      timestamp: new Date().toISOString(),
+    };
+    (payload as any).senderTabId = this.tabId;
+    (payload as any).id = params.role || "roles_config";
+    this.dispatchLocalEvent("role", payload);
+    this.sendBroadcast("role", payload);
+    this.postToSyncEndpoint("role", payload);
+  }
+
+  public onRole(listener: RoleListener) {
+    this.roleListeners.add(listener);
+    return () => {
+      this.roleListeners.delete(listener);
     };
   }
 
