@@ -352,10 +352,22 @@ export default function TicketModal({
                   [ {paymentMethod} ]
                 </span>
               </div>
+              {paymentMethod === "tarjeta" && cardTerminal && (
+                <div className="flex justify-between text-xs print:text-[10px] border-t border-dashed border-black pt-1">
+                  <span className="font-black text-black">TERMINAL:</span>
+                  <span className="font-black text-black text-right break-words flex-1">{cardTerminal}</span>
+                </div>
+              )}
               {paymentMethod === "transferencia" && transferAccount && (
                 <div className="flex justify-between text-xs print:text-[10px] border-t border-dashed border-black pt-1">
                   <span className="font-black text-black">CUENTA DEPÓSITO:</span>
                   <span className="font-black text-black text-right break-words flex-1">{transferAccount}</span>
+                </div>
+              )}
+              {paymentReference && (
+                <div className="flex justify-between text-xs print:text-[10px] border-t border-dashed border-black pt-1">
+                  <span className="font-black text-black">REF. / AUT:</span>
+                  <span className="font-black text-black text-right break-words flex-1 font-mono">{paymentReference}</span>
                 </div>
               )}
             </div>

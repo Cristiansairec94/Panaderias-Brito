@@ -55,6 +55,7 @@ export interface RealtimeCashMovementPayload {
   reason: string;
   authorizedBy?: string;
   cashier?: string;
+  paymentMethod?: "efectivo" | "tarjeta" | "transferencia" | string;
   timestamp: string;
   senderDeviceId: string;
 }

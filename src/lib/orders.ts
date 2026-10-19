@@ -258,10 +258,12 @@ export async function persistOrderPaymentMovementToSupabase(params: {
   cashier: string;
   branchId?: string;
   isLiquidation?: boolean;
+  paymentMethod?: "efectivo" | "tarjeta" | "transferencia";
 }): Promise<boolean> {
   if (typeof window === "undefined" || params.amount <= 0) return false;
   const movId = `ING-${Date.now().toString().slice(-6)}-${Math.floor(1000 + Math.random() * 9000)}`;
   const effBranch = resolveBranchId(params.branchId, params.cashier);
+  const methodTag = (params.paymentMethod || "efectivo").toUpperCase();
   try {
     const supabase = createClient();
     const { error } = await supabase.from("cash_movements").insert({
@@ -270,7 +272,7 @@ export async function persistOrderPaymentMovementToSupabase(params: {
       category: "abono_pedido",
       category_label: params.isLiquidation ? "Liquidación de Pedido Especial" : "Anticipo de Pedido Especial",
       amount: params.amount,
-      reason: `${params.isLiquidation ? "Liquidación final" : "Anticipo"} pedido ${params.orderNumber} - ${params.customerName}`,
+      reason: `${params.isLiquidation ? "Liquidación final" : "Anticipo"} pedido ${params.orderNumber} - ${params.customerName} [${methodTag}]`,
       authorized_by: params.cashier || "Cajero",
       branch_id: effBranch,
     });
@@ -278,7 +280,7 @@ export async function persistOrderPaymentMovementToSupabase(params: {
       console.warn("[OrdersSupabase] Error registrando movimiento de dinero en Supabase, encolando offline:", error);
       enqueueSyncItem({
         type: "income",
-        title: `${params.isLiquidation ? "Liquidación" : "Anticipo"} pedido ${params.orderNumber} (${params.customerName})`,
+        title: `${params.isLiquidation ? "Liquidación" : "Anticipo"} pedido ${params.orderNumber} (${params.customerName}) [${methodTag}]`,
         amount: params.amount,
         branchId: effBranch,
         data: {
@@ -287,9 +289,10 @@ export async function persistOrderPaymentMovementToSupabase(params: {
           category: "abono_pedido",
           category_label: params.isLiquidation ? "Liquidación de Pedido Especial" : "Anticipo de Pedido Especial",
           amount: params.amount,
-          concept: `${params.isLiquidation ? "Liquidación final" : "Anticipo"} pedido ${params.orderNumber} - ${params.customerName}`,
+          concept: `${params.isLiquidation ? "Liquidación final" : "Anticipo"} pedido ${params.orderNumber} - ${params.customerName} [${methodTag}]`,
           authorized_by: params.cashier || "Cajero",
           cashier: params.cashier || "Cajero",
+          paymentMethod: params.paymentMethod || "efectivo",
           branchId: effBranch,
           orderId: params.orderId,
           orderNumber: params.orderNumber,
@@ -1365,6 +1368,7 @@ export function addCustomOrder(data: {
       cashier: data.cashier,
       branchId: effOperatingBranchId,
       isLiquidation: remaining === 0,
+      paymentMethod: data.paymentMethod,
     });
 
     if (typeof window !== "undefined" && realtimeHub?.broadcastCashMovement) {
@@ -1376,9 +1380,10 @@ export function addCustomOrder(data: {
         category: "abono_pedido" as any,
         categoryLabel: remaining === 0 ? "Liquidación de Pedido Especial" : "Anticipo de Pedido Especial",
         amount: deposit,
-        reason: `${remaining === 0 ? "Liquidación final" : "Anticipo"} pedido ${orderNumber} - ${data.customerName}`,
+        reason: `${remaining === 0 ? "Liquidación final" : "Anticipo"} pedido ${orderNumber} - ${data.customerName} [${(data.paymentMethod || "efectivo").toUpperCase()}]`,
         authorizedBy: data.cashier || "Cajero",
         cashier: data.cashier,
+        paymentMethod: data.paymentMethod,
         timestamp: formatTime24(new Date()),
       });
     }
@@ -1415,6 +1420,9 @@ export function addOrderPayment(
     cashier: string;
     operatingBranchId?: string;
     operatingBranchName?: string;
+    transferAccount?: string;
+    cardTerminal?: string;
+    paymentReference?: string;
     notes?: string;
     markAsDelivered?: boolean;
   }
@@ -1432,12 +1440,23 @@ export function addOrderPayment(
   const newRemaining = Math.max(0, order.total - newDeposit);
   const isFullLiquidation = newRemaining === 0;
 
+  const paymentCashierBranch = params.cashier ? resolveBranchId(undefined, params.cashier) : undefined;
+  const effOperatingBranchId = params.operatingBranchId
+    ? resolveBranchId(params.operatingBranchId, undefined)
+    : (paymentCashierBranch || resolveBranchId(order.operatingBranchId || order.branchId, params.cashier));
+  const effOperatingBranchName = params.operatingBranchName || (effOperatingBranchId && CANONICAL_BRANCH_NAMES[effOperatingBranchId]) || order.operatingBranchName || order.branchName;
+
   const newPayment: OrderPayment = {
     id: `PAY-${order.orderNumber}-${(order.payments?.length || 0) + 1}`,
     date: formatOrderDateTime(),
     amount: paymentAmount,
     paymentMethod: params.paymentMethod,
     cashier: params.cashier,
+    operatingBranchId: effOperatingBranchId,
+    operatingBranchName: effOperatingBranchName,
+    transferAccount: params.transferAccount,
+    cardTerminal: params.cardTerminal,
+    paymentReference: params.paymentReference,
     notes: params.notes || (isFullLiquidation ? "Liquidación de saldo pendiente" : "Abono a cuenta"),
   };
 
@@ -1451,12 +1470,6 @@ export function addOrderPayment(
   if (params.markAsDelivered && isFullLiquidation) {
     order.status = "entregado";
   }
-
-  const paymentCashierBranch = params.cashier ? resolveBranchId(undefined, params.cashier) : undefined;
-  const effOperatingBranchId = params.operatingBranchId
-    ? resolveBranchId(params.operatingBranchId, undefined)
-    : (paymentCashierBranch || resolveBranchId(order.operatingBranchId || order.branchId, params.cashier));
-  const effOperatingBranchName = params.operatingBranchName || (effOperatingBranchId && CANONICAL_BRANCH_NAMES[effOperatingBranchId]) || order.operatingBranchName || order.branchName;
 
   // Registrar en ingresos de caja de quien opera el turno
   recordOrderCashIncome({
@@ -1503,6 +1516,7 @@ export function addOrderPayment(
     cashier: params.cashier,
     branchId: effOperatingBranchId,
     isLiquidation: isFullLiquidation,
+    paymentMethod: params.paymentMethod,
   });
 
   if (typeof window !== "undefined" && realtimeHub?.broadcastCashMovement) {
@@ -1514,9 +1528,10 @@ export function addOrderPayment(
       category: "abono_pedido" as any,
       categoryLabel: isFullLiquidation ? "Liquidación de Pedido Especial" : "Abono a Pedido Especial",
       amount: paymentAmount,
-      reason: `${isFullLiquidation ? "Liquidación final" : "Abono"} pedido ${order.orderNumber} - ${order.customerName}`,
+      reason: `${isFullLiquidation ? "Liquidación final" : "Abono"} pedido ${order.orderNumber} - ${order.customerName} [${(params.paymentMethod || "efectivo").toUpperCase()}]`,
       authorizedBy: params.cashier || "Cajero",
       cashier: params.cashier,
+      paymentMethod: params.paymentMethod,
       timestamp: formatTime24(new Date()),
     });
   }

@@ -203,6 +203,7 @@ export default function CajaPage() {
   const [liveBranchFilter, setLiveBranchFilter] = useState<string>("all");
   const [liveCashierFilter, setLiveCashierFilter] = useState<string>("all");
   const [liveTypeFilter, setLiveTypeFilter] = useState<"all" | "venta" | "entrada" | "salida" | "corte">("all");
+  const [livePaymentMethodFilter, setLivePaymentMethodFilter] = useState<"all" | "efectivo" | "tarjeta" | "transferencia">("all");
   const [liveSearchQuery, setLiveSearchQuery] = useState<string>("");
 
   // Historical shift cuts state
@@ -672,6 +673,18 @@ export default function CajaPage() {
             dbMovs.forEach((m: any) => {
               if (m.category === "venta_mostrador") return;
               if (m.id && (m.id.includes("ING-ING") || m.id.includes("mov-mov-"))) return;
+              const reasonLower = (m.reason || "").toLowerCase();
+              let movMethod: "efectivo" | "tarjeta" | "transferencia" = "efectivo";
+              if (reasonLower.includes("[tarjeta]") || reasonLower.includes("tarjeta")) {
+                movMethod = "tarjeta";
+              } else if (
+                reasonLower.includes("[transferencia]") ||
+                reasonLower.includes("transferencia") ||
+                reasonLower.includes("spei")
+              ) {
+                movMethod = "transferencia";
+              }
+
               remoteItems.push({
                 id: m.id,
                 timestamp: m.created_at || Date.now(),
@@ -683,7 +696,7 @@ export default function CajaPage() {
                 categoryLabel: m.category_label || (m.type === "entrada" ? "🪙 Entrada Dinero" : "Salida / Gasto"),
                 concept: m.reason || "Movimiento de caja",
                 amount: Number(m.amount) || 0,
-                paymentMethod: "efectivo",
+                paymentMethod: movMethod,
                 source: "caja",
               });
             });
@@ -790,9 +803,9 @@ export default function CajaPage() {
           const t = parseDateTimeSafe(s.timestamp || s.createdAt || s.date);
           return shiftStart <= 0 || (t > 0 && t > shiftStart);
         });
-        const cSum = filtered.filter((s: any) => s.paymentMethod === "efectivo").reduce((acc: number, s: any) => acc + (Number(s.total) || 0), 0);
-        const kSum = filtered.filter((s: any) => s.paymentMethod === "tarjeta").reduce((acc: number, s: any) => acc + (Number(s.total) || 0), 0);
-        const tSum = filtered.filter((s: any) => s.paymentMethod === "transferencia").reduce((acc: number, s: any) => acc + (Number(s.total) || 0), 0);
+        const cSum = filtered.filter((s: any) => (s.paymentMethod || s.payment_method) === "efectivo").reduce((acc: number, s: any) => acc + (Number(s.total) || 0), 0);
+        const kSum = filtered.filter((s: any) => (s.paymentMethod || s.payment_method) === "tarjeta").reduce((acc: number, s: any) => acc + (Number(s.total) || 0), 0);
+        const tSum = filtered.filter((s: any) => (s.paymentMethod || s.payment_method) === "transferencia").reduce((acc: number, s: any) => acc + (Number(s.total) || 0), 0);
 
         // Anticipos y liquidaciones de pedidos especiales cobrados en este turno y sucursal
         let ordersCash = 0;
@@ -854,6 +867,15 @@ export default function CajaPage() {
     }) : () => {};
 
     const unsubCash = realtimeHub.onCashMovement((movPayload) => {
+      const reasonLower = (movPayload.reason || "").toLowerCase();
+      let pMethod: "efectivo" | "tarjeta" | "transferencia" = "efectivo";
+      if (movPayload.paymentMethod === "tarjeta" || movPayload.paymentMethod === "transferencia" || movPayload.paymentMethod === "efectivo") {
+        pMethod = movPayload.paymentMethod;
+      } else if (reasonLower.includes("[tarjeta]") || reasonLower.includes("tarjeta")) {
+        pMethod = "tarjeta";
+      } else if (reasonLower.includes("[transferencia]") || reasonLower.includes("transferencia") || reasonLower.includes("spei")) {
+        pMethod = "transferencia";
+      }
       const newLiveItem: LiveMoneyMovement = {
         id: movPayload.id,
         timestamp: Date.now(),
@@ -865,7 +887,7 @@ export default function CajaPage() {
         categoryLabel: movPayload.type === "salida" ? "💸 Salida / Gasto" : "🪙 Entrada Dinero",
         concept: movPayload.reason,
         amount: movPayload.amount,
-        paymentMethod: "efectivo",
+        paymentMethod: pMethod,
         source: "caja",
       };
       setLiveStreamMovements((prev) => [newLiveItem, ...prev.filter((p) => p.id !== newLiveItem.id)]);
@@ -1328,7 +1350,7 @@ export default function CajaPage() {
     });
   }, [periodCuts, searchQuery, selectedResponsibles, uniqueResponsibles, filterStatus, isAllBranches, currentBranch?.id]);
 
-  // Realtime Live Stream Movements (Filtered by Branch, Cashier, Type, Search)
+  // Realtime Live Stream Movements (Filtered by Branch, Cashier, Type, Method, Search)
   const filteredLiveMovements = useMemo(() => {
     return liveStreamMovements.filter((m) => {
       // 1. Branch filter
@@ -1345,7 +1367,12 @@ export default function CajaPage() {
         if (liveTypeFilter === "salida" && m.type !== "salida") return false;
       }
 
-      // 4. Search query
+      // 4. Payment Method filter
+      if (livePaymentMethodFilter !== "all" && m.paymentMethod !== livePaymentMethodFilter) {
+        return false;
+      }
+
+      // 5. Search query
       if (liveSearchQuery.trim()) {
         const q = liveSearchQuery.toLowerCase();
         const matchConcept = (m.concept || "").toLowerCase().includes(q);
@@ -1357,18 +1384,28 @@ export default function CajaPage() {
 
       return true;
     });
-  }, [liveStreamMovements, liveBranchFilter, liveCashierFilter, liveTypeFilter, liveSearchQuery]);
+  }, [liveStreamMovements, liveBranchFilter, liveCashierFilter, liveTypeFilter, livePaymentMethodFilter, liveSearchQuery]);
 
   // Live Stream KPIs
   const liveKpis = useMemo(() => {
     let totalIn = 0;
     let totalOut = 0;
     let cashBalance = 0;
+    let cashIn = 0;
+    let cardIn = 0;
+    let transferIn = 0;
 
     filteredLiveMovements.forEach((m) => {
       if (m.type === "venta" || m.type === "entrada") {
         totalIn += m.amount;
-        if (m.paymentMethod === "efectivo") cashBalance += m.amount;
+        if (m.paymentMethod === "efectivo") {
+          cashBalance += m.amount;
+          cashIn += m.amount;
+        } else if (m.paymentMethod === "tarjeta") {
+          cardIn += m.amount;
+        } else if (m.paymentMethod === "transferencia") {
+          transferIn += m.amount;
+        }
       } else if (m.type === "salida") {
         totalOut += m.amount;
         if (m.paymentMethod === "efectivo") cashBalance -= m.amount;
@@ -1379,6 +1416,9 @@ export default function CajaPage() {
       totalIn,
       totalOut,
       netCash: cashBalance,
+      cashIn,
+      cardIn,
+      transferIn,
       count: filteredLiveMovements.length,
     };
   }, [filteredLiveMovements]);
@@ -2970,7 +3010,7 @@ export default function CajaPage() {
                               {formatCurrency(totalVentas)}
                             </span>
                             <span className="text-[10px] text-stone-500 block mt-0.5">
-                              Efvo: {formatCurrency(cut.cashSales)} • Tarj: {formatCurrency(cut.cardSales)}
+                              Efvo: {formatCurrency(cut.cashSales)} • Tarj: {formatCurrency(cut.cardSales)} • Transf: {formatCurrency(cut.transferSales || 0)}
                             </span>
                           </td>
 
@@ -3107,9 +3147,17 @@ export default function CajaPage() {
               <span className="text-2xl font-black text-emerald-700 mt-2 block tracking-tight font-mono">
                 +{formatCurrency(liveKpis.totalIn)}
               </span>
-              <span className="text-[11px] text-stone-500 font-medium mt-1 block">
-                Ventas mostrador + Aportaciones de cambio
-              </span>
+              <div className="flex items-center gap-1.5 flex-wrap mt-2 pt-2 border-t border-stone-100 text-[10px] font-black">
+                <span className="text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-200">
+                  💵 Efvo: {formatCurrency(liveKpis.cashIn)}
+                </span>
+                <span className="text-blue-800 bg-blue-50 px-2 py-0.5 rounded-lg border border-blue-200">
+                  💳 Tarj: {formatCurrency(liveKpis.cardIn)}
+                </span>
+                <span className="text-purple-800 bg-purple-50 px-2 py-0.5 rounded-lg border border-purple-200">
+                  ✈️ Transf: {formatCurrency(liveKpis.transferIn)}
+                </span>
+              </div>
             </div>
 
             {/* KPI 2: Salidas y Retiros en Vivo */}
@@ -3245,6 +3293,23 @@ export default function CajaPage() {
                   <option value="corte">🏁 Cortes de Turno</option>
                 </select>
               </div>
+
+              {/* Selector de Método de Pago */}
+              <div className="flex items-center gap-2">
+                <label className="text-xs font-bold text-stone-500 shrink-0 flex items-center gap-1">
+                  <CreditCard className="w-3.5 h-3.5 text-stone-400" /> Método:
+                </label>
+                <select
+                  value={livePaymentMethodFilter}
+                  onChange={(e) => setLivePaymentMethodFilter(e.target.value as any)}
+                  className="px-3 py-2 bg-stone-50 border border-stone-200 rounded-xl text-xs font-bold text-stone-800 focus:ring-2 focus:ring-amber-500 focus:outline-none cursor-pointer"
+                >
+                  <option value="all">Todos los Métodos</option>
+                  <option value="efectivo">💵 Efectivo</option>
+                  <option value="tarjeta">💳 Tarjeta</option>
+                  <option value="transferencia">✈️ Transferencia</option>
+                </select>
+              </div>
             </div>
           </div>
 
@@ -3261,12 +3326,13 @@ export default function CajaPage() {
                 <p className="text-xs text-stone-500 max-w-md mx-auto">
                   El sistema está conectado al Hub en tiempo real y esperando nuevas transacciones de mostrador, entradas o gastos.
                 </p>
-                {(liveBranchFilter !== "all" || liveCashierFilter !== "all" || liveTypeFilter !== "all" || liveSearchQuery) && (
+                {(liveBranchFilter !== "all" || liveCashierFilter !== "all" || liveTypeFilter !== "all" || livePaymentMethodFilter !== "all" || liveSearchQuery) && (
                   <button
                     onClick={() => {
                       setLiveBranchFilter("all");
                       setLiveCashierFilter("all");
                       setLiveTypeFilter("all");
+                      setLivePaymentMethodFilter("all");
                       setLiveSearchQuery("");
                     }}
                     className="text-xs font-bold text-amber-700 bg-amber-50 hover:bg-amber-100 px-3.5 py-1.5 rounded-xl border border-amber-200 transition-colors cursor-pointer"

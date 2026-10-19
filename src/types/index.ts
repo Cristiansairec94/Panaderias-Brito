@@ -105,6 +105,8 @@ export interface OrderPayment {
   paymentMethod: "efectivo" | "tarjeta" | "transferencia";
   cashier: string;
   notes?: string;
+  operatingBranchId?: string;
+  operatingBranchName?: string;
   transferAccount?: string;
   cardTerminal?: string;
   paymentReference?: string;

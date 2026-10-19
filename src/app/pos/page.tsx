@@ -1171,8 +1171,7 @@ export default function POSPage() {
     return initialCashFund;
   }, [initialCashFund]);
 
-  // Relevo & Apertura de Turno: Estado de Autenticación de Cajero Entrante
-  const [incomingSelectedUser, setIncomingSelectedUser] = useState<string>("");
+  // Relevo & Apertura de Turno: Estado de Autenticación de Cajero Entrante (Automático desde el corte)
   const [incomingPassword, setIncomingPassword] = useState<string>("");
   const [showIncomingPassword, setShowIncomingPassword] = useState<boolean>(false);
   const [incomingAuthError, setIncomingAuthError] = useState<string>("");
@@ -1180,39 +1179,10 @@ export default function POSPage() {
 
   useEffect(() => {
     if (isShiftLocked) {
-      const defaultUser = lastCutInfo?.incomingCashier || activeBranch?.currentShift?.cashier || cashierName || "";
-      if (defaultUser) {
-        setIncomingSelectedUser(defaultUser);
-      }
       setIncomingPassword("");
       setIncomingAuthError("");
     }
-  }, [isShiftLocked, lastCutInfo?.incomingCashier, activeBranch?.currentShift?.cashier, cashierName]);
-
-  const shiftCoworkerCandidates = useMemo(() => {
-    const branchId = activeBranch?.id;
-    const branchName = (activeBranch?.name || "").toLowerCase();
-    const branchShort = (activeBranch?.shortName || "").toLowerCase();
-
-    const branchUsers = usersList.filter((u) => {
-      if (u.status === "inactivo") return false;
-      const uBranchId = u.assignedBranchId;
-      const uBranchName = (u.assignedBranchName || "").toLowerCase();
-      return (
-        (branchId && uBranchId === branchId) ||
-        (uBranchId && branchId && resolveBranchId(uBranchId) === resolveBranchId(branchId)) ||
-        (branchShort && uBranchName.includes(branchShort)) ||
-        (branchName && branchName.includes(uBranchName))
-      );
-    });
-
-    const otherUsers = usersList.filter((u) => {
-      if (u.status === "inactivo") return false;
-      return !branchUsers.some((bu) => bu.id === u.id);
-    });
-
-    return { branchUsers, otherUsers };
-  }, [usersList, activeBranch]);
+  }, [isShiftLocked]);
 
   const handleUnlockShiftWithCredentials = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -1220,14 +1190,14 @@ export default function POSPage() {
 
     setIncomingAuthError("");
 
-    const targetCashierName = incomingSelectedUser || lastCutInfo?.incomingCashier || activeBranch?.currentShift?.cashier || cashierName;
+    const targetCashierName = lastCutInfo?.incomingCashier || activeBranch?.currentShift?.cashier || cashierName;
     if (!targetCashierName) {
-      setIncomingAuthError("Por favor selecciona el usuario o compañero que toma el turno.");
+      setIncomingAuthError("No se encontró el perfil asignado para tomar el turno.");
       return;
     }
 
     if (!incomingPassword.trim()) {
-      setIncomingAuthError("Por favor ingresa tu contraseña o PIN de acceso.");
+      setIncomingAuthError(`Por favor ingresa la contraseña o PIN de ${targetCashierName} para acceder.`);
       return;
     }
 
@@ -2430,6 +2400,14 @@ export default function POSPage() {
       return updated;
     });
 
+    const cardTerminalName = currentPaymentMethod === "tarjeta"
+      ? (selectedCardTerminal?.name || "Terminal Bancaria")
+      : undefined;
+    const transferAccountName = currentPaymentMethod === "transferencia"
+      ? (selectedTransferAccount ? `${selectedTransferAccount.name} (${selectedTransferAccount.bank} - CLABE ${selectedTransferAccount.clabe})` : "Transferencia SPEI")
+      : undefined;
+    const finalPaymentRef = paymentReference.trim() || undefined;
+
     // 2. Crear registro de venta con folio y fecha instantánea
     const newSaleRecord: Sale = {
       id: createdSaleId,
@@ -2437,6 +2415,9 @@ export default function POSPage() {
       items: currentItems,
       total: currentTotal,
       paymentMethod: currentPaymentMethod,
+      cardTerminal: cardTerminalName,
+      transferAccount: transferAccountName,
+      paymentReference: finalPaymentRef,
       cashier: cashierName,
       cashGiven: currentCashGiven,
       change: currentChange,
@@ -2473,7 +2454,7 @@ export default function POSPage() {
         branchName: activeBranch?.name || "Sucursal Matriz Centro",
         customerId: selectedCustomer.id !== "cli-0" ? selectedCustomer.id : undefined,
         customerName: selectedCustomer.name !== "Público General" ? selectedCustomer.name : undefined,
-        referenceNumber: paymentReference.trim() || undefined,
+        referenceNumber: finalPaymentRef,
         date: newSaleRecord.date,
       });
     } catch (err) {
@@ -2540,8 +2521,10 @@ export default function POSPage() {
     // Al completar la compra, la charola se limpia y vuelve automáticamente a Público en General con efectivo
     setCart([]);
     setCashGiven("");
+    setPaymentReference("");
     setPaymentMethod("efectivo");
     setSelectedTransferAccountId(DEFAULT_TRANSFER_ACCOUNTS[0].id);
+    setSelectedCardTerminalId(DEFAULT_CARD_TERMINALS[0].id);
     setSelectedCustomer(DEFAULT_GENERAL_CUSTOMER);
     setCustomerSearchQuery("");
     setIsCustomerPickerOpen(false);
@@ -2563,9 +2546,9 @@ export default function POSPage() {
             payment_method: currentPaymentMethod,
             cashier: cashierName,
             branch_id: resolveBranchId(activeBranch?.id || user?.assignedBranchId, cashierName),
-            payment_reference: null,
-            transfer_account: null,
-            card_terminal: null,
+            payment_reference: finalPaymentRef || null,
+            transfer_account: transferAccountName || null,
+            card_terminal: cardTerminalName || null,
             cash_given: currentCashGiven || null,
             change: currentChange || null,
           };
@@ -2748,6 +2731,8 @@ export default function POSPage() {
     setCashGiven("");
     setPaymentMethod("efectivo");
     setSelectedTransferAccountId(DEFAULT_TRANSFER_ACCOUNTS[0].id);
+    setSelectedCardTerminalId(DEFAULT_CARD_TERMINALS[0].id);
+    setPaymentReference("");
     setSelectedCustomer(DEFAULT_GENERAL_CUSTOMER);
     setCustomerSearchQuery("");
     setIsCustomerPickerOpen(false);
@@ -2984,9 +2969,9 @@ export default function POSPage() {
                 </div>
               </div>
 
-              {/* 3. RELEVO DE QUIÉN TOMA EL TURNO & AUTENTICACIÓN CON CONTRASEÑA */}
+              {/* 3. RELEVO DE QUIÉN TOMA EL TURNO (PERFIL AUTOMÁTICO) & AUTENTICACIÓN CON CONTRASEÑA */}
               {(() => {
-                const incomingCashierName = incomingSelectedUser || lastCutInfo?.incomingCashier || activeBranch?.currentShift?.cashier || cashierName;
+                const incomingCashierName = lastCutInfo?.incomingCashier || activeBranch?.currentShift?.cashier || cashierName;
                 const isAft = isAfternoonShift(lastCutInfo?.nextShift || shiftName, incomingCashierName);
                 const incomingShiftDisplay = lastCutInfo?.nextShift || (isAft ? "Turno Vespertino" : "Turno Matutino");
                 const matchedUser = usersList.find((u) => matchesCashier(u.name, incomingCashierName) || matchesCashier(u.username, incomingCashierName));
@@ -2995,52 +2980,26 @@ export default function POSPage() {
                   <form onSubmit={handleUnlockShiftWithCredentials} className="space-y-3">
                     <div className="p-3.5 sm:p-4 bg-gradient-to-r from-emerald-950/80 to-stone-900 border-2 border-emerald-500/50 rounded-2xl space-y-3 shadow-lg">
                       <div className="flex items-center justify-between">
-                        <span className="text-[10px] sm:text-xs text-emerald-400 uppercase font-black tracking-wider flex items-center gap-1.5">
-                          <span>👤</span> Toma el turno ahora (Usuario):
-                        </span>
-                        <span className="text-[11px] font-bold text-emerald-300 bg-emerald-900/80 px-2.5 py-0.5 rounded-lg border border-emerald-500/40 shrink-0">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div className="w-10 h-10 bg-emerald-600/30 rounded-xl border border-emerald-400/40 flex items-center justify-center text-xl shrink-0 shadow-inner">
+                            {getEffectiveAvatar(matchedUser, incomingCashierName)}
+                          </div>
+                          <div className="min-w-0">
+                            <span className="text-[10px] sm:text-xs text-emerald-400 uppercase font-black tracking-wider block">
+                              TOMA EL TURNO AHORA:
+                            </span>
+                            <span className="text-sm sm:text-base font-black text-white truncate block">
+                              {incomingCashierName}
+                            </span>
+                          </div>
+                        </div>
+                        <span className="text-[11px] font-bold text-emerald-300 bg-emerald-900/80 px-2.5 py-1 rounded-lg border border-emerald-500/40 shrink-0">
                           {incomingShiftDisplay.split(" ")[0]} {incomingShiftDisplay.split(" ")[1] || ""}
                         </span>
                       </div>
 
-                      {/* Selector de Compañero */}
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-10 h-10 bg-emerald-600/30 rounded-xl border border-emerald-400/40 flex items-center justify-center text-xl shrink-0 shadow-inner">
-                          {getEffectiveAvatar(matchedUser, incomingCashierName)}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <label htmlFor="incoming-cashier-shift-select" className="sr-only">Seleccionar cajero entrante</label>
-                          <select
-                            id="incoming-cashier-shift-select"
-                            value={incomingCashierName}
-                            onChange={(e) => {
-                              setIncomingSelectedUser(e.target.value);
-                              setIncomingAuthError("");
-                            }}
-                            className="w-full bg-stone-950 border-2 border-emerald-500/60 text-white rounded-xl px-3 py-2 text-xs sm:text-sm font-black focus:ring-2 focus:ring-emerald-400 focus:outline-none cursor-pointer"
-                          >
-                            <optgroup label={`Compañeros de ${activeBranch?.shortName || "esta Sucursal"}`}>
-                              {shiftCoworkerCandidates.branchUsers.map((u) => (
-                                <option key={u.id} value={u.name}>
-                                  {u.avatar || "👤"} {u.name} — {u.shiftName || u.jobTitle || "Cajero"}
-                                </option>
-                              ))}
-                            </optgroup>
-                            {shiftCoworkerCandidates.otherUsers.length > 0 && (
-                              <optgroup label="Otros compañeros de la empresa">
-                                {shiftCoworkerCandidates.otherUsers.map((u) => (
-                                  <option key={u.id} value={u.name}>
-                                    {u.avatar || "👤"} {u.name} ({u.assignedBranchName || "General"})
-                                  </option>
-                                ))}
-                              </optgroup>
-                            )}
-                          </select>
-                        </div>
-                      </div>
-
-                      {/* Campo de Contraseña / PIN */}
-                      <div className="pt-1 space-y-1.5 border-t border-emerald-500/20">
+                      {/* Campo de Contraseña / PIN del compañero */}
+                      <div className="pt-2 space-y-1.5 border-t border-emerald-500/20">
                         <label className="text-[11px] font-black text-emerald-300 flex items-center justify-between">
                           <span className="flex items-center gap-1.5">
                             <Lock className="w-3.5 h-3.5 text-emerald-400" />
@@ -3051,7 +3010,7 @@ export default function POSPage() {
                         <div className="relative">
                           <input
                             type={showIncomingPassword ? "text" : "password"}
-                            placeholder="Ingresa tu contraseña o PIN de acceso..."
+                            placeholder={`Ingresa la contraseña de ${incomingCashierName}...`}
                             value={incomingPassword}
                             onChange={(e) => {
                               setIncomingPassword(e.target.value);
@@ -4719,11 +4678,195 @@ export default function POSPage() {
             </div>
           )}
 
+          {/* Manejo de Tarjeta con Selector de Terminales y Referencia */}
+          {paymentMethod === "tarjeta" && (
+            <div className="p-2.5 sm:p-3 bg-gradient-to-br from-amber-50/95 via-orange-50/40 to-stone-50 rounded-xl border border-amber-300/90 space-y-2 animate-in fade-in slide-in-from-top-1 duration-200 shadow-2xs">
+              <div className="flex items-center justify-between gap-2 border-b border-amber-200/80 pb-1.5">
+                <div className="flex items-center gap-1.5">
+                  <div className="p-1.5 bg-gradient-to-tr from-amber-500 to-orange-500 text-white rounded-lg shadow-2xs text-xs">
+                    💳
+                  </div>
+                  <div>
+                    <h5 className="text-xs font-black text-stone-900 leading-tight">
+                      Cobro con Tarjeta
+                    </h5>
+                    <p className="text-[10px] text-stone-600 font-medium">
+                      Terminal bancaria / punto de venta
+                    </p>
+                  </div>
+                </div>
+                <span className="text-xs font-black text-amber-950 bg-amber-200/80 border border-amber-300 px-2 py-0.5 rounded-lg shadow-2xs">
+                  {formatCurrency(total)}
+                </span>
+              </div>
 
+              {/* Selector de Terminal */}
+              <div className="space-y-1">
+                <label className="block text-[10px] font-black text-stone-700 uppercase tracking-wider">
+                  Terminal / Cuenta a Cobrar:
+                </label>
+                <div className="relative">
+                  <select
+                    value={selectedCardTerminalId}
+                    onChange={(e) => setSelectedCardTerminalId(e.target.value)}
+                    className="w-full px-3 py-1.5 bg-white text-stone-900 rounded-lg border border-amber-400 focus:border-amber-600 font-black text-xs focus:outline-none shadow-2xs cursor-pointer appearance-none pr-8"
+                  >
+                    {cardTerminals.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.name} — {t.bank}
+                      </option>
+                    ))}
+                  </select>
+                  <span className="text-stone-600 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none font-bold text-xs">▼</span>
+                </div>
+              </div>
 
+              {/* Ficha Visual de la Terminal Seleccionada */}
+              {selectedCardTerminal && (
+                <div className="bg-white/90 rounded-lg p-2 border border-amber-200 shadow-2xs space-y-1 text-[11px]">
+                  <div className="flex items-center justify-between">
+                    <span className="text-stone-500 font-medium">Terminal:</span>
+                    <span className="font-black text-stone-900">{selectedCardTerminal.name}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-stone-500 font-medium">Banco:</span>
+                    <span className="font-extrabold text-amber-900 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200 text-[10px]">
+                      {selectedCardTerminal.bank}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between pt-1 border-t border-stone-100">
+                    <span className="text-stone-500 font-medium">Abono a:</span>
+                    <span className="font-bold text-stone-800 text-[10px]">{selectedCardTerminal.accountDestination}</span>
+                  </div>
+                </div>
+              )}
 
+              {/* Referencia o voucher */}
+              <div>
+                <label className="block text-[10px] font-bold text-stone-600 mb-0.5">
+                  No. de Autorización / Voucher (Opcional):
+                </label>
+                <input
+                  type="text"
+                  placeholder="Ej. AUTH-4912 o 5519"
+                  value={paymentReference}
+                  onChange={(e) => setPaymentReference(e.target.value)}
+                  className="w-full px-2.5 py-1.5 bg-white rounded-lg border border-amber-300 focus:border-amber-500 text-xs font-mono font-bold text-stone-900 focus:outline-none placeholder:font-normal placeholder:text-stone-400 shadow-inner"
+                />
+              </div>
+            </div>
+          )}
 
-          {/* Botones de Acción */}
+          {/* Manejo de Transferencia con Selector de Cuentas y Copiar CLABE */}
+          {paymentMethod === "transferencia" && (
+            <div className="p-2.5 sm:p-3 bg-gradient-to-br from-amber-50/95 via-orange-50/40 to-stone-50 rounded-xl border border-amber-300/90 space-y-2 animate-in fade-in slide-in-from-top-1 duration-200 shadow-2xs">
+              <div className="flex items-center justify-between gap-2 border-b border-amber-200/80 pb-1.5">
+                <div className="flex items-center gap-1.5">
+                  <div className="p-1.5 bg-gradient-to-tr from-amber-500 to-orange-500 text-white rounded-lg shadow-2xs text-xs">
+                    📱
+                  </div>
+                  <div>
+                    <h5 className="text-xs font-black text-stone-900 leading-tight">
+                      Transferencia SPEI
+                    </h5>
+                    <p className="text-[10px] text-stone-600 font-medium">
+                      Cuenta y CLABE para depósito
+                    </p>
+                  </div>
+                </div>
+                <span className="text-xs font-black text-amber-950 bg-amber-200/80 border border-amber-300 px-2 py-0.5 rounded-lg shadow-2xs">
+                  {formatCurrency(total)}
+                </span>
+              </div>
+
+              {/* Selector de Cuentas */}
+              <div className="space-y-1">
+                <label className="block text-[10px] font-black text-stone-700 uppercase tracking-wider">
+                  ¿A quién va a transferir? (Beneficiario):
+                </label>
+                <div className="relative">
+                  <select
+                    value={selectedTransferAccountId}
+                    onChange={(e) => setSelectedTransferAccountId(e.target.value)}
+                    className="w-full px-3 py-1.5 bg-white text-stone-900 rounded-lg border border-amber-400 focus:border-amber-600 font-black text-xs focus:outline-none shadow-2xs cursor-pointer appearance-none pr-8"
+                  >
+                    {transferAccounts.map((acc) => (
+                      <option key={acc.id} value={acc.id}>
+                        {acc.name} — {acc.bank}
+                      </option>
+                    ))}
+                  </select>
+                  <span className="text-stone-600 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none font-bold text-xs">▼</span>
+                </div>
+              </div>
+
+              {/* Ficha Visual con CLABE y Copiado Rápido */}
+              {selectedTransferAccount && (
+                <div className="bg-white/90 rounded-lg p-2 border border-amber-200 shadow-2xs space-y-1.5 text-[11px]">
+                  <div className="flex items-center justify-between">
+                    <span className="text-stone-500 font-medium">Titular:</span>
+                    <span className="font-black text-stone-900">{selectedTransferAccount.name}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-stone-500 font-medium">Banco:</span>
+                    <span className="font-extrabold text-amber-900 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200 text-[10px]">
+                      {selectedTransferAccount.bank}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between pt-1 border-t border-stone-100 gap-1.5">
+                    <div className="flex-1 min-w-0">
+                      <span className="text-stone-500 font-medium block text-[10px]">CLABE Interbancaria:</span>
+                      <span className="font-mono font-black text-stone-900 bg-stone-100 px-1.5 py-0.5 rounded border border-stone-200 select-all tracking-wider text-[11px] block truncate">
+                        {selectedTransferAccount.clabe}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (navigator.clipboard) {
+                          navigator.clipboard.writeText(selectedTransferAccount.clabe.replace(/\s+/g, ""));
+                          setCopiedClabe(true);
+                          setTimeout(() => setCopiedClabe(false), 2000);
+                        }
+                      }}
+                      className={`px-2 py-1 rounded-md font-bold text-[10px] flex items-center gap-1 transition-all shrink-0 cursor-pointer ${
+                        copiedClabe
+                          ? "bg-emerald-600 text-white"
+                          : "bg-amber-100 hover:bg-amber-200 text-amber-950 border border-amber-300"
+                      }`}
+                      title="Copiar CLABE"
+                    >
+                      {copiedClabe ? (
+                        <>
+                          <Check className="w-3 h-3 text-white" />
+                          <span>¡Copiada!</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="w-3 h-3" />
+                          <span>Copiar</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Referencia o Folio SPEI */}
+              <div>
+                <label className="block text-[10px] font-bold text-stone-600 mb-0.5">
+                  Folio de Rastreo / Referencia SPEI (Opcional):
+                </label>
+                <input
+                  type="text"
+                  placeholder="Ej. SPEI-88219 o nombre del titular"
+                  value={paymentReference}
+                  onChange={(e) => setPaymentReference(e.target.value)}
+                  className="w-full px-2.5 py-1.5 bg-white rounded-lg border border-amber-300 focus:border-amber-500 text-xs font-mono font-bold text-stone-900 focus:outline-none placeholder:font-normal placeholder:text-stone-400 shadow-inner"
+                />
+              </div>
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-2 pt-0.5">
             <button
               type="button"

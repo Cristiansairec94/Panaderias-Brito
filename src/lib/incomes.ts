@@ -260,13 +260,14 @@ export function recordCashIncome(income: {
         try {
           const supabase = createClient();
           const incId = newIncome.id || `ING-${Date.now().toString().slice(-6)}`;
+          const methodTag = (newIncome.paymentMethod || "efectivo").toUpperCase();
           supabase.from("cash_movements").upsert({
             id: incId,
             type: "entrada",
             category: newIncome.category || "otro",
             category_label: newIncome.categoryLabel || "Entrada de Dinero",
             amount: newIncome.amount,
-            reason: newIncome.concept || "Entrada de dinero a caja",
+            reason: `${newIncome.concept || "Entrada de dinero a caja"} [${methodTag}]`,
             authorized_by: newIncome.cashier || "Don Toño Brito",
             branch_id: newIncome.branchId || "branch-matriz",
           }).then(() => {}, () => {});
@@ -283,9 +284,10 @@ export function recordCashIncome(income: {
           category: "otro",
           categoryLabel: newIncome.categoryLabel || "Entrada de Dinero",
           amount: newIncome.amount,
-          reason: newIncome.concept || "Entrada de dinero a caja",
+          reason: `${newIncome.concept || "Entrada de dinero a caja"} [${(newIncome.paymentMethod || "efectivo").toUpperCase()}]`,
           authorizedBy: newIncome.cashier || "Don Toño Brito",
           cashier: newIncome.cashier,
+          paymentMethod: newIncome.paymentMethod,
           timestamp: newIncome.date || formatTime24(new Date()),
         });
       }
@@ -408,7 +410,7 @@ export function syncMissingSalesToIncomes(): void {
               amount: s.total,
               category: "venta_mostrador",
               categoryLabel: "Venta Mostrador (Panadería / POS)",
-              paymentMethod: s.paymentMethod,
+              paymentMethod: (s.paymentMethod || (s as any).payment_method || "efectivo") as any,
               concept: `Compra de mostrador: ${itemsSummary}`,
               customerId: s.customerId,
               customerName:
