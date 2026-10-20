@@ -419,6 +419,21 @@ export default function NextDayDistributionModal({
   const [storedCategories, setStoredCategories] = useState<ProductCategory[]>([]);
   const [storedProducts, setStoredProducts] = useState<Product[]>([]);
   const [breadCategoryFilter, setBreadCategoryFilter] = useState<string>("all");
+  const [isCategoryMenuOpen, setIsCategoryMenuOpen] = useState(false);
+  const categoryMenuRef = useRef<HTMLDivElement>(null);
+
+  // Cerrar menú de categorías con Escape
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        setIsCategoryMenuOpen(false);
+      }
+    }
+    if (isCategoryMenuOpen) {
+      window.addEventListener("keydown", handleKeyDown);
+      return () => window.removeEventListener("keydown", handleKeyDown);
+    }
+  }, [isCategoryMenuOpen]);
 
   useEffect(() => {
     if (isOpen) {
@@ -924,37 +939,37 @@ export default function NextDayDistributionModal({
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pt-2 border-t border-stone-100">
             {/* Filtros de Sucursal y Búsqueda */}
             <div className="flex items-center gap-2 flex-wrap">
-                              <div className="relative">
-                  <select
-                    value={selectedBranchId}
-                    onChange={(e) => setSelectedBranchId(e.target.value)}
-                    className="text-xs font-bold text-stone-800 bg-white border border-stone-200 rounded-xl px-2.5 py-1.5 pr-7 focus:outline-none focus:ring-2 focus:ring-amber-500 cursor-pointer shadow-2xs appearance-none"
-                  >
-                    <option value="all">🏬 Todas las Sucursales</option>
-                    {branches.map((b) => (
-                      <option key={b.id} value={b.id}>
-                        🏬 {b.name}
-                      </option>
-                    ))}
-                  </select>
-                  <ChevronDown className="w-3.5 h-3.5 text-stone-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
-                </div>
+              <div className="relative">
+                <select
+                  value={selectedBranchId}
+                  onChange={(e) => setSelectedBranchId(e.target.value)}
+                  className="text-xs sm:text-sm font-bold text-stone-800 bg-white border border-stone-200 rounded-xl px-3 py-2 pr-8 focus:outline-none focus:ring-2 focus:ring-amber-500 cursor-pointer shadow-2xs appearance-none"
+                >
+                  <option value="all">🏬 Todas las Sucursales</option>
+                  {branches.map((b) => (
+                    <option key={b.id} value={b.id}>
+                      🏬 {b.name}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className="w-4 h-4 text-stone-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+              </div>
 
               {/* Buscador de pan específico */}
-              <div className="relative min-w-[160px] sm:min-w-[200px]">
-                <Search className="w-3.5 h-3.5 text-stone-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <div className="relative min-w-[170px] sm:min-w-[220px]">
+                <Search className="w-4 h-4 text-stone-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                 <input
                   type="text"
                   placeholder="Buscar pan (ej. concha, bolillo)..."
                   value={searchProduct}
                   onChange={(e) => setSearchProduct(e.target.value)}
-                  className="w-full pl-8 pr-2.5 py-1.5 text-xs rounded-xl border border-stone-200 bg-white focus:outline-none focus:ring-2 focus:ring-amber-500 font-medium placeholder:text-stone-400 shadow-2xs"
+                  className="w-full pl-8.5 pr-3 py-2 text-xs sm:text-sm rounded-xl border border-stone-200 bg-white focus:outline-none focus:ring-2 focus:ring-amber-500 font-medium placeholder:text-stone-400 shadow-2xs"
                 />
                 {searchProduct && (
                   <button
                     type="button"
                     onClick={() => setSearchProduct("")}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-700 text-xs font-bold"
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-700 text-sm font-bold"
                   >
                     ×
                   </button>
@@ -966,64 +981,179 @@ export default function NextDayDistributionModal({
 
         {/* Tarjetas KPI Resumen del Día */}
         <div className="p-3 sm:p-4 bg-[#f8f5ef] border-b border-[#e8ded2] grid grid-cols-2 gap-2 sm:gap-3 shrink-0">
-          {/* 1. Categoría de Pan (Desplegable que ocupa todo el cuadro) */}
-          <div className="relative w-full h-full min-h-[66px] bg-white hover:bg-emerald-50/50 border-2 border-emerald-500 rounded-2xl p-2.5 sm:p-3 shadow-2xs flex items-center gap-2.5 sm:gap-3 transition-colors group cursor-pointer">
-            <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-800 font-black text-xl flex items-center justify-center shrink-0">
-              {breadCategoryFilter === "all"
-                ? "🧺"
-                : storedCategories.find((c) => c.id === breadCategoryFilter)?.icon || "🥖"}
-            </div>
-            <div className="min-w-0 flex-1">
-              <span className="text-[10px] sm:text-[11px] uppercase font-black text-emerald-900 block leading-tight truncate">
-                {breadCategoryFilter === "all"
-                  ? "Todas las Categorías de Pan"
-                  : storedCategories.find((c) => c.id === breadCategoryFilter)?.label || "Categoría de Pan"}
-              </span>
-              <div className="flex items-baseline gap-1.5 mt-0.5">
-                <span className="text-xl sm:text-2xl font-black text-emerald-950 block tabular-nums leading-none">
-                  {breadCategoryFilter === "all"
-                    ? totalGlobalPieces
-                    : (categoryPiecesMap[breadCategoryFilter] || 0)}
-                </span>
-                <span className="text-xs font-bold text-stone-500">
-                  {breadCategoryFilter === "all" ? "pzas totales" : "pzas"}
-                </span>
-              </div>
-            </div>
-            <ChevronDown className="w-5 h-5 text-emerald-700 shrink-0 group-hover:translate-y-0.5 transition-transform" />
-
-            {/* Select invisible 100% interactivo que cubre todo el cuadro para que todo sea desplegable */}
-            <select
-              value={breadCategoryFilter}
-              onChange={(e) => setBreadCategoryFilter(e.target.value)}
-              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-              title="Seleccionar categoría de pan"
+          {/* 1. Categoría de Pan (Botón con Desplegable en LETRAS GRANDES) */}
+          <div ref={categoryMenuRef} className="relative w-full">
+            <button
+              type="button"
+              onClick={() => setIsCategoryMenuOpen((prev) => !prev)}
+              aria-haspopup="listbox"
+              aria-expanded={isCategoryMenuOpen}
+              className="w-full h-full min-h-[72px] sm:min-h-[80px] bg-white hover:bg-emerald-50/70 border-2 border-emerald-500 rounded-2xl p-3 sm:p-3.5 shadow-xs flex items-center justify-between gap-2.5 sm:gap-3 transition-all cursor-pointer group text-left focus:outline-none focus:ring-2 focus:ring-emerald-500"
             >
-              <option value="all">
-                🧺 Todas las Categorías de Pan ({totalGlobalPieces} pzas totales)
-              </option>
-              {storedCategories.map((cat) => (
-                <option key={cat.id} value={cat.id}>
-                  {cat.icon || "🥖"} {cat.label} ({categoryPiecesMap[cat.id] || 0} pzas)
-                </option>
-              ))}
-            </select>
+              <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 flex-1">
+                <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-emerald-100 text-emerald-800 font-black text-2xl sm:text-3xl flex items-center justify-center shrink-0 shadow-2xs group-hover:scale-105 transition-transform">
+                  {breadCategoryFilter === "all"
+                    ? "🧺"
+                    : storedCategories.find((c) => c.id === breadCategoryFilter)?.icon || "🥖"}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <span className="text-xs sm:text-sm uppercase font-black text-emerald-900 block leading-tight truncate">
+                    {breadCategoryFilter === "all"
+                      ? "Todas las Categorías de Pan"
+                      : storedCategories.find((c) => c.id === breadCategoryFilter)?.label || "Categoría de Pan"}
+                  </span>
+                  <div className="flex items-baseline gap-2 mt-1">
+                    <span className="text-2xl sm:text-3xl font-black text-emerald-950 block tabular-nums leading-none">
+                      {breadCategoryFilter === "all"
+                        ? totalGlobalPieces
+                        : (categoryPiecesMap[breadCategoryFilter] || 0)}
+                    </span>
+                    <span className="text-xs sm:text-sm font-bold text-stone-600">
+                      {breadCategoryFilter === "all" ? "pzas totales" : "pzas"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-1.5 shrink-0 pl-1">
+                <span className="hidden md:inline-block text-[11px] font-black uppercase text-emerald-700 bg-emerald-100/80 px-2 py-0.5 rounded-lg">
+                  Cambiar
+                </span>
+                <ChevronDown
+                  className={`w-5 h-5 text-emerald-700 transition-transform duration-200 ${
+                    isCategoryMenuOpen ? "rotate-180" : "group-hover:translate-y-0.5"
+                  }`}
+                />
+              </div>
+            </button>
+
+            {/* Menú Desplegable con LETRAS GRANDES para fácil lectura en mostradores y pantallas táctiles */}
+            {isCategoryMenuOpen && (
+              <>
+                {/* Backdrop invisible para cerrar al hacer clic afuera */}
+                <div
+                  className="fixed inset-0 z-40 bg-black/20 backdrop-blur-[0.5px]"
+                  onClick={() => setIsCategoryMenuOpen(false)}
+                />
+
+                <div className="fixed sm:absolute inset-x-3 bottom-6 sm:bottom-auto sm:inset-x-auto sm:left-0 sm:top-[calc(100%+8px)] sm:w-[460px] bg-white rounded-3xl shadow-2xl border-2 border-emerald-500 z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+                  {/* Encabezado del menú */}
+                  <div className="bg-gradient-to-r from-emerald-800 to-teal-800 text-white px-4 py-3 flex items-center justify-between border-b border-emerald-600">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xl">🧺</span>
+                      <span className="text-sm sm:text-base font-black uppercase tracking-wide">
+                        Categorías de Pan
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setIsCategoryMenuOpen(false)}
+                      className="text-emerald-100 hover:text-white text-xs font-black px-2.5 py-1 rounded-xl bg-white/10 hover:bg-white/20 transition-colors cursor-pointer"
+                    >
+                      ✕ Cerrar
+                    </button>
+                  </div>
+
+                  {/* Lista con LETRAS GRANDES */}
+                  <div className="max-h-[380px] sm:max-h-[420px] overflow-y-auto divide-y divide-stone-100 p-2 space-y-1">
+                    {/* 1. Opción Todas las Categorías */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setBreadCategoryFilter("all");
+                        setIsCategoryMenuOpen(false);
+                      }}
+                      className={`w-full text-left px-4 py-3.5 sm:py-4 rounded-2xl flex items-center justify-between gap-3 transition-colors cursor-pointer ${
+                        breadCategoryFilter === "all"
+                          ? "bg-emerald-100/90 text-emerald-950 font-black ring-2 ring-emerald-500/80 shadow-xs"
+                          : "hover:bg-emerald-50/70 text-stone-900 font-bold"
+                      }`}
+                    >
+                      <div className="flex items-center gap-3.5 min-w-0">
+                        <span className="text-2xl sm:text-3xl shrink-0 leading-none">🧺</span>
+                        <span className="text-base sm:text-lg font-black truncate">
+                          Todas las Categorías de Pan
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2.5 shrink-0">
+                        <span
+                          className={`text-sm sm:text-base font-black px-3 py-1 rounded-xl ${
+                            breadCategoryFilter === "all"
+                              ? "bg-emerald-800 text-white"
+                              : "bg-stone-100 text-stone-800"
+                          }`}
+                        >
+                          {totalGlobalPieces} pzas totales
+                        </span>
+                        {breadCategoryFilter === "all" && (
+                          <Check className="w-5 h-5 text-emerald-800 stroke-[3] shrink-0" />
+                        )}
+                      </div>
+                    </button>
+
+                    {/* 2. Categorías Individuales */}
+                    {storedCategories.map((cat) => {
+                      const isSelected = breadCategoryFilter === cat.id;
+                      const pieces = categoryPiecesMap[cat.id] || 0;
+                      return (
+                        <button
+                          key={cat.id}
+                          type="button"
+                          onClick={() => {
+                            setBreadCategoryFilter(cat.id);
+                            setIsCategoryMenuOpen(false);
+                          }}
+                          className={`w-full text-left px-4 py-3.5 sm:py-4 rounded-2xl flex items-center justify-between gap-3 transition-colors cursor-pointer ${
+                            isSelected
+                              ? "bg-emerald-100/90 text-emerald-950 font-black ring-2 ring-emerald-500/80 shadow-xs"
+                              : "hover:bg-emerald-50/70 text-stone-900 font-bold"
+                          }`}
+                        >
+                          <div className="flex items-center gap-3.5 min-w-0">
+                            <span className="text-2xl sm:text-3xl shrink-0 leading-none">
+                              {cat.icon || "🥖"}
+                            </span>
+                            <span className="text-base sm:text-lg font-black truncate">
+                              {cat.label}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2.5 shrink-0">
+                            <span
+                              className={`text-sm sm:text-base font-black px-3 py-1 rounded-xl ${
+                                isSelected
+                                  ? "bg-emerald-800 text-white"
+                                  : "bg-stone-100 text-stone-800"
+                              }`}
+                            >
+                              {pieces} pzas
+                            </span>
+                            {isSelected && (
+                              <Check className="w-5 h-5 text-emerald-800 stroke-[3] shrink-0" />
+                            )}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </>
+            )}
           </div>
 
           {/* 2. Pedidos Programados */}
-          <div className="bg-white p-2.5 sm:p-3 rounded-2xl border border-amber-200/90 shadow-2xs flex items-center gap-2.5 sm:gap-3 min-h-[66px]">
-            <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-900 font-black text-xl flex items-center justify-center shrink-0">
+          <div className="bg-white p-3 sm:p-3.5 rounded-2xl border border-amber-200/90 shadow-xs flex items-center gap-2.5 sm:gap-3 min-h-[72px] sm:min-h-[80px]">
+            <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-amber-100 text-amber-900 font-black text-2xl sm:text-3xl flex items-center justify-center shrink-0 shadow-2xs">
               📦
             </div>
-            <div className="min-w-0">
-              <span className="text-[10px] sm:text-[11px] uppercase font-bold text-stone-400 block leading-tight">
+            <div className="min-w-0 flex-1">
+              <span className="text-xs sm:text-sm uppercase font-bold text-stone-500 block leading-tight">
                 Pedidos Programados
               </span>
-              <div className="flex items-baseline gap-1.5 mt-0.5">
-                <span className="text-xl sm:text-2xl font-black text-stone-900 block tabular-nums leading-none">
+              <div className="flex items-baseline gap-2 mt-1">
+                <span className="text-2xl sm:text-3xl font-black text-stone-900 block tabular-nums leading-none">
                   {totalGlobalOrders}
                 </span>
-                <span className="text-xs font-bold text-stone-500">pedidos</span>
+                <span className="text-xs sm:text-sm font-bold text-stone-500">pedidos</span>
               </div>
             </div>
           </div>
