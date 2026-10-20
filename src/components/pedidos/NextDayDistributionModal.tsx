@@ -198,6 +198,202 @@ function extractItemsFromOrder(order: CustomOrder): { name: string; quantity: nu
   return results.length > 0 ? results : [{ name: desc, quantity: 1 }];
 }
 
+// Función para imprimir la hoja personalizada por sucursal con únicamente el nombre de la sucursal y sus panes requeridos
+function printBranchDeliverySheet(
+  groups: BranchDistributionGroup[],
+  formattedDate: string,
+  dateLabelText: string
+) {
+  if (typeof window === "undefined") return;
+
+  const oldFrame = document.getElementById("brito-delivery-print-frame");
+  if (oldFrame) {
+    oldFrame.remove();
+  }
+
+  const iframe = document.createElement("iframe");
+  iframe.id = "brito-delivery-print-frame";
+  iframe.style.position = "fixed";
+  iframe.style.top = "-9999px";
+  iframe.style.left = "-9999px";
+  iframe.style.width = "850px";
+  iframe.style.height = "1200px";
+  iframe.style.border = "none";
+  iframe.style.zIndex = "-9999";
+  iframe.style.visibility = "visible";
+  document.body.appendChild(iframe);
+
+  const doc = iframe.contentWindow?.document;
+  if (!doc) return;
+
+  const pagesHtml = groups
+    .map((g, pageIdx) => {
+      const itemsRows =
+        g.items.length === 0
+          ? `<tr><td colspan="4" style="text-align: center; padding: 24px; color: #64748b; font-style: italic;">No hay panes requeridos para esta sucursal en esta fecha.</td></tr>`
+          : g.items
+              .map(
+                (it, idx) => `
+          <tr style="border-bottom: 1.5px solid #e2e8f0; ${idx % 2 === 1 ? "background-color: #f8fafc;" : ""}">
+            <td style="padding: 12px 14px; text-align: center; font-weight: 800; color: #64748b; font-family: monospace; font-size: 14px; width: 45px;">
+              ${idx + 1}
+            </td>
+            <td style="padding: 12px 14px; font-weight: 900; font-size: 17px; color: #0f172a; text-transform: uppercase;">
+              ${it.name}
+            </td>
+            <td style="padding: 12px 14px; text-align: center; width: 170px;">
+              <span style="display: inline-block; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-weight: 900; font-size: 22px; color: #065f46; background: #ecfdf5; border: 2px solid #6ee7b7; padding: 5px 16px; border-radius: 8px;">
+                ${it.totalPieces} <span style="font-size: 13px; font-weight: 800; color: #047857;">pzas</span>
+              </span>
+            </td>
+            <td style="padding: 12px 14px; text-align: center; width: 90px;">
+              <div style="display: inline-block; width: 24px; height: 24px; border: 2.5px solid #64748b; border-radius: 5px;"></div>
+            </td>
+          </tr>
+        `
+              )
+              .join("");
+
+      return `
+      <div class="sheet-page" style="${pageIdx < groups.length - 1 ? "page-break-after: always; break-after: page;" : ""} padding: 28px 32px; max-width: 820px; margin: 0 auto;">
+        <!-- ENCABEZADO PERSONALIZADO: ÚNICAMENTE EL NOMBRE DE LA SUCURSAL -->
+        <div style="border-bottom: 3.5px solid #0f172a; padding-bottom: 14px; margin-bottom: 18px;">
+          <div style="display: flex; justify-content: space-between; align-items: flex-end;">
+            <div>
+              <div style="font-size: 12px; font-weight: 900; text-transform: uppercase; letter-spacing: 1.5px; color: #b45309; margin-bottom: 2px;">
+                🥖 PANADERÍA BRITO • HOJA DE REPARTO
+              </div>
+              <h1 style="font-size: 32px; font-weight: 900; color: #0f172a; margin: 0; text-transform: uppercase; letter-spacing: -0.5px; line-height: 1.1;">
+                ${g.branchName}
+              </h1>
+              <div style="font-size: 14px; font-weight: 700; color: #475569; margin-top: 5px;">
+                📅 Fecha de Entrega: <strong style="color: #0f172a;">${formattedDate}</strong> <span style="color: #64748b;">(${dateLabelText})</span>
+              </div>
+            </div>
+            <div style="text-align: right;">
+              <div style="font-size: 11px; font-weight: 800; text-transform: uppercase; color: #64748b; letter-spacing: 0.5px;">
+                Total a Entregar
+              </div>
+              <div style="font-size: 36px; font-weight: 900; font-family: ui-monospace, SFMono-Regular, monospace; color: #0f172a; line-height: 1;">
+                ${g.totalPieces} <span style="font-size: 15px; font-weight: 800; color: #64748b;">pzas</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- NOTA CLARA Y DIRECTA -->
+        <div style="background-color: #f8fafc; border-left: 4.5px solid #0f172a; padding: 10px 14px; margin-bottom: 18px; font-size: 13.5px; font-weight: 700; color: #1e293b;">
+          Panes requeridos para entregar en <strong style="color: #0f172a; text-transform: uppercase;">${g.branchName}</strong>:
+        </div>
+
+        <!-- TABLA DE PANES REQUERIDOS PARA LA SUCURSAL -->
+        <table style="width: 100%; border-collapse: collapse; margin-top: 8px;">
+          <thead>
+            <tr style="background-color: #0f172a; color: #ffffff;">
+              <th style="padding: 10px 12px; font-size: 11px; font-weight: 900; text-transform: uppercase; text-align: center; width: 45px; border-top-left-radius: 6px;">#</th>
+              <th style="padding: 10px 14px; font-size: 12px; font-weight: 900; text-transform: uppercase; text-align: left;">Pan / Producto Requerido</th>
+              <th style="padding: 10px 14px; font-size: 12px; font-weight: 900; text-transform: uppercase; text-align: center; width: 170px;">Cantidad Requerida</th>
+              <th style="padding: 10px 14px; font-size: 12px; font-weight: 900; text-transform: uppercase; text-align: center; width: 90px; border-top-right-radius: 6px;">Chequeo</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${itemsRows}
+          </tbody>
+          <tfoot>
+            <tr style="border-top: 3px solid #0f172a; background-color: #f8fafc;">
+              <td colspan="2" style="padding: 14px; font-weight: 900; font-size: 15px; text-transform: uppercase; color: #0f172a;">
+                Total Piezas para ${g.branchName}:
+              </td>
+              <td style="padding: 14px; text-align: center; font-weight: 900; font-size: 24px; font-family: ui-monospace, SFMono-Regular, monospace; color: #065f46;">
+                ${g.totalPieces} pzas
+              </td>
+              <td></td>
+            </tr>
+          </tfoot>
+        </table>
+
+        <!-- FIRMAS DE CONTROL DE SALIDA Y RECEPCIÓN -->
+        <div style="margin-top: 50px; display: flex; justify-content: space-between; gap: 48px;">
+          <div style="flex: 1; border-top: 1.5px solid #94a3b8; padding-top: 8px; text-align: center; font-size: 12px; font-weight: 700; color: #475569;">
+            Entregó (Taller / Chofer de Reparto)
+          </div>
+          <div style="flex: 1; border-top: 1.5px solid #94a3b8; padding-top: 8px; text-align: center; font-size: 12px; font-weight: 700; color: #475569;">
+            Recibió (${g.branchName})
+          </div>
+        </div>
+      </div>
+      `;
+    })
+    .join("");
+
+  doc.open();
+  doc.write(`<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hoja de Reparto - Panadería Brito</title>
+  <style>
+    @page {
+      size: letter portrait;
+      margin: 10mm 12mm;
+    }
+    @media print {
+      body {
+        margin: 0 !important;
+        padding: 0 !important;
+        background: #ffffff !important;
+        color: #000000 !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      }
+      .sheet-page {
+        page-break-after: always !important;
+        break-after: page !important;
+      }
+      .sheet-page:last-child {
+        page-break-after: avoid !important;
+        break-after: avoid !important;
+      }
+    }
+    *, *::before, *::after {
+      box-sizing: border-box !important;
+    }
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: #ffffff;
+      color: #0f172a;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+  </style>
+</head>
+<body>
+  ${pagesHtml}
+</body>
+</html>`);
+  doc.close();
+
+  if (iframe.contentWindow) {
+    iframe.contentWindow.onafterprint = () => {
+      try {
+        iframe.remove();
+      } catch {}
+    };
+  }
+
+  setTimeout(() => {
+    try {
+      iframe.contentWindow?.focus();
+      iframe.contentWindow?.print();
+    } catch (e) {
+      console.warn("Error al imprimir:", e);
+      window.print();
+    }
+  }, 350);
+}
+
 export default function NextDayDistributionModal({
   isOpen,
   onClose,
@@ -583,9 +779,28 @@ export default function NextDayDistributionModal({
     });
   };
 
-  // Función de impresión limpia
-  const handlePrint = () => {
-    window.print();
+  // Función para imprimir hoja personalizada con únicamente el nombre de la sucursal y sus panes requeridos
+  const handlePrint = (targetGroup?: BranchDistributionGroup) => {
+    let groupsToPrint: BranchDistributionGroup[] = [];
+
+    if (targetGroup) {
+      groupsToPrint = [targetGroup];
+    } else if (selectedBranchId !== "all") {
+      const found = branchGroups.find((g) => g.branchId === selectedBranchId);
+      if (found) {
+        groupsToPrint = [found];
+      }
+    } else {
+      // Filtrar solo las sucursales que tengan piezas requeridas
+      groupsToPrint = branchGroups.filter((g) => g.totalPieces > 0);
+    }
+
+    if (groupsToPrint.length === 0) {
+      alert("No hay piezas de pan programadas para entregar en la fecha seleccionada.");
+      return;
+    }
+
+    printBranchDeliverySheet(groupsToPrint, formatLongDateSpanish(selectedDate), dateLabel);
   };
 
   if (!isOpen) return null;
@@ -654,19 +869,6 @@ export default function NextDayDistributionModal({
                 </span>
               </button>
 
-              {/* Botón Hoy */}
-              <button
-                type="button"
-                onClick={() => setSelectedDate(todayISO)}
-                className={`px-2.5 py-1.5 rounded-xl font-bold text-xs transition-all flex items-center gap-1 cursor-pointer shadow-2xs ${
-                  selectedDate === todayISO
-                    ? "bg-amber-600 text-white shadow-xs scale-102 ring-2 ring-amber-400/40"
-                    : "bg-stone-100 hover:bg-stone-200 text-stone-700"
-                }`}
-              >
-                <span>⏰ Hoy</span>
-              </button>
-
               {/* Botón Pasado Mañana */}
               <button
                 type="button"
@@ -716,12 +918,20 @@ export default function NextDayDistributionModal({
 
               <button
                 type="button"
-                onClick={handlePrint}
+                onClick={() => handlePrint()}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-stone-900 hover:bg-stone-800 text-white font-bold text-xs shadow-xs transition-all cursor-pointer active:scale-95"
-                title="Imprimir hoja de reparto para producción y panaderos"
+                title={
+                  selectedBranchId !== "all"
+                    ? `Imprimir hoja únicamente para ${branches.find((b) => b.id === selectedBranchId)?.name || "esta sucursal"}`
+                    : "Imprimir hoja de reparto por sucursal"
+                }
               >
                 <Printer className="w-3.5 h-3.5 text-stone-300" />
-                <span>Imprimir Hoja</span>
+                <span>
+                  {selectedBranchId !== "all"
+                    ? `Imprimir Hoja (${branches.find((b) => b.id === selectedBranchId)?.name.replace(/^Sucursal\s+/i, "") || "Sucursal"})`
+                    : "Imprimir Hoja"}
+                </span>
               </button>
             </div>
           </div>
@@ -898,10 +1108,10 @@ export default function NextDayDistributionModal({
               <div className="pt-2 flex items-center justify-center gap-2">
                 <button
                   type="button"
-                  onClick={() => setSelectedDate(todayISO)}
+                  onClick={() => setSelectedDate(dayAfterTomorrowISO)}
                   className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-xl shadow-xs transition-colors cursor-pointer"
                 >
-                  Ver pedidos de Hoy
+                  Ver Pasado Mañana ({dayAfterTomorrowISO.slice(5)})
                 </button>
               </div>
             </div>
@@ -1046,6 +1256,18 @@ export default function NextDayDistributionModal({
                             {group.totalPieces} <span className="text-xs font-bold text-stone-500">pzas</span>
                           </span>
                         </div>
+
+                        {hasPieces && (
+                          <button
+                            type="button"
+                            onClick={() => handlePrint(group)}
+                            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-stone-900 hover:bg-stone-800 text-white text-xs font-bold transition-all cursor-pointer shadow-2xs active:scale-95"
+                            title={`Imprimir hoja únicamente para ${group.branchName}`}
+                          >
+                            <Printer className="w-3.5 h-3.5 text-stone-300" />
+                            <span className="hidden sm:inline">Imprimir Hoja</span>
+                          </button>
+                        )}
 
                         {group.orders.length > 0 && (
                           <button
