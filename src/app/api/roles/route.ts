@@ -69,7 +69,7 @@ const DEFAULT_ROLES_DATA: StoredRolesData = {
       canAccessClientes: true,
       canAccessProductos: true,
       canEditPrices: false,
-      canAccessIngresos: true,
+      canAccessIngresos: false,
       canAccessGastos: false,
       canAccessFinanzas: false,
       canAccessCaja: true,
@@ -120,6 +120,10 @@ function normalizeRolesData(parsed: any): StoredRolesData {
       ...mergedPermissions[roleKey],
     };
   });
+
+  if (mergedPermissions.cajero) {
+    mergedPermissions.cajero.canAccessIngresos = false;
+  }
 
   if (mergedPermissions.admin) {
     mergedPermissions.admin = {

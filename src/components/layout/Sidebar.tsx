@@ -193,6 +193,9 @@ export default function Sidebar() {
         const allowed = canAccessRoute ? canAccessRoute(item.href) : true;
         return allowed ? item : null;
       }
+      if (item.id === "ingresos" && (user?.role === "cajero" || !permissions?.canAccessIngresos)) {
+        return null;
+      }
       const allowedChildren = item.items.filter((sub) => {
         const [cleanHref] = sub.href.split("?");
         if (cleanHref === "/configuracion") {

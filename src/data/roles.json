@@ -55,7 +55,7 @@
       "canAccessClientes": true,
       "canAccessProductos": true,
       "canEditPrices": false,
-      "canAccessIngresos": true,
+      "canAccessIngresos": false,
       "canAccessGastos": false,
       "canAccessFinanzas": false,
       "canAccessCaja": true,

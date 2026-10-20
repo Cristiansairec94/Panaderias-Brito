@@ -71,7 +71,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
     canAccessClientes: true,
     canAccessProductos: true,
     canEditPrices: false,
-    canAccessIngresos: true,
+    canAccessIngresos: false,
     canAccessGastos: false,
     canAccessFinanzas: false,
     canAccessCaja: true,
@@ -960,6 +960,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           if (key === "admin") {
             sanitized[key].canAccessDashboard = true;
           }
+          if (key === "cajero") {
+            sanitized[key].canAccessIngresos = false;
+          }
         });
         setRolePermissionsMap((prev) => ({
           ...prev,
@@ -992,6 +995,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               };
               if (key === "admin") {
                 merged[key] = { ...ROLE_PERMISSIONS.admin };
+              }
+              if (key === "cajero") {
+                merged[key].canAccessIngresos = false;
               }
             });
             if (Array.isArray(rolesData.deletedRoleIds)) {
@@ -1250,6 +1256,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           ...(ROLE_PERMISSIONS[user.role] || ROLE_PERMISSIONS.cajero),
           ...(user.permissions || {}),
           ...(rolePermissionsMap[user.role] || {}),
+          ...(user.role === "cajero" ? { canAccessIngresos: false } : {}),
         }
     : {
         canAccessDashboard: false,
