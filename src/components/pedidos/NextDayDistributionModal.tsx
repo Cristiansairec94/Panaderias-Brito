@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo, useRef } from "react";
+import React, { useState, useMemo, useRef, useEffect } from "react";
 import {
   X,
   Truck,
@@ -191,6 +191,22 @@ export default function NextDayDistributionModal({
   const [expandedOrdersList, setExpandedOrdersList] = useState<Record<string, boolean>>({});
 
   const printableRef = useRef<HTMLDivElement>(null);
+
+  // Limpiar residuos en memoria local de planificaciones previas
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      localStorage.removeItem("brito_custom_bread_varieties");
+      const keysToRemove: string[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && k.startsWith("brito_planned_bread_")) {
+          keysToRemove.push(k);
+        }
+      }
+      keysToRemove.forEach((k) => localStorage.removeItem(k));
+    } catch {}
+  }, []);
 
   // Determinar la etiqueta del día seleccionado
   const dateLabel = useMemo(() => {
