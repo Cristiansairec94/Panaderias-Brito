@@ -515,78 +515,100 @@ export function BarcodeCard({
   };
 
   return (
-    <div className="bg-gradient-to-br from-stone-50 via-amber-50/20 to-stone-50 rounded-2xl border-2 border-amber-200/80 p-3.5 space-y-3 shadow-2xs">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-1.5">
-          <div className="w-6 h-6 rounded-lg bg-amber-500 text-stone-950 flex items-center justify-center font-bold">
-            <Barcode className="w-3.5 h-3.5" />
+    <div className="bg-[#101217] rounded-2xl border border-stone-800/90 p-4 space-y-3 shadow-xl text-stone-100">
+      {/* Header (Igual a la Imagen 1) */}
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        {/* Título e Ícono de Código de Barras */}
+        <div className="flex items-center gap-2">
+          <div className="flex items-center text-amber-400 font-mono font-black text-sm tracking-tighter select-none">
+            <span>||||</span>
           </div>
-          <div>
-            <label className="text-xs font-black text-stone-900 flex items-center gap-1.5">
-              <span>Código de Barras del Producto</span>
-              <span className="px-1.5 py-0.2 text-[9px] font-bold bg-amber-100 text-amber-950 rounded-md border border-amber-300">
-                Oficial EAN-13
-              </span>
-            </label>
-          </div>
+          <label className="text-sm font-bold text-white tracking-wide">
+            Código de Barras
+          </label>
         </div>
 
-        {/* Quick Actions */}
-        <div className="flex items-center gap-1.5 flex-wrap justify-end">
+        {/* Botones de Acción (Igual a la Imagen 1) */}
+        <div className="flex items-center gap-2 flex-wrap">
           <button
             type="button"
             onClick={handleActivateScanner}
-            className={`px-2.5 py-1 text-white text-[10px] font-black rounded-lg transition-all flex items-center gap-1.5 cursor-pointer shadow-xs active:scale-95 ${
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer border active:scale-95 ${
               isWaitingForScan
-                ? "bg-emerald-600 ring-2 ring-emerald-400 ring-offset-1 animate-pulse"
-                : "bg-emerald-600 hover:bg-emerald-700 hover:scale-102"
+                ? "bg-emerald-900/80 border-emerald-400 text-emerald-300 ring-2 ring-emerald-500/40 animate-pulse"
+                : "bg-emerald-950/70 hover:bg-emerald-900/80 border-emerald-600/50 text-emerald-400 hover:border-emerald-500"
             }`}
             title="Activar escaneo con lector físico de código de barras (pistola USB / Bluetooth)"
           >
             <ScanLine className="w-3.5 h-3.5 stroke-[2.5]" />
-            <span>{isWaitingForScan ? "Lector Activo..." : "Escanear con Lector"}</span>
+            <span>{isWaitingForScan ? "Lector listo..." : "Escanear de empaque"}</span>
           </button>
 
           <button
             type="button"
-            onClick={onRegenerate}
-            className="px-2.5 py-1 bg-white hover:bg-amber-100 text-amber-950 border border-stone-200 hover:border-amber-300 text-[10px] font-bold rounded-lg transition-all flex items-center gap-1 cursor-pointer shadow-2xs hover:scale-102"
+            onClick={() => {
+              onRegenerate();
+              setScanFeedback("¡Código propio EAN-13 generado!");
+              setTimeout(() => setScanFeedback(null), 2500);
+            }}
+            className="px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer border bg-amber-950/70 hover:bg-amber-900/80 border-amber-600/50 text-amber-300 hover:border-amber-400 active:scale-95"
             title="Generar un nuevo código de barras único para este producto"
           >
-            <RefreshCw className="w-3 h-3 text-amber-700" />
-            <span>Regenerar</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={handlePrintLabel}
-            className="px-2.5 py-1 bg-stone-900 hover:bg-stone-800 text-amber-300 text-[10px] font-bold rounded-lg transition-all flex items-center gap-1 cursor-pointer shadow-2xs hover:scale-102"
-            title="Imprimir etiqueta con código de barras y precio"
-          >
-            <Printer className="w-3 h-3" />
-            <span className="hidden sm:inline">Imprimir Etiqueta</span>
+            <Sparkles className="w-3.5 h-3.5 text-amber-400 stroke-[2.5]" />
+            <span>Generar código propio</span>
           </button>
         </div>
       </div>
 
+      {/* Input de captura directa con lector o manual (Igual a la Imagen 1) */}
+      <div className="relative">
+        <input
+          ref={inputRef}
+          type="text"
+          value={barcode}
+          onChange={(e) => {
+            const val = e.target.value.trim().toUpperCase();
+            onChangeBarcode(val);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              playScanBeep(true);
+              setScanFeedback(`¡Código "${barcode}" asignado correctamente!`);
+              setIsWaitingForScan(false);
+              setTimeout(() => setScanFeedback(null), 3000);
+            }
+          }}
+          placeholder="Dispara con tu lector al código del envase o escribe..."
+          className={`w-full px-4 py-3 bg-[#181a21] rounded-xl border text-sm font-mono font-medium text-stone-100 placeholder:text-stone-500 tracking-wider transition-all focus:outline-none ${
+            isWaitingForScan
+              ? "border-emerald-500 bg-emerald-950/20 ring-2 ring-emerald-500/30 text-emerald-200"
+              : "border-stone-700/80 focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20"
+          }`}
+        />
+        {barcode && (
+          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-mono font-black text-amber-400 bg-amber-950/70 border border-amber-700/60 px-2 py-0.5 rounded-md">
+            {displayBarcode}
+          </span>
+        )}
+      </div>
+
       {/* Banner de Estado del Lector Físico */}
       {isWaitingForScan && (
-        <div className="p-2.5 bg-emerald-50 border-2 border-emerald-500/40 rounded-xl flex items-center justify-between gap-2 animate-in fade-in duration-150">
+        <div className="p-2.5 bg-emerald-950/50 border border-emerald-500/40 rounded-xl flex items-center justify-between gap-2 animate-in fade-in duration-150">
           <div className="flex items-center gap-2">
             <span className="relative flex h-2.5 w-2.5 flex-shrink-0">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
               <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-600"></span>
             </span>
-            <div className="text-[11px] text-emerald-950 font-bold leading-tight">
-              <span>Lector USB conectado y listo: </span>
-              <span className="font-normal text-emerald-800">Apunta la pistola al código del empaque y presiona el gatillo.</span>
+            <div className="text-xs text-emerald-200 font-medium">
+              <strong className="text-emerald-400">Lector listo:</strong> Apunta la pistola al código del envase o empaque y presiona el gatillo.
             </div>
           </div>
           <button
             type="button"
             onClick={() => setIsWaitingForScan(false)}
-            className="text-[10px] font-black text-emerald-800 hover:text-emerald-950 px-2 py-0.5 rounded bg-emerald-100 hover:bg-emerald-200 cursor-pointer flex-shrink-0"
+            className="text-[10px] font-bold text-emerald-400 hover:text-white px-2 py-0.5 rounded bg-emerald-900/60 hover:bg-emerald-800/80 cursor-pointer flex-shrink-0"
           >
             Listo
           </button>
@@ -594,107 +616,60 @@ export function BarcodeCard({
       )}
 
       {scanFeedback && (
-        <div className="p-2 bg-emerald-100 border border-emerald-300 rounded-xl flex items-center gap-2 text-xs font-bold text-emerald-900 animate-in fade-in">
-          <CheckCircle2 className="w-4 h-4 text-emerald-700 flex-shrink-0" />
+        <div className="p-2.5 bg-emerald-950/60 border border-emerald-500/40 rounded-xl flex items-center gap-2 text-xs font-bold text-emerald-300 animate-in fade-in">
+          <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
           <span>{scanFeedback}</span>
         </div>
       )}
 
-      {/* Barcode Visual Graphic Card */}
-      <div 
-        id="active-product-barcode-svg"
-        className="bg-white rounded-xl border-2 border-stone-200 p-3 flex flex-col items-center justify-center shadow-inner relative overflow-hidden group"
-      >
-        <BarcodeSvg barcode={displayBarcode} />
+      {/* Visualización de la etiqueta de Código de Barras (SVG con opciones de copia e impresión) */}
+      <div className="pt-1 space-y-2">
+        <div className="flex items-center justify-between text-xs text-stone-400">
+          <span className="text-[11px] font-medium text-stone-400 flex items-center gap-1.5">
+            <span>Vista de etiqueta comercial:</span>
+            <span className="px-1.5 py-0.2 text-[9px] font-bold bg-amber-950/80 text-amber-300 rounded border border-amber-700/60">
+              EAN-13 Oficial
+            </span>
+          </span>
 
-        {/* Floating copy button */}
-        <button
-          type="button"
-          onClick={handleCopy}
-          className="absolute top-2 right-2 p-1.5 rounded-lg bg-stone-100 hover:bg-amber-100 text-stone-700 hover:text-amber-950 border border-stone-200 transition-all text-[10px] font-bold flex items-center gap-1 opacity-75 group-hover:opacity-100 cursor-pointer shadow-2xs"
-          title="Copiar número de código de barras"
-        >
-          {copied ? (
-            <>
-              <Check className="w-3 h-3 text-emerald-600" />
-              <span className="text-emerald-700 text-[9px] font-bold">Copiado</span>
-            </>
-          ) : (
-            <>
-              <Copy className="w-3 h-3" />
-              <span className="text-[9px]">Copiar</span>
-            </>
-          )}
-        </button>
-      </div>
-
-      {/* Expand / Collapse manual scan or edit */}
-      <div className="space-y-2">
-        <div className="flex items-center justify-between text-[11px] gap-2 flex-wrap">
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-1.5">
             <button
               type="button"
-              onClick={handleActivateScanner}
-              className="text-emerald-700 hover:text-emerald-900 font-black flex items-center gap-1 cursor-pointer transition-colors"
-              title="Colocar el cursor listo para la pistola lectora"
+              onClick={handleCopy}
+              className="px-2.5 py-1 bg-stone-800 hover:bg-stone-700 text-stone-300 hover:text-white rounded-lg text-[10px] font-bold flex items-center gap-1 transition-all cursor-pointer border border-stone-700"
+              title="Copiar número de código de barras"
             >
-              <Zap className="w-3.5 h-3.5 text-emerald-600" />
-              <span>{isWaitingForScan ? "Pistola activa" : "Activar lector de pistola"}</span>
+              {copied ? (
+                <>
+                  <Check className="w-3 h-3 text-emerald-400" />
+                  <span className="text-emerald-400">Copiado</span>
+                </>
+              ) : (
+                <>
+                  <Copy className="w-3 h-3" />
+                  <span>Copiar</span>
+                </>
+              )}
             </button>
 
             <button
               type="button"
-              onClick={() => setIsManualEditOpen(!isManualEditOpen)}
-              className="text-stone-600 hover:text-stone-950 font-bold flex items-center gap-1 cursor-pointer transition-colors"
+              onClick={handlePrintLabel}
+              className="px-2.5 py-1 bg-amber-500 hover:bg-amber-400 text-stone-950 rounded-lg text-[10px] font-black flex items-center gap-1 transition-all cursor-pointer shadow-sm hover:scale-102"
+              title="Imprimir etiqueta con código de barras y precio"
             >
-              <Scan className="w-3.5 h-3.5 text-amber-600" />
-              <span>{isManualEditOpen ? "Ocultar casilla manual" : "Editar número o ver casilla"}</span>
+              <Printer className="w-3 h-3" />
+              <span>Imprimir Etiqueta</span>
             </button>
           </div>
-
-          <span className="font-mono text-[11px] font-black text-amber-950 bg-amber-100/70 border border-amber-300 px-2 py-0.5 rounded-md">
-            {displayBarcode}
-          </span>
         </div>
 
-        {isManualEditOpen && (
-          <div className="p-2.5 bg-white rounded-xl border border-stone-200 space-y-1.5 animate-in fade-in slide-in-from-top-1 duration-150">
-            <label className="text-[10px] font-bold text-stone-700 flex items-center justify-between">
-              <span>Número de Código de Barras (EAN-13 o comercial):</span>
-              <span className="text-emerald-700 font-bold flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                Lector USB / Pistola compatible
-              </span>
-            </label>
-            <div className="relative">
-              <input
-                ref={inputRef}
-                type="text"
-                required
-                value={barcode}
-                onChange={(e) => onChangeBarcode(e.target.value.trim().toUpperCase())}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    playScanBeep(true);
-                    setScanFeedback(`¡Código "${barcode}" asignado correctamente!`);
-                    setIsWaitingForScan(false);
-                    setTimeout(() => setScanFeedback(null), 3000);
-                  }
-                }}
-                placeholder="750100010001"
-                className={`w-full px-3 py-2 rounded-lg border text-xs font-mono font-black text-stone-900 tracking-wider transition-all focus:outline-none ${
-                  isWaitingForScan 
-                    ? "bg-emerald-50/50 border-emerald-500 ring-2 ring-emerald-500/30" 
-                    : "bg-stone-50 border-stone-300 focus:bg-white focus:ring-2 focus:ring-amber-500"
-                }`}
-              />
-            </div>
-            <p className="text-[10px] text-stone-500">
-              Al conectar un lector de código de barras físico (pistola USB o Bluetooth) puedes disparar directamente al empaque en este campo sin necesidad de usar cámara.
-            </p>
-          </div>
-        )}
+        <div 
+          id="active-product-barcode-svg"
+          className="bg-white rounded-xl p-3 flex flex-col items-center justify-center shadow-inner relative overflow-hidden group border border-stone-300"
+        >
+          <BarcodeSvg barcode={displayBarcode} />
+        </div>
       </div>
     </div>
   );
