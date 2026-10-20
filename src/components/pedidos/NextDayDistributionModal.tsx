@@ -367,6 +367,7 @@ export default function NextDayDistributionModal({
         globalPieces += qty;
 
         const normalized = normalizeProductName(it.name);
+        const resolvedCategory = resolveBreadCategory(it.name, it.productId, storedProducts);
 
         // Sumar a la sucursal
         if (!bData.itemsMap.has(normalized)) {
@@ -382,7 +383,9 @@ export default function NextDayDistributionModal({
               deliveryTime: order.deliveryTime,
               quantity: qty,
               order,
+              productId: it.productId,
             }],
+            categoryId: resolvedCategory,
           });
         } else {
           const existing = bData.itemsMap.get(normalized)!;
@@ -398,7 +401,11 @@ export default function NextDayDistributionModal({
             deliveryTime: order.deliveryTime,
             quantity: qty,
             order,
+            productId: it.productId,
           });
+          if (!existing.categoryId) {
+            existing.categoryId = resolvedCategory;
+          }
         }
 
         // Sumar al consolidado global
@@ -415,7 +422,9 @@ export default function NextDayDistributionModal({
               deliveryTime: order.deliveryTime,
               quantity: qty,
               order,
+              productId: it.productId,
             }],
+            categoryId: resolvedCategory,
           });
         } else {
           const gExisting = globalItemsMap.get(normalized)!;
@@ -431,7 +440,11 @@ export default function NextDayDistributionModal({
             deliveryTime: order.deliveryTime,
             quantity: qty,
             order,
+            productId: it.productId,
           });
+          if (!gExisting.categoryId) {
+            gExisting.categoryId = resolvedCategory;
+          }
         }
       });
     });
@@ -471,9 +484,19 @@ export default function NextDayDistributionModal({
       totalGlobalPieces: globalPieces,
       totalGlobalOrders: targetOrders.length,
     };
-  }, [targetOrders, branches]);
+  }, [targetOrders, branches, storedProducts]);
 
-  // Filtrado por buscador y sucursal seleccionada
+  // Conteo de piezas totales por categoría
+  const categoryPiecesMap = useMemo(() => {
+    const map: Record<string, number> = {};
+    globalConsolidated.forEach((item) => {
+      const cat = item.categoryId || resolveBreadCategory(item.name, undefined, storedProducts);
+      map[cat] = (map[cat] || 0) + item.totalPieces;
+    });
+    return map;
+  }, [globalConsolidated, storedProducts]);
+
+  // Filtrado por buscador, sucursal y categoría de pan
   const filteredBranchGroups = useMemo(() => {
     return branchGroups
       .filter((g) => {
@@ -483,26 +506,43 @@ export default function NextDayDistributionModal({
         return true;
       })
       .map((g) => {
-        if (!searchProduct.trim()) return g;
-        const q = normalizeProductName(searchProduct);
-        const filteredItems = g.items.filter((it) =>
-          normalizeProductName(it.name).includes(q)
-        );
+        const filteredItems = g.items.filter((it) => {
+          if (breadCategoryFilter !== "all") {
+            const cat = it.categoryId || resolveBreadCategory(it.name, undefined, storedProducts);
+            if (cat !== breadCategoryFilter) return false;
+          }
+          if (searchProduct.trim()) {
+            const q = normalizeProductName(searchProduct);
+            if (!normalizeProductName(it.name).includes(q)) return false;
+          }
+          return true;
+        });
+
+        const totalP = filteredItems.reduce((acc, it) => acc + it.totalPieces, 0);
+
         return {
           ...g,
           items: filteredItems,
+          totalPieces: totalP,
         };
-      });
-  }, [branchGroups, selectedBranchId, searchProduct]);
+      })
+      .filter((g) => (breadCategoryFilter === "all" && !searchProduct.trim()) || g.items.length > 0);
+  }, [branchGroups, selectedBranchId, breadCategoryFilter, searchProduct, storedProducts]);
 
-  // Filtrado de lista consolidada global
+  // Filtrado de lista consolidada global por categoría y buscador
   const filteredConsolidated = useMemo(() => {
-    if (!searchProduct.trim()) return globalConsolidated;
-    const q = normalizeProductName(searchProduct);
-    return globalConsolidated.filter((it) =>
-      normalizeProductName(it.name).includes(q)
-    );
-  }, [globalConsolidated, searchProduct]);
+    return globalConsolidated.filter((it) => {
+      if (breadCategoryFilter !== "all") {
+        const cat = it.categoryId || resolveBreadCategory(it.name, undefined, storedProducts);
+        if (cat !== breadCategoryFilter) return false;
+      }
+      if (searchProduct.trim()) {
+        const q = normalizeProductName(searchProduct);
+        if (!normalizeProductName(it.name).includes(q)) return false;
+      }
+      return true;
+    });
+  }, [globalConsolidated, breadCategoryFilter, searchProduct, storedProducts]);
 
   // Conteo de sucursales activas (con al menos 1 pieza de pan)
   const activeBranchesCount = useMemo(() => {
@@ -763,31 +803,65 @@ export default function NextDayDistributionModal({
 
         {/* Tarjetas KPI Resumen del Día */}
         <div className="p-3 sm:p-4 bg-[#f8f5ef] border-b border-[#e8ded2] grid grid-cols-2 gap-2 sm:gap-3 shrink-0">
-          <div className="bg-white p-2.5 sm:p-3 rounded-2xl border border-emerald-200/90 shadow-2xs flex items-center gap-3">
+          {/* 1. Categoría de Pan (Desplegable que ocupa todo el cuadro) */}
+          <div className="relative w-full h-full min-h-[66px] bg-white hover:bg-emerald-50/50 border-2 border-emerald-500 rounded-2xl p-2.5 sm:p-3 shadow-2xs flex items-center gap-2.5 sm:gap-3 transition-colors group cursor-pointer">
             <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-800 font-black text-xl flex items-center justify-center shrink-0">
-              🥖
+              {breadCategoryFilter === "all"
+                ? "🧺"
+                : storedCategories.find((c) => c.id === breadCategoryFilter)?.icon || "🥖"}
             </div>
-            <div className="min-w-0">
-              <span className="text-[10px] uppercase font-bold text-stone-400 block leading-tight">
-                Total Piezas de Pan
+            <div className="min-w-0 flex-1">
+              <span className="text-[10px] sm:text-[11px] uppercase font-black text-emerald-900 block leading-tight truncate">
+                {breadCategoryFilter === "all"
+                  ? "Todas las Categorías de Pan"
+                  : storedCategories.find((c) => c.id === breadCategoryFilter)?.label || "Categoría de Pan"}
               </span>
-              <span className="text-xl sm:text-2xl font-black text-emerald-950 block tabular-nums">
-                {totalGlobalPieces} <span className="text-xs font-bold text-stone-500">pzas</span>
-              </span>
+              <div className="flex items-baseline gap-1.5 mt-0.5">
+                <span className="text-xl sm:text-2xl font-black text-emerald-950 block tabular-nums leading-none">
+                  {breadCategoryFilter === "all"
+                    ? totalGlobalPieces
+                    : (categoryPiecesMap[breadCategoryFilter] || 0)}
+                </span>
+                <span className="text-xs font-bold text-stone-500">
+                  {breadCategoryFilter === "all" ? "pzas totales" : "pzas"}
+                </span>
+              </div>
             </div>
+            <ChevronDown className="w-5 h-5 text-emerald-700 shrink-0 group-hover:translate-y-0.5 transition-transform" />
+
+            {/* Select invisible 100% interactivo que cubre todo el cuadro para que todo sea desplegable */}
+            <select
+              value={breadCategoryFilter}
+              onChange={(e) => setBreadCategoryFilter(e.target.value)}
+              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+              title="Seleccionar categoría de pan"
+            >
+              <option value="all">
+                🧺 Todas las Categorías de Pan ({totalGlobalPieces} pzas totales)
+              </option>
+              {storedCategories.map((cat) => (
+                <option key={cat.id} value={cat.id}>
+                  {cat.icon || "🥖"} {cat.label} ({categoryPiecesMap[cat.id] || 0} pzas)
+                </option>
+              ))}
+            </select>
           </div>
 
-          <div className="bg-white p-2.5 sm:p-3 rounded-2xl border border-amber-200/90 shadow-2xs flex items-center gap-3">
+          {/* 2. Pedidos Programados */}
+          <div className="bg-white p-2.5 sm:p-3 rounded-2xl border border-amber-200/90 shadow-2xs flex items-center gap-2.5 sm:gap-3 min-h-[66px]">
             <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-900 font-black text-xl flex items-center justify-center shrink-0">
               📦
             </div>
             <div className="min-w-0">
-              <span className="text-[10px] uppercase font-bold text-stone-400 block leading-tight">
+              <span className="text-[10px] sm:text-[11px] uppercase font-bold text-stone-400 block leading-tight">
                 Pedidos Programados
               </span>
-              <span className="text-xl sm:text-2xl font-black text-stone-900 block tabular-nums">
-                {totalGlobalOrders} <span className="text-xs font-bold text-stone-500">pedidos</span>
-              </span>
+              <div className="flex items-baseline gap-1.5 mt-0.5">
+                <span className="text-xl sm:text-2xl font-black text-stone-900 block tabular-nums leading-none">
+                  {totalGlobalOrders}
+                </span>
+                <span className="text-xs font-bold text-stone-500">pedidos</span>
+              </div>
             </div>
           </div>
         </div>
