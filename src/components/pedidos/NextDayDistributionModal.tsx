@@ -50,7 +50,9 @@ export interface BreadSummaryItem {
     deliveryTime?: string;
     quantity: number;
     order: CustomOrder;
+    productId?: string;
   }[];
+  categoryId?: string;
 }
 
 // Resumen por sucursal
@@ -117,13 +119,42 @@ const normalizeProductName = (name: string): string => {
     .trim();
 };
 
+// Determinador inteligente de categoría de pan
+function resolveBreadCategory(breadName: string, productId?: string, products: Product[] = []): string {
+  if (productId) {
+    const p = products.find((sp) => sp.id === productId);
+    if (p && p.category) return p.category;
+  }
+  const norm = normalizeProductName(breadName);
+  const p = products.find((sp) => normalizeProductName(sp.name) === norm);
+  if (p && p.category) return p.category;
+
+  if (/bolillo|telera|baguette|birote|pan blanco|barra/i.test(norm)) {
+    return "pan_blanco";
+  }
+  if (/pastel|pay|tarta|cheesecake|gelatina|reposteria|cupcake|flan/i.test(norm)) {
+    return "pasteleria";
+  }
+  if (/cafe|café|refresco|agua|bebida|te|té|leche|chocolate/i.test(norm)) {
+    return "bebidas";
+  }
+  if (/temporada|muerto|rosca/i.test(norm)) {
+    return "temporada";
+  }
+  if (/harina|arina|mantequilla|levadura|materia/i.test(norm)) {
+    return "materia_prima";
+  }
+  return "pan_dulce";
+}
+
 // Extractor robusto de productos y piezas desde cualquier pedido
-function extractItemsFromOrder(order: CustomOrder): { name: string; quantity: number }[] {
+function extractItemsFromOrder(order: CustomOrder): { name: string; quantity: number; productId?: string }[] {
   // 1. Si el pedido tiene items estructurados en array
   if (Array.isArray(order.items) && order.items.length > 0) {
     return order.items.map((it) => ({
       name: (it.name || "Pan").trim(),
       quantity: Number(it.quantity) || 1,
+      productId: it.productId,
     }));
   }
 
@@ -133,7 +164,7 @@ function extractItemsFromOrder(order: CustomOrder): { name: string; quantity: nu
     return [{ name: "Pedido de Pan Encargado", quantity: 1 }];
   }
 
-  const results: { name: string; quantity: number }[] = [];
+  const results: { name: string; quantity: number; productId?: string }[] = [];
   const rawParts = desc.split(/[,;\n+]+/).map((p) => p.trim()).filter(Boolean);
 
   for (const part of rawParts) {
