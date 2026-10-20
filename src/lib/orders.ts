@@ -1,6 +1,6 @@
 import { CLEAN_SLATE_EPOCH } from "@/lib/wipeOperationalData";
 import { CustomOrder, OrderItem, OrderPayment, CashIncome, Sale } from "@/types";
-import { formatCurrency, formatDateTimeSafe, parseDateTimeSafe, getStoredShiftStartBoundary, resolveBranchId, formatTime24 } from "@/lib/utils";
+import { formatCurrency, formatDateTimeSafe, parseDateTimeSafe, getStoredShiftStartBoundary, resolveBranchId, formatTime24, matchesCashier, isAdminCashier } from "@/lib/utils";
 import { realtimeHub } from "@/lib/realtime/realtimeHub";
 import { createClient } from "@/lib/supabase/client";
 import { enqueueSyncItem, markRecordIdsAsSynced, getSyncQueue } from "@/lib/sync/syncService";
@@ -501,7 +501,7 @@ export interface OrderShiftCollection {
  * estrictamente dentro del turno activo (>= shiftBoundary), evitando que pedidos
  * de días o turnos anteriores inflen la caja actual.
  */
-export function getOrderShiftCollection(order: any, shiftBoundary: number, targetBranchId?: string): OrderShiftCollection {
+export function getOrderShiftCollection(order: any, shiftBoundary: number, targetBranchId?: string, targetCashier?: string): OrderShiftCollection {
   const empty: OrderShiftCollection = {
     isInShift: false,
     isCreatedInShift: false,
@@ -514,6 +514,7 @@ export function getOrderShiftCollection(order: any, shiftBoundary: number, targe
   if (!order || order.status === "cancelado") return empty;
 
   const effectiveBoundary = Math.max(shiftBoundary || 0, CLEAN_SLATE_EPOCH);
+  const enforceCashier = Boolean(targetCashier && targetCashier.trim() && !isAdminCashier(targetCashier));
 
   const rawNotes = String(order.notes || "");
   const originMatch = rawNotes.match(/\[Origen:\s*([^\|\]\r\n]+)(?:\|([^\]\r\n]+))?\]/);
@@ -532,7 +533,8 @@ export function getOrderShiftCollection(order: any, shiftBoundary: number, targe
   const createdRaw = order.createdAt || order.created_at || order.date;
   const createdTs = parseDateTimeSafe(createdRaw);
   const isOriginBranchMatch = !targetBranchId || targetBranchId === "all" || orderOriginBranch === targetBranchId;
-  const isCreatedInShift = isOriginBranchMatch && createdTs > effectiveBoundary && createdTs <= Date.now() + 60000;
+  const isOrderCashierMatch = !enforceCashier || matchesCashier(order.cashier, targetCashier);
+  const isCreatedInShift = isOriginBranchMatch && isOrderCashierMatch && createdTs > effectiveBoundary && createdTs <= Date.now() + 60000;
 
   const total = Number(order.total) || 0;
   const deposit = Number(order.deposit) || 0;
@@ -551,6 +553,10 @@ export function getOrderShiftCollection(order: any, shiftBoundary: number, targe
       if (amt <= 0) continue;
 
       const pCashier = p.cashier || order.cashier;
+      if (enforceCashier && !matchesCashier(pCashier, targetCashier)) {
+        continue;
+      }
+
       const pBranch = p.operatingBranchId
         ? resolveBranchId(p.operatingBranchId, pCashier)
         : (pCashier && !/don toño|admin|carlos/i.test(String(pCashier))

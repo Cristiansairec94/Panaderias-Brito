@@ -393,15 +393,27 @@ interface BranchContextType {
   };
 }
 
-export function syncBranchWithUsers(branch: Branch, users: any[]): Branch {
+export function syncBranchWithUsers(branch: Branch, users: any[], activeUser?: any): Branch {
   if (!branch || !branch.id) return branch;
 
   const cleanAssignedId = isRetiredDemoCashier(branch.assignedUserId) ? undefined : branch.assignedUserId;
   const cleanAssignedName = isRetiredDemoCashier(branch.assignedUserName) ? undefined : branch.assignedUserName;
   const cleanManager = isRetiredDemoCashier(branch.manager) ? "Don Toño Brito" : (branch.manager || "Don Toño Brito");
 
+  const isLoggedBranchUser = Boolean(
+    activeUser &&
+    activeUser.name &&
+    !isAdminCashier(activeUser.name) &&
+    activeUser.role !== "admin" &&
+    activeUser.id !== "usr-1" &&
+    activeUser.id !== "usr-2" &&
+    (activeUser.assignedBranchId === branch.id || resolveBranchId(activeUser.assignedBranchId, activeUser.name) === branch.id)
+  );
+
   // 1. Buscar usuario asignado explícitamente por ID que esté activo y NO sea administrador
-  let assignedUser = cleanAssignedId
+  let assignedUser = isLoggedBranchUser
+    ? activeUser
+    : cleanAssignedId
     ? (users || []).find((u: any) => u.id === cleanAssignedId && u.status !== "inactivo" && !isAdminCashier(u.name) && u.role !== "admin" && u.id !== "usr-1" && u.id !== "usr-2")
     : undefined;
 
@@ -444,9 +456,19 @@ export function syncBranchWithUsers(branch: Branch, users: any[]): Branch {
     (users || []).some((u: any) => u.status !== "inactivo" && (matchesCashier(u.name, candidateCashier) || matchesCashier(u.username, candidateCashier)))
   );
 
-  const effectiveCashier = isCandidateValid
+  const effectiveCashier = isLoggedBranchUser
+    ? activeUser.name
+    : isCandidateValid
     ? candidateCashier!
     : (assignedUser ? assignedUser.name : cleanManager);
+
+  const isUserAfternoon = isLoggedBranchUser
+    ? isAfternoonShift(activeUser.shiftName || activeUser.shift || activeUser.roleLabel, activeUser.name, activeUser)
+    : false;
+
+  const effectiveShiftName = isLoggedBranchUser
+    ? (isUserAfternoon ? "Turno Vespertino (14:00 - 22:00)" : "Turno Matutino (06:00 - 14:00)")
+    : (branch.currentShift?.name || "Turno Matutino (06:00 - 14:00)");
 
   return {
     ...branch,
@@ -456,12 +478,13 @@ export function syncBranchWithUsers(branch: Branch, users: any[]): Branch {
     manager: assignedUser?.name || cleanManager,
     currentShift: branch.currentShift ? {
       ...branch.currentShift,
+      name: effectiveShiftName,
       cashier: effectiveCashier,
     } : {
       id: `shift-${branch.id}`,
-      name: "Turno Matutino (06:00 - 14:00)",
+      name: effectiveShiftName,
       cashier: effectiveCashier,
-      openedAt: "06:00 AM",
+      openedAt: isLoggedBranchUser && isUserAfternoon ? "14:00 PM" : "06:00 AM",
       initialFund: 0,
       cashSales: 0,
       cardSales: 0,
@@ -660,12 +683,13 @@ function resolveBranchParam(param: string | null): string | null {
     setBranches((prevBranches) => {
       let changed = false;
       const reconciled = prevBranches.map((b) => {
-        const synced = syncBranchWithUsers(b, usersList);
+        const synced = syncBranchWithUsers(b, usersList, user);
         if (
           synced.manager !== b.manager ||
           synced.assignedUserName !== b.assignedUserName ||
           synced.assignedUserId !== b.assignedUserId ||
-          synced.currentShift?.cashier !== b.currentShift?.cashier
+          synced.currentShift?.cashier !== b.currentShift?.cashier ||
+          synced.currentShift?.name !== b.currentShift?.name
         ) {
           changed = true;
           return synced;
@@ -680,7 +704,7 @@ function resolveBranchParam(param: string | null): string | null {
       }
       return prevBranches;
     });
-  }, [usersList]);
+  }, [usersList, user]);
 
   // Escuchar eventos de actualización de perfiles desde cualquier pestaña o componente del administrador
   useEffect(() => {
@@ -691,7 +715,7 @@ function resolveBranchParam(param: string | null): string | null {
           const parsed = JSON.parse(raw);
           if (Array.isArray(parsed) && parsed.length > 0) {
             setBranches((prev) => {
-              const reconciled = prev.map((b) => syncBranchWithUsers(b, parsed));
+              const reconciled = prev.map((b) => syncBranchWithUsers(b, parsed, userRef.current));
               try {
                 localStorage.setItem("brito_branches_data", JSON.stringify(reconciled));
               } catch {}
@@ -716,6 +740,16 @@ function resolveBranchParam(param: string | null): string | null {
   const [recentSimulatedSales, setRecentSimulatedSales] = useState<SimulatedSale[]>([]);
   const [cashMovements, setCashMovements] = useState<BranchCashMovement[]>(DEFAULT_CASH_MOVEMENTS);
   const syncBranchesRef = useRef<() => void>(() => {});
+  const userRef = useRef(user);
+  const usersListRef = useRef(usersList);
+  const permissionsRef = useRef(permissions);
+
+  useEffect(() => {
+    userRef.current = user;
+    usersListRef.current = usersList;
+    permissionsRef.current = permissions;
+    syncBranchesRef.current?.();
+  }, [user, usersList, permissions]);
 
   // Load state from localStorage & Server API
   useEffect(() => {
@@ -914,9 +948,9 @@ function resolveBranchParam(param: string | null): string | null {
             }
           });
 
-          // Límite estricto del turno actual para cada sucursal: último corte cerrado de esa sucursal o CLEAN_SLATE_EPOCH
+          // Límite estricto del turno actual para cada sucursal: inicio de hoy o último corte cerrado de esa sucursal
           const getShiftLimit = (bId: string): number => {
-            return Math.max(CLEAN_SLATE_EPOCH, cutTimestampByBranch.get(bId) || 0);
+            return Math.max(CLEAN_SLATE_EPOCH, todayStartTs, cutTimestampByBranch.get(bId) || 0);
           };
 
           // Sincronizar historial de cortes y límites de turno en localStorage para todas las pantallas del navegador
@@ -1217,6 +1251,7 @@ function resolveBranchParam(param: string | null): string | null {
             dayAccumulatedPieces: number;
             lastCashier?: string;
             branchName?: string;
+            productCounts: Map<string, { name: string; piecesSold: number; revenue: number; category: string; icon: string }>;
           }>();
 
           const initBranchAgg = () => ({
@@ -1243,6 +1278,7 @@ function resolveBranchParam(param: string | null): string | null {
             dayAccumulatedPieces: 0,
             lastCashier: undefined as string | undefined,
             branchName: undefined as string | undefined,
+            productCounts: new Map<string, { name: string; piecesSold: number; revenue: number; category: string; icon: string }>(),
           });
 
           const currentDeletedIds = getDeletedBranchIds();
@@ -1261,6 +1297,75 @@ function resolveBranchParam(param: string | null): string | null {
             return resolveBranchId(rawBranchId, cashierName);
           };
 
+          const currentUser = userRef.current;
+          const currentUsers = (usersListRef.current && usersListRef.current.length > 0) ? usersListRef.current : usersList;
+          const isCurrentAdmin =
+            isAdministrativeUser(currentUser, permissionsRef.current) &&
+            !Boolean(
+              currentUser &&
+              currentUser.role !== "admin" &&
+              currentUser.id !== "usr-1" &&
+              currentUser.id !== "usr-2" &&
+              currentUser.assignedBranchId
+            );
+          const userScopedBranchId = (!isCurrentAdmin && currentUser)
+            ? resolveBranchId(currentUser.assignedBranchId, currentUser.name)
+            : undefined;
+          const userScopedCashier = (!isCurrentAdmin && currentUser && currentUser.name && !isAdminCashier(currentUser.name))
+            ? currentUser.name
+            : undefined;
+
+          // Si el usuario operativo ya cerró su turno hoy y no se ha abierto otro turno para él, determinar si su turno está cerrado
+          const getUserShiftStartBoundary = (bId: string): number => {
+            const baseLimit = getShiftLimit(bId);
+            if (bId === userScopedBranchId && userScopedCashier) {
+              let latestUserCutTs = 0;
+              allCutsList.forEach((c) => {
+                let cBranch = c.branchId || "branch-matriz";
+                if (cBranch === "branch-matriz" && (c.responsible || c.outgoingCashier)) {
+                  cBranch = resolveBranchId(c.branchId, c.responsible || c.outgoingCashier);
+                }
+                if (cBranch !== bId) return;
+                const cTs = c.timestamp || parseDateTimeSafe(c.date);
+                if (cTs >= todayStartTs && (matchesCashier(c.outgoingCashier, userScopedCashier) || matchesCashier(c.incomingCashier, userScopedCashier))) {
+                  if (cTs > latestUserCutTs) latestUserCutTs = cTs;
+                }
+              });
+              return Math.max(baseLimit, latestUserCutTs);
+            }
+            return baseLimit;
+          };
+
+          const accumulateSaleProducts = (
+            cur: { productCounts: Map<string, { name: string; piecesSold: number; revenue: number; category: string; icon: string }> },
+            rawItems: any[]
+          ) => {
+            if (!Array.isArray(rawItems)) return;
+            rawItems.forEach((it: any) => {
+              if (!it) return;
+              const prod = it.product || it;
+              const name = String(prod.product_name || prod.name || "").trim();
+              if (!name || name === "Venta en mostrador") return;
+              const qty = Number(it.quantity) || 1;
+              const price = Number(prod.unit_price || prod.price) || 0;
+              const rev = Number(it.subtotal) || qty * price;
+              const rawCat = String(prod.category || "").toLowerCase();
+              const isPastel = rawCat.includes("pastel") || rawCat.includes("pay") || name.toLowerCase().includes("pastel");
+              const isHojaldre = rawCat.includes("hojaldre") || name.toLowerCase().includes("cuerno") || name.toLowerCase().includes("oreja");
+              const isSalado = rawCat.includes("salado") || rawCat.includes("blanco") || name.toLowerCase().includes("bolillo") || name.toLowerCase().includes("telera");
+              const category = isPastel ? "Pastelería" : isHojaldre ? "Hojaldre" : isSalado ? "Pan Salado" : "Pan Dulce";
+              const icon = isPastel ? "🍰" : isHojaldre ? "🥐" : "🥖";
+              const key = name.toLowerCase();
+              const prevProd = cur.productCounts.get(key);
+              if (prevProd) {
+                prevProd.piecesSold += qty;
+                prevProd.revenue += rev;
+              } else {
+                cur.productCounts.set(key, { name, piecesSold: qty, revenue: rev, category, icon });
+              }
+            });
+          };
+
           // 1. Agregar ventas de mostrador (filtrando turno activo vs acumulado de hoy)
           const seenSaleIds = new Set<string>();
           dbSales.forEach((s: any) => {
@@ -1270,6 +1375,9 @@ function resolveBranchParam(param: string | null): string | null {
             if (sId) seenSaleIds.add(sId);
 
             const bId = resolveBranchForRecord(s.branch_id, s.cashier);
+            if (bId === userScopedBranchId && userScopedCashier && !matchesCashier(s.cashier, userScopedCashier)) {
+              return;
+            }
             let cur = branchAgg.get(bId);
             if (!cur) {
               cur = initBranchAgg();
@@ -1277,7 +1385,7 @@ function resolveBranchParam(param: string | null): string | null {
             }
             const amt = Number(s.total) || 0;
             const saleTime = parseDateTimeSafe(s.created_at || s.date);
-            const shiftLimit = getShiftLimit(bId);
+            const shiftLimit = getUserShiftStartBoundary(bId);
             const rawItems = Array.isArray(s.sale_items) ? s.sale_items : Array.isArray(s.items) ? s.items : [];
             const salePieces = rawItems.reduce((acc: number, it: any) => acc + (Number(it.quantity) || 0), 0);
 
@@ -1296,6 +1404,7 @@ function resolveBranchParam(param: string | null): string | null {
               else if (s.payment_method === "transferencia") cur.deskTransfer += amt;
               else cur.deskCash += amt;
               if (s.cashier) cur.lastCashier = s.cashier;
+              accumulateSaleProducts(cur, rawItems);
             }
           });
 
@@ -1314,6 +1423,9 @@ function resolveBranchParam(param: string | null): string | null {
                     if (sId) seenSaleIds.add(sId);
 
                     const bId = resolveBranchForRecord(s.branchId || s.branch_id, s.cashier);
+                    if (bId === userScopedBranchId && userScopedCashier && !matchesCashier(s.cashier, userScopedCashier)) {
+                      return;
+                    }
                     let cur = branchAgg.get(bId);
                     if (!cur) {
                       cur = initBranchAgg();
@@ -1321,7 +1433,7 @@ function resolveBranchParam(param: string | null): string | null {
                     }
                     const amt = Number(s.total) || 0;
                     const saleTime = parseDateTimeSafe(s.timestamp || s.createdAt || s.date);
-                    const shiftLimit = getShiftLimit(bId);
+                    const shiftLimit = getUserShiftStartBoundary(bId);
                     const rawItems = Array.isArray(s.items) ? s.items : Array.isArray(s.sale_items) ? s.sale_items : [];
                     const salePieces = rawItems.reduce((acc: number, it: any) => acc + (Number(it.quantity) || 0), 0);
 
@@ -1339,6 +1451,7 @@ function resolveBranchParam(param: string | null): string | null {
                       else if (pm === "transferencia") cur.deskTransfer += amt;
                       else cur.deskCash += amt;
                       if (s.cashier) cur.lastCashier = s.cashier;
+                      accumulateSaleProducts(cur, rawItems);
                     }
                   });
                 }
@@ -1357,8 +1470,9 @@ function resolveBranchParam(param: string | null): string | null {
             const ordPieces = ordItems.reduce((acc: number, it: any) => acc + (Number(it.quantity) || 0), 0);
 
             branchAgg.forEach((cur, bId) => {
-              const shiftLimit = getShiftLimit(bId);
-              const dayCol = getOrderShiftCollection(o, todayStartTs, bId);
+              const shiftLimit = getUserShiftStartBoundary(bId);
+              const targetCashierForOrders = (bId === userScopedBranchId && userScopedCashier) ? userScopedCashier : undefined;
+              const dayCol = getOrderShiftCollection(o, todayStartTs, bId, targetCashierForOrders);
               if (dayCol.collectedTotal > 0) {
                 cur.dayAccumulatedOrdersDeposit += dayCol.collectedTotal;
               }
@@ -1366,7 +1480,7 @@ function resolveBranchParam(param: string | null): string | null {
                 cur.dayAccumulatedPieces += ordPieces;
               }
 
-              const shiftCol = getOrderShiftCollection(o, shiftLimit, bId);
+              const shiftCol = getOrderShiftCollection(o, shiftLimit, bId, targetCashierForOrders);
               if (shiftCol.isInShift) {
                 cur.orderTotal += shiftCol.orderTotalInShift;
                 cur.orderCount += 1;
@@ -1392,6 +1506,9 @@ function resolveBranchParam(param: string | null): string | null {
               if (!pedKey || !countedOrderNums.has(pedKey)) {
                 if (pedKey) countedOrderNums.add(pedKey);
                 const bId = resolveBranchForRecord(m.branch_id, m.authorized_by);
+                if (bId === userScopedBranchId && userScopedCashier && !matchesCashier(m.authorized_by, userScopedCashier)) {
+                  return;
+                }
                 let cur = branchAgg.get(bId);
                 if (!cur) {
                   cur = initBranchAgg();
@@ -1399,7 +1516,7 @@ function resolveBranchParam(param: string | null): string | null {
                 }
                 const amt = Number(m.amount) || 0;
                 const movTime = parseDateTimeSafe(m.created_at);
-                const shiftLimit = getShiftLimit(bId);
+                const shiftLimit = getUserShiftStartBoundary(bId);
                 if (movTime >= todayStartTs && amt > 0) cur.dayAccumulatedOrdersDeposit += amt;
                 if (movTime > shiftLimit && amt > 0) {
                   cur.orderTotal += amt;
@@ -1421,6 +1538,9 @@ function resolveBranchParam(param: string | null): string | null {
             if (m.type === "entrada" && Number(m.amount) === 6000) return; // Duplicado fantasma de pedido de 6000
             if (m.id && (m.id.includes("ING-ING") || m.id.includes("mov-mov-") || m.id.includes("012599") || m.id.includes("331037") || m.amount > 500000)) return;
             const bId = resolveBranchForRecord(m.branch_id, m.authorized_by);
+            if (bId === userScopedBranchId && userScopedCashier && !matchesCashier(m.authorized_by, userScopedCashier)) {
+              return;
+            }
             let cur = branchAgg.get(bId);
             if (!cur) {
               cur = initBranchAgg();
@@ -1428,7 +1548,7 @@ function resolveBranchParam(param: string | null): string | null {
             }
             const amt = Number(m.amount) || 0;
             const movTime = parseDateTimeSafe(m.created_at);
-            const shiftLimit = getShiftLimit(bId);
+            const shiftLimit = getUserShiftStartBoundary(bId);
             if (movTime > shiftLimit) {
               if (m.type === "entrada") {
                 cur.cashInflow += amt;
@@ -1456,6 +1576,9 @@ function resolveBranchParam(param: string | null): string | null {
                     if (Number(inc.amount) === 6000) return; // Duplicado fantasma de pedido de 6000
                     if (dbMovs.some((m: any) => m.id === inc.id)) return;
                     const bId = resolveBranchForRecord(inc.branchId || inc.branch_id, inc.cashier);
+                    if (bId === userScopedBranchId && userScopedCashier && !matchesCashier(inc.cashier, userScopedCashier)) {
+                      return;
+                    }
                     let cur = branchAgg.get(bId);
                     if (!cur) {
                       cur = initBranchAgg();
@@ -1463,7 +1586,7 @@ function resolveBranchParam(param: string | null): string | null {
                     }
                     const amt = Number(inc.amount) || 0;
                     const t = parseDateTimeSafe(inc.timestamp || inc.date || inc.createdAt);
-                    const shiftLimit = getShiftLimit(bId);
+                    const shiftLimit = getUserShiftStartBoundary(bId);
                     if (t > shiftLimit && (inc.paymentMethod === "efectivo" || !inc.paymentMethod)) {
                       cur.cashInflow += amt;
                       cur.movNet += amt;
@@ -1480,13 +1603,16 @@ function resolveBranchParam(param: string | null): string | null {
             if (!e) return;
             if (e.id) seenExpIds.add(String(e.id));
             const bId = resolveBranchForRecord(e.branch_id, e.cashier);
+            if (bId === userScopedBranchId && userScopedCashier && !matchesCashier(e.cashier, userScopedCashier)) {
+              return;
+            }
             let cur = branchAgg.get(bId);
             if (!cur) {
               cur = initBranchAgg();
               branchAgg.set(bId, cur);
             }
             const expTime = parseDateTimeSafe(e.created_at);
-            const shiftLimit = getShiftLimit(bId);
+            const shiftLimit = getUserShiftStartBoundary(bId);
             if (expTime > shiftLimit) {
               cur.expCash += Number(e.amount) || 0;
               if (e.cashier && !cur.lastCashier) cur.lastCashier = e.cashier;
@@ -1506,13 +1632,16 @@ function resolveBranchParam(param: string | null): string | null {
                     if (seenExpIds.has(eId)) return;
                     seenExpIds.add(eId);
                     const bId = resolveBranchForRecord(e.branchId || e.branch_id, e.cashier);
+                    if (bId === userScopedBranchId && userScopedCashier && !matchesCashier(e.cashier, userScopedCashier)) {
+                      return;
+                    }
                     let cur = branchAgg.get(bId);
                     if (!cur) {
                       cur = initBranchAgg();
                       branchAgg.set(bId, cur);
                     }
                     const expTime = parseDateTimeSafe(e.timestamp || e.createdAt || e.date);
-                    const shiftLimit = getShiftLimit(bId);
+                    const shiftLimit = getUserShiftStartBoundary(bId);
                     if (expTime > shiftLimit) {
                       cur.expCash += Number(e.amount) || 0;
                       if (e.cashier && !cur.lastCashier) cur.lastCashier = e.cashier;
@@ -1624,7 +1753,7 @@ function resolveBranchParam(param: string | null): string | null {
             });
 
             const updated = Array.from(branchMap.values()).map((rawB) => {
-              const b = syncBranchWithUsers(rawB, usersList);
+              const b = syncBranchWithUsers(rawB, currentUsers, currentUser);
               const agg = branchAgg.get(b.id) || initBranchAgg();
 
               const latestCut = latestCutByBranch.get(b.id);
@@ -1636,7 +1765,7 @@ function resolveBranchParam(param: string | null): string | null {
               const totalPieces = agg.deskPieces + agg.orderPieces;
 
               // Cajero del turno activo vinculado estrictamente a la plantilla de perfiles del administrador:
-              const branchActiveUsers = usersList.filter(
+              const branchActiveUsers = currentUsers.filter(
                 (u) =>
                   u.status !== "inactivo" &&
                   u.id !== "usr-1" &&
@@ -1650,43 +1779,77 @@ function resolveBranchParam(param: string | null): string | null {
                 branchActiveUsers.find((u) => !isAfternoonShift("", "", u)) ||
                 branchActiveUsers[0];
 
+              const isUserScopedBranch = Boolean(b.id === userScopedBranchId && userScopedCashier);
               let activeCashier = "";
 
-              if (latestCut?.incomingCashier && !isAdminCashier(latestCut.incomingCashier) && usersList.some((u) => (matchesCashier(u.name, latestCut.incomingCashier) || matchesCashier(u.username, latestCut.incomingCashier)) && u.status !== "inactivo")) {
+              if (isUserScopedBranch && userScopedCashier) {
+                activeCashier = userScopedCashier;
+              } else if (latestCut?.incomingCashier && !isAdminCashier(latestCut.incomingCashier) && currentUsers.some((u) => (matchesCashier(u.name, latestCut.incomingCashier) || matchesCashier(u.username, latestCut.incomingCashier)) && u.status !== "inactivo")) {
                 activeCashier = latestCut.incomingCashier;
-              } else if (b.currentShift?.cashier && !isAdminCashier(b.currentShift.cashier) && !b.currentShift.cashier.includes("Cajera 2") && usersList.some((u) => (matchesCashier(u.name, b.currentShift.cashier) || matchesCashier(u.username, b.currentShift.cashier)) && u.status !== "inactivo")) {
+              } else if (b.currentShift?.cashier && !isAdminCashier(b.currentShift.cashier) && !b.currentShift.cashier.includes("Cajera 2") && currentUsers.some((u) => (matchesCashier(u.name, b.currentShift.cashier) || matchesCashier(u.username, b.currentShift.cashier)) && u.status !== "inactivo")) {
                 activeCashier = b.currentShift.cashier;
-              } else if (user && (user.id === b.assignedUserId || user.assignedBranchId === b.id) && user.name && user.id !== "usr-1" && user.id !== "usr-2" && !isAdminCashier(user.name)) {
-                activeCashier = user.name;
-              } else if (agg.lastCashier && !isAdminCashier(agg.lastCashier) && usersList.some((u) => matchesCashier(u.name, agg.lastCashier) && u.status !== "inactivo")) {
+              } else if (currentUser && (currentUser.id === b.assignedUserId || currentUser.assignedBranchId === b.id) && currentUser.name && currentUser.id !== "usr-1" && currentUser.id !== "usr-2" && !isAdminCashier(currentUser.name)) {
+                activeCashier = currentUser.name;
+              } else if (agg.lastCashier && !isAdminCashier(agg.lastCashier) && currentUsers.some((u) => matchesCashier(u.name, agg.lastCashier) && u.status !== "inactivo")) {
                 activeCashier = agg.lastCashier;
               } else if (assignedEmployee?.name && !isAdminCashier(assignedEmployee.name)) {
                 activeCashier = assignedEmployee.name;
               } else if (b.assignedUserName && !isAdminCashier(b.assignedUserName)) {
                 activeCashier = b.assignedUserName;
-              } else if (b.manager && !isAdminCashier(b.manager) && usersList.some((u) => matchesCashier(u.name, b.manager) && u.status !== "inactivo")) {
+              } else if (b.manager && !isAdminCashier(b.manager) && currentUsers.some((u) => matchesCashier(u.name, b.manager) && u.status !== "inactivo")) {
                 activeCashier = b.manager;
               } else {
-                activeCashier = getOriginalBranchOperator(b, latestCut?.nextShift || b.currentShift?.name, usersList);
+                activeCashier = getOriginalBranchOperator(b, latestCut?.nextShift || b.currentShift?.name, currentUsers);
               }
 
-              // Determinar turno activo: si hubo corte previo, es el nextShift; de lo contrario Turno Matutino (o según cajero)
-              const activeUserObj = usersList.find((u) => matchesCashier(u.name, activeCashier) || matchesCashier(u.username, activeCashier)) || (user?.name === activeCashier ? user : undefined);
-              const isAfternoon = isAfternoonShift(latestCut?.nextShift || b.currentShift?.name, activeCashier, activeUserObj);
-              const shiftName = latestCut?.nextShift || (isAfternoon ? "Turno Vespertino (14:00 - 22:00)" : "Turno Matutino (06:00 - 14:00)");
+              // Determinar turno activo: si es cajero logueado, respetar su turno asignado; si hubo corte previo, usar nextShift
+              const activeUserObj = isUserScopedBranch
+                ? currentUser
+                : (currentUsers.find((u) => matchesCashier(u.name, activeCashier) || matchesCashier(u.username, activeCashier)) || (currentUser?.name === activeCashier ? currentUser : undefined));
+              const isAfternoon = isUserScopedBranch
+                ? isAfternoonShift(currentUser?.shiftName || currentUser?.shift || currentUser?.roleLabel, activeCashier, currentUser)
+                : isAfternoonShift(latestCut?.nextShift || b.currentShift?.name, activeCashier, activeUserObj);
+              const shiftName = isUserScopedBranch
+                ? (isAfternoon ? "Turno Vespertino (14:00 - 22:00)" : "Turno Matutino (06:00 - 14:00)")
+                : (latestCut?.nextShift || (isAfternoon ? "Turno Vespertino (14:00 - 22:00)" : "Turno Matutino (06:00 - 14:00)"));
 
-              // Fondo inicial sincronizado 100% con Caja y Corte de Turno:
-              // - Turno Matutino: $1,000 en todas las sucursales
-              // - Turno Vespertino: $0 hasta recibir el corte y remanente de la mañana
+              // Verificar si el usuario logueado ya cerró su propio turno el día de hoy
+              const userClosedShiftToday = Boolean(
+                isUserScopedBranch &&
+                userScopedCashier &&
+                latestCut &&
+                latestCutTs >= todayStartTs &&
+                (matchesCashier(latestCut.outgoingCashier, userScopedCashier) || matchesCashier(latestCut.responsible, userScopedCashier)) &&
+                !matchesCashier(latestCut.incomingCashier, userScopedCashier) &&
+                totalCobrado === 0
+              );
+
+              // Fondo inicial sincronizado 100% con el turno del usuario activo:
               let initialFund = 1000;
-              if (isAfternoon) {
-                if (latestCut && latestCutTs >= CLEAN_SLATE_EPOCH && latestCut.nextFund !== undefined && latestCut.nextFund !== null) {
+              if (userClosedShiftToday) {
+                initialFund = 0;
+              } else if (isAfternoon) {
+                const cutIsForThisAfternoonUser = Boolean(
+                  latestCut &&
+                  latestCutTs >= todayStartTs &&
+                  latestCut.nextFund !== undefined &&
+                  latestCut.nextFund !== null &&
+                  (!isUserScopedBranch || !userScopedCashier || matchesCashier(latestCut.incomingCashier, userScopedCashier))
+                );
+                if (cutIsForThisAfternoonUser && latestCut) {
                   initialFund = Number(latestCut.nextFund) || 0;
                 } else {
                   initialFund = 0;
                 }
               } else {
-                if (latestCut && latestCutTs >= CLEAN_SLATE_EPOCH && latestCut.nextFund !== undefined && latestCut.nextFund !== null && Number(latestCut.nextFund) > 0) {
+                if (
+                  latestCut &&
+                  latestCutTs >= CLEAN_SLATE_EPOCH &&
+                  latestCut.nextFund !== undefined &&
+                  latestCut.nextFund !== null &&
+                  Number(latestCut.nextFund) > 0 &&
+                  (!isUserScopedBranch || !userScopedCashier || matchesCashier(latestCut.incomingCashier, userScopedCashier) || latestCutTs < todayStartTs)
+                ) {
                   const parsed = Number(latestCut.nextFund);
                   initialFund = (b.id === "branch-matriz" && parsed === 800) ? 1000 : parsed;
                 } else {
@@ -1707,13 +1870,42 @@ function resolveBranchParam(param: string | null): string | null {
 
               // Flujo de salidas: evitar doble deducción entre cash_movements y cash_expenses
               const totalOutflows = Math.max(agg.cashOutflow, agg.expCash);
-              const calculatedCash = Math.max(0, initialFund + agg.deskCash + agg.orderCash + agg.cashInflow - totalOutflows);
+              const calculatedCash = userClosedShiftToday
+                ? 0
+                : Math.max(0, initialFund + agg.deskCash + agg.orderCash + agg.cashInflow - totalOutflows);
+
+              // Producto más vendido real en este turno activo
+              let shiftTopProduct = {
+                name: "Sin ventas en el turno",
+                piecesSold: 0,
+                category: "Panadería",
+                icon: "🥖",
+              };
+              if (agg.productCounts.size > 0) {
+                const sortedProds = Array.from(agg.productCounts.values()).sort(
+                  (a, bProd) => bProd.piecesSold - a.piecesSold || bProd.revenue - a.revenue
+                );
+                if (sortedProds[0]) {
+                  shiftTopProduct = {
+                    name: sortedProds[0].name,
+                    piecesSold: sortedProds[0].piecesSold,
+                    category: sortedProds[0].category,
+                    icon: sortedProds[0].icon,
+                  };
+                }
+              }
+
+              const shiftOpenedAt = isUserScopedBranch
+                ? (latestCut && latestCutTs >= todayStartTs && userScopedCashier && matchesCashier(latestCut.incomingCashier, userScopedCashier)
+                    ? latestCut.date
+                    : (isAfternoon ? (currentUser?.shiftStartTime || "14:00 PM") : (currentUser?.shiftStartTime || "06:00 AM")))
+                : (latestCut?.date || b.currentShift?.openedAt || "06:00 AM");
 
               return {
                 ...b,
                 manager: b.id === "branch-matriz" ? (!isRetiredDemoCashier(b.manager) && b.manager ? b.manager : "Don Toño Brito") : (activeCashier || (!isRetiredDemoCashier(b.manager) && b.manager ? b.manager : "Don Toño Brito")),
-                assignedUserName: assignedEmployee?.name || (b.assignedUserName && !isAdminCashier(b.assignedUserName) && !isRetiredDemoCashier(b.assignedUserName) ? b.assignedUserName : undefined),
-                assignedUserId: assignedEmployee?.id || (!isRetiredDemoCashier(b.assignedUserId) ? b.assignedUserId : undefined),
+                assignedUserName: (isUserScopedBranch && userScopedCashier) ? userScopedCashier : (assignedEmployee?.name || (b.assignedUserName && !isAdminCashier(b.assignedUserName) && !isRetiredDemoCashier(b.assignedUserName) ? b.assignedUserName : undefined)),
+                assignedUserId: (isUserScopedBranch && currentUser?.id) ? currentUser.id : (assignedEmployee?.id || (!isRetiredDemoCashier(b.assignedUserId) ? b.assignedUserId : undefined)),
                 todaySales: totalCobrado,
                 todayTickets: totalTickets,
                 todayPieces: totalPieces,
@@ -1724,6 +1916,7 @@ function resolveBranchParam(param: string | null): string | null {
                 todayOrdersTotal: agg.orderTotal,
                 todayOrdersCount: agg.orderCount,
                 lastCut: latestCut,
+                topProduct: shiftTopProduct,
                 dayAccumulatedSales: agg.dayAccumulatedDeskSales + agg.dayAccumulatedOrdersDeposit,
                 dayAccumulatedTickets: agg.dayAccumulatedDeskTickets,
                 dayAccumulatedPieces: agg.dayAccumulatedPieces,
@@ -1731,14 +1924,14 @@ function resolveBranchParam(param: string | null): string | null {
                   id: b.currentShift?.id || `shift-${b.id}`,
                   name: shiftName,
                   cashier: activeCashier,
-                  openedAt: latestCut?.date || b.currentShift?.openedAt || "06:00 AM",
+                  openedAt: shiftOpenedAt,
                   initialFund: initialFund,
                   totalSales: totalCobrado,
                   ticketCount: totalTickets,
                   cashSales: agg.deskCash + agg.orderCash,
                   cardSales: agg.deskCard + agg.orderCard,
                   transferSales: agg.deskTransfer + agg.orderTransfer,
-                  status: "abierto" as const,
+                  status: userClosedShiftToday ? ("cerrado" as const) : ("abierto" as const),
                 },
               };
             });
@@ -1757,9 +1950,12 @@ function resolveBranchParam(param: string | null): string | null {
                   b.name === u.name &&
                   b.status === u.status &&
                   b.manager === u.manager &&
+                  b.topProduct?.name === u.topProduct?.name &&
+                  b.topProduct?.piecesSold === u.topProduct?.piecesSold &&
                   b.currentShift?.totalSales === u.currentShift?.totalSales &&
                   b.currentShift?.cashier === u.currentShift?.cashier &&
                   b.currentShift?.name === u.currentShift?.name &&
+                  b.currentShift?.status === u.currentShift?.status &&
                   b.currentShift?.initialFund === u.currentShift?.initialFund
                 );
               });
@@ -2125,8 +2321,22 @@ function resolveBranchParam(param: string | null): string | null {
             const isCard = sale.paymentMethod === "tarjeta";
             const isTransfer = sale.paymentMethod === "transferencia";
 
+            const currentUser = userRef.current;
+            const isCurrentAdmin =
+              isAdministrativeUser(currentUser, permissionsRef.current) &&
+              !Boolean(
+                currentUser &&
+                currentUser.role !== "admin" &&
+                currentUser.id !== "usr-1" &&
+                currentUser.id !== "usr-2" &&
+                currentUser.assignedBranchId
+              );
+
             const updated = prev.map((b) => {
               if (b.id !== targetBranchId) return b;
+              if (!isCurrentAdmin && currentUser && currentUser.name && !isAdminCashier(currentUser.name) && !matchesCashier(sale.cashier, currentUser.name)) {
+                return b;
+              }
 
               const curShift: BranchShift = b.currentShift || {
                 id: `shift-${b.id}`,
@@ -2461,8 +2671,21 @@ function resolveBranchParam(param: string | null): string | null {
 
           // Actualizar efectivo en gaveta de la sucursal
           setBranches((prev) => {
+            const currentUser = userRef.current;
+            const isCurrentAdmin =
+              isAdministrativeUser(currentUser, permissionsRef.current) &&
+              !Boolean(
+                currentUser &&
+                currentUser.role !== "admin" &&
+                currentUser.id !== "usr-1" &&
+                currentUser.id !== "usr-2" &&
+                currentUser.assignedBranchId
+              );
             const updated = prev.map((b) => {
               if (b.id !== movement.branchId) return b;
+              if (!isCurrentAdmin && currentUser && currentUser.name && !isAdminCashier(currentUser.name) && !matchesCashier(movement.cashier || movement.authorizedBy, currentUser.name)) {
+                return b;
+              }
               const delta = movement.type === "entrada" ? movement.amount : -movement.amount;
               return {
                 ...b,

@@ -25,12 +25,21 @@ import {
   Plus,
   Lock
 } from "lucide-react";
-import { formatCurrency } from "@/lib/utils";
+import { 
+  formatCurrency, 
+  parseDateTimeSafe, 
+  getStoredShiftStartBoundary, 
+  resolveBranchId, 
+  matchesCashier, 
+  isAdminCashier, 
+  isAfternoonShift 
+} from "@/lib/utils";
 import { useAuth, getFriendlyName } from "@/context/AuthContext";
 import { useNotifications } from "@/context/NotificationContext";
-import { useBranch } from "@/context/BranchContext";
-import { getStoredOrders } from "@/lib/orders";
-import { CustomOrder } from "@/types";
+import { useBranch, isAdministrativeUser } from "@/context/BranchContext";
+import { getStoredOrders, getOrderShiftCollection } from "@/lib/orders";
+import { CLEAN_SLATE_EPOCH } from "@/lib/wipeOperationalData";
+import { CustomOrder, ShiftCutRecord } from "@/types";
 
 // Catálogo enriquecido de productos estrella de Panadería Brito con clasificación por categoría
 interface TopProductItem {
@@ -51,46 +60,163 @@ const ALL_TOP_BAKERY_PRODUCTS: TopProductItem[] = [];
 
 export default function Home() {
   const { user, permissions } = useAuth();
-  const isAdmin = user?.role === "admin" || user?.role === "auxiliar_admin";
-  const canSwitchBranches = isAdmin || Boolean(user?.role === "supervisor" || permissions?.canAccessSucursales);
   const { unreadCount } = useNotifications();
   const { 
     branches, 
     currentBranch, 
     isAllBranches, 
+    isAdmin: branchContextIsAdmin,
     switchBranch, 
     consolidatedMetrics
   } = useBranch();
 
+  // Estrictamente solo el Administrador General puede cambiar entre sucursales; cada usuario operativo ve únicamente su sucursal y su turno
+  const isAdmin = Boolean(
+    (branchContextIsAdmin ?? isAdministrativeUser(user, permissions)) &&
+    !Boolean(
+      user &&
+      user.role !== "admin" &&
+      user.id !== "usr-1" &&
+      user.id !== "usr-2" &&
+      user.assignedBranchId
+    )
+  );
+  const canSwitchBranches = isAdmin;
+
+  const targetBranchId = useMemo(() => {
+    if (!isAdmin && user) {
+      return resolveBranchId(user.assignedBranchId || currentBranch?.id, user.name);
+    }
+    if (!isAllBranches && currentBranch) {
+      return currentBranch.id;
+    }
+    return undefined;
+  }, [isAdmin, user, isAllBranches, currentBranch]);
+
+  const targetCashier = useMemo(() => {
+    if (!isAdmin && user?.name && !isAdminCashier(user.name)) {
+      return user.name;
+    }
+    return undefined;
+  }, [isAdmin, user]);
+
   // Orders state (Pedidos de mostrador levantados por cajeros)
   const [orders, setOrders] = useState<CustomOrder[]>([]);
   const [realTopProducts, setRealTopProducts] = useState<TopProductItem[]>([]);
+  const [shiftStartBoundary, setShiftStartBoundary] = useState<number>(() => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return Math.max(CLEAN_SLATE_EPOCH, d.getTime());
+  });
+  const [isUserShiftClosed, setIsUserShiftClosed] = useState<boolean>(false);
 
   useEffect(() => {
     const refreshRealData = () => {
-      setOrders(getStoredOrders());
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+      const todayStartTs = todayStart.getTime();
+
+      let computedShiftStart = Math.max(
+        CLEAN_SLATE_EPOCH,
+        todayStartTs,
+        targetBranchId ? getStoredShiftStartBoundary(targetBranchId) : 0
+      );
+      let latestCutForBranchToday: ShiftCutRecord | null = null;
+
       try {
-        const rawSales = localStorage.getItem("brito_pos_master_sales");
-        const sales = rawSales ? JSON.parse(rawSales) : [];
-        if (!Array.isArray(sales) || sales.length === 0) {
+        const rawCuts = localStorage.getItem("brito_shift_cuts_history");
+        const cuts: ShiftCutRecord[] = rawCuts ? JSON.parse(rawCuts) : [];
+        if (Array.isArray(cuts) && targetBranchId) {
+          const branchCutsToday = cuts
+            .filter((c) => {
+              if (!c) return false;
+              let cBranch = c.branchId || "branch-matriz";
+              if (cBranch === "branch-matriz" && (c.responsible || c.outgoingCashier)) {
+                cBranch = resolveBranchId(c.branchId, c.responsible || c.outgoingCashier);
+              }
+              if (cBranch !== targetBranchId) return false;
+              const cTs = c.timestamp || parseDateTimeSafe(c.date);
+              return cTs >= todayStartTs && cTs >= CLEAN_SLATE_EPOCH;
+            })
+            .sort((a, b) => (b.timestamp || parseDateTimeSafe(b.date)) - (a.timestamp || parseDateTimeSafe(a.date)));
+
+          if (branchCutsToday.length > 0) {
+            latestCutForBranchToday = branchCutsToday[0];
+            const latestCutTs = latestCutForBranchToday.timestamp || parseDateTimeSafe(latestCutForBranchToday.date);
+            if (latestCutTs > computedShiftStart) {
+              computedShiftStart = latestCutTs;
+            }
+          }
+        }
+      } catch {}
+
+      setShiftStartBoundary(computedShiftStart);
+      const storedOrders = getStoredOrders();
+      setOrders(storedOrders);
+
+      try {
+        const rawCurSales = localStorage.getItem("brito_pos_current_sales");
+        const rawMasterSales = localStorage.getItem("brito_pos_master_sales");
+        const curSales = rawCurSales ? JSON.parse(rawCurSales) : [];
+        const masterSales = rawMasterSales ? JSON.parse(rawMasterSales) : [];
+
+        const combinedMap = new Map<string, any>();
+        if (Array.isArray(masterSales)) {
+          masterSales.forEach((s: any) => {
+            if (s && s.id) combinedMap.set(String(s.id), s);
+          });
+        }
+        if (Array.isArray(curSales)) {
+          curSales.forEach((s: any) => {
+            if (s && s.id) combinedMap.set(String(s.id), s);
+          });
+        }
+
+        const allSales = Array.from(combinedMap.values());
+        const shiftSales = allSales.filter((s: any) => {
+          if (!s) return false;
+          const sId = String(s.id || "");
+          if (sId.startsWith("PED-") || sId.startsWith("LIQ-") || /^pos-\d{10,}$/i.test(sId) || s.isCustomOrder || s.is_custom_order) {
+            return false;
+          }
+          const sBranch = resolveBranchId(s.branchId || s.branch_id, s.cashier);
+          if (targetBranchId && sBranch !== targetBranchId) return false;
+          if (targetCashier && !matchesCashier(s.cashier, targetCashier)) return false;
+          const sTime = parseDateTimeSafe(s.timestamp || s.createdAt || s.date);
+          return sTime > computedShiftStart;
+        });
+
+        const closedTodayByUser = Boolean(
+          targetCashier &&
+          latestCutForBranchToday &&
+          (matchesCashier(latestCutForBranchToday.outgoingCashier, targetCashier) ||
+            matchesCashier(latestCutForBranchToday.responsible, targetCashier)) &&
+          !matchesCashier(latestCutForBranchToday.incomingCashier, targetCashier) &&
+          shiftSales.length === 0
+        );
+        setIsUserShiftClosed(closedTodayByUser);
+
+        if (closedTodayByUser || shiftSales.length === 0) {
           setRealTopProducts([]);
           return;
         }
+
         const agg = new Map<string, { name: string; price: number; pieces: number; revenue: number; category: TopProductItem["category"] }>();
-        for (const s of sales) {
-          if (!s || !Array.isArray(s.items)) continue;
-          for (const item of s.items) {
+        for (const s of shiftSales) {
+          const rawItems = Array.isArray(s.items) ? s.items : Array.isArray(s.sale_items) ? s.sale_items : [];
+          for (const item of rawItems) {
             const prod = item.product || item;
-            const id = String(prod.id || prod.name || "item");
-            const name = String(prod.name || "Producto");
+            const id = String(prod.id || prod.product_id || prod.name || prod.product_name || "item");
+            const name = String(prod.name || prod.product_name || "Producto").trim();
+            if (!name || name === "Venta en mostrador") continue;
             const qty = Number(item.quantity) || 1;
-            const price = Number(prod.price) || 0;
+            const price = Number(prod.price || prod.unit_price) || 0;
             const rev = Number(item.subtotal) || qty * price;
             const rawCat = String(prod.category || "").toLowerCase();
             const cat: TopProductItem["category"] =
               rawCat.includes("salado") || rawCat.includes("blanco") || name.toLowerCase().includes("bolillo") || name.toLowerCase().includes("telera")
                 ? "pan_salado"
-                : rawCat.includes("pastel") || rawCat.includes("pay")
+                : rawCat.includes("pastel") || rawCat.includes("pay") || name.toLowerCase().includes("pastel")
                 ? "pasteleria"
                 : rawCat.includes("hojaldre") || name.toLowerCase().includes("cuerno") || name.toLowerCase().includes("oreja")
                 ? "hojaldre"
@@ -106,7 +232,7 @@ export default function Home() {
         }
         const totalRev = Array.from(agg.values()).reduce((sum, x) => sum + x.revenue, 0) || 1;
         const list: TopProductItem[] = Array.from(agg.entries())
-          .sort((a, b) => b[1].revenue - a[1].revenue)
+          .sort((a, b) => b[1].pieces - a[1].pieces || b[1].revenue - a[1].revenue)
           .slice(0, 8)
           .map(([id, v]) => ({
             id,
@@ -125,7 +251,7 @@ export default function Home() {
             piecesSold: v.pieces,
             revenue: v.revenue,
             share: Math.round((v.revenue / totalRev) * 100),
-            trend: "Real",
+            trend: "Turno Activo",
             tag: "En Vivo",
           }));
         setRealTopProducts(list);
@@ -137,15 +263,18 @@ export default function Home() {
     window.addEventListener("storage", refreshRealData);
     window.addEventListener("brito_sales_updated", refreshRealData);
     window.addEventListener("brito_orders_updated", refreshRealData);
+    window.addEventListener("brito_shift_cuts_updated", refreshRealData);
+    window.addEventListener("brito_caja_updated", refreshRealData);
     return () => {
       window.removeEventListener("storage", refreshRealData);
       window.removeEventListener("brito_sales_updated", refreshRealData);
       window.removeEventListener("brito_orders_updated", refreshRealData);
+      window.removeEventListener("brito_shift_cuts_updated", refreshRealData);
+      window.removeEventListener("brito_caja_updated", refreshRealData);
     };
-  }, []);
+  }, [targetBranchId, targetCashier]);
 
   // Filters state
-  const [selectedPeriod, setSelectedPeriod] = useState<"hoy" | "semana" | "mes">("hoy");
   const [productCategoryFilter, setProductCategoryFilter] = useState<string>("todas");
   const [orderStatusFilter, setOrderStatusFilter] = useState<"todos" | "pendiente" | "listo">("todos");
   const [greeting, setGreeting] = useState("¡Bienvenido");
@@ -173,65 +302,110 @@ export default function Home() {
     return () => clearInterval(interval);
   }, []);
 
-  const baseSales = isAllBranches 
+  const baseSales = isUserShiftClosed
+    ? 0
+    : isAllBranches 
     ? consolidatedMetrics.totalSales 
     : (currentBranch?.todaySales ?? 0);
 
-  const baseTickets = isAllBranches
+  const baseTickets = isUserShiftClosed
+    ? 0
+    : isAllBranches
     ? consolidatedMetrics.totalTickets 
     : (currentBranch?.todayTickets ?? 0);
 
   const activeSales = Math.round(baseSales);
   const activeTickets = Math.round(baseTickets);
+  const activePieces = isUserShiftClosed
+    ? 0
+    : isAllBranches
+    ? branches.reduce((sum, b) => sum + (b.todayPieces || 0), 0)
+    : (currentBranch?.todayPieces ?? 0);
+  const avgPiecesPerTicket = activeTickets > 0 ? (activePieces / activeTickets).toFixed(1) : "0";
   
-  const activeCash = isAllBranches 
+  const activeCash = isUserShiftClosed
+    ? 0
+    : isAllBranches 
     ? consolidatedMetrics.totalCashInDrawer 
     : (currentBranch?.cashInDrawer ?? 0);
 
   const avgTicket = activeTickets > 0 ? Math.round(activeSales / activeTickets) : 0;
 
-  // Filtered orders for active branch (only pending orders to be delivered)
-  const filteredOrders = useMemo(() => {
-    let result = orders.filter((o) => o && o.status !== "entregado" && o.status !== "cancelado");
-    if (!isAllBranches && currentBranch) {
-      result = result.filter((o) => !o.branchId || o.branchId === currentBranch.id);
+  const activeShiftName = useMemo(() => {
+    if (!isAdmin && user) {
+      const isAft = isAfternoonShift(user.shiftName || user.shift || user.roleLabel, user.name, user);
+      return isAft ? "Turno Vespertino (14:00 - 22:00)" : "Turno Matutino (06:00 - 14:00)";
     }
-    if (orderStatusFilter !== "todos") {
-      result = result.filter((o) => o.status === orderStatusFilter);
-    }
-    return result;
-  }, [orders, isAllBranches, currentBranch, orderStatusFilter]);
+    return currentBranch?.currentShift?.name || "Turno Activo";
+  }, [isAdmin, user, currentBranch]);
 
+  const activeShiftCashier = useMemo(() => {
+    if (targetCashier) return targetCashier;
+    return currentBranch?.currentShift?.cashier || "Cajero";
+  }, [targetCashier, currentBranch]);
+
+  // Pedidos del turno activo (filtrados por sucursal, límite de apertura del turno y cajero cuando aplica)
   const allBranchOrders = useMemo(() => {
+    if (isUserShiftClosed) return [];
     const activeOnly = orders.filter((o) => o && o.status !== "entregado" && o.status !== "cancelado");
-    if (isAllBranches) return activeOnly;
-    return activeOnly.filter((o) => !o.branchId || o.branchId === currentBranch?.id);
-  }, [orders, isAllBranches, currentBranch]);
+    return activeOnly.filter((o) => {
+      if (isAllBranches) {
+        const col = getOrderShiftCollection(o, shiftStartBoundary, undefined, targetCashier);
+        return col.isInShift;
+      }
+      const bId = targetBranchId || currentBranch?.id;
+      const col = getOrderShiftCollection(o, shiftStartBoundary, bId, targetCashier);
+      return col.isInShift;
+    });
+  }, [orders, isAllBranches, currentBranch, targetBranchId, targetCashier, shiftStartBoundary, isUserShiftClosed]);
+
+  const filteredOrders = useMemo(() => {
+    if (orderStatusFilter === "todos") return allBranchOrders;
+    return allBranchOrders.filter((o) => o.status === orderStatusFilter);
+  }, [allBranchOrders, orderStatusFilter]);
 
   const pendingOrdersCount = allBranchOrders.filter((o) => o.status === "pendiente").length;
   const inOvenOrdersCount = allBranchOrders.filter((o) => o.status === "en_horno").length;
   const readyOrdersCount = allBranchOrders.filter((o) => o.status === "listo").length;
   const totalPendingCollection = allBranchOrders.reduce((sum, o) => sum + (o.remainingBalance || 0), 0);
 
-  // Method breakdowns
-  const cashShare = isAllBranches ? 0.70 : (currentBranch ? currentBranch.currentShift.cashSales / Math.max(1, currentBranch.currentShift.totalSales) : 0.70);
-  const cardShare = isAllBranches ? 0.20 : (currentBranch ? currentBranch.currentShift.cardSales / Math.max(1, currentBranch.currentShift.totalSales) : 0.20);
-  const transferShare = Math.max(0, 1 - cashShare - cardShare);
+  // Desglose exacto de métodos de pago en el turno activo (0% cuando no hay ventas)
+  const rawCashAmount = isUserShiftClosed
+    ? 0
+    : isAllBranches
+    ? branches.reduce((sum, b) => sum + (b.currentShift?.cashSales || 0), 0)
+    : (currentBranch?.currentShift?.cashSales || 0);
+  const rawCardAmount = isUserShiftClosed
+    ? 0
+    : isAllBranches
+    ? branches.reduce((sum, b) => sum + (b.currentShift?.cardSales || 0), 0)
+    : (currentBranch?.currentShift?.cardSales || 0);
+  const rawTransferAmount = isUserShiftClosed
+    ? 0
+    : isAllBranches
+    ? branches.reduce((sum, b) => sum + (b.currentShift?.transferSales || 0), 0)
+    : (currentBranch?.currentShift?.transferSales || 0);
 
-  const cashAmount = Math.round(activeSales * cashShare);
-  const cardAmount = Math.round(activeSales * cardShare);
-  const transferAmount = Math.round(activeSales * transferShare);
+  const totalMethodSales = rawCashAmount + rawCardAmount + rawTransferAmount;
+  const cashShare = totalMethodSales > 0 ? rawCashAmount / totalMethodSales : 0;
+  const cardShare = totalMethodSales > 0 ? rawCardAmount / totalMethodSales : 0;
+  const transferShare = totalMethodSales > 0 ? Math.max(0, 1 - cashShare - cardShare) : 0;
+
+  const cashAmount = Math.round(rawCashAmount);
+  const cardAmount = Math.round(rawCardAmount);
+  const transferAmount = Math.round(rawTransferAmount);
 
   // Ranked branches by today sales
   const sortedBranches = useMemo(() => {
     return [...branches].sort((a, b) => b.todaySales - a.todaySales);
   }, [branches]);
 
-  // Si es cajero/operativo, solo visualiza la sucursal asignada; supervisores y admins ven todas
+  // Si es usuario de sucursal, solo visualiza su sucursal asignada; solo el Administrador General ve todas
   const displayedBranches = useMemo(() => {
     if (canSwitchBranches) return sortedBranches;
-    return sortedBranches.filter((b) => b.id === currentBranch?.id);
-  }, [canSwitchBranches, sortedBranches, currentBranch]);
+    const assignedId = targetBranchId || currentBranch?.id;
+    return sortedBranches.filter((b) => b.id === assignedId);
+  }, [canSwitchBranches, sortedBranches, currentBranch, targetBranchId]);
 
   // Filtrado de productos estrella por categoría
   const displayedTopProducts = useMemo(() => {
@@ -342,59 +516,41 @@ export default function Home() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-stone-100 pb-4">
           <div className="flex items-center gap-2.5">
             <span className="relative flex h-2.5 w-2.5">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500" />
+              <span className={`animate-ping absolute inline-flex h-full w-full rounded-full ${isUserShiftClosed ? "bg-stone-400" : "bg-emerald-400"} opacity-75`} />
+              <span className={`relative inline-flex rounded-full h-2.5 w-2.5 ${isUserShiftClosed ? "bg-stone-500" : "bg-emerald-500"}`} />
             </span>
             <div>
               <h2 className="text-xs sm:text-sm font-black text-stone-900 uppercase tracking-wider">
-                Métricas de Rendimiento & Flujo Financiero
+                Métricas de Rendimiento & Flujo Financiero de tu Turno
               </h2>
               <p className="text-[11px] text-stone-500">
-                {isAllBranches ? "Consolidando las 3 sucursales de Brito" : `Filtrando sucursal ${currentBranch?.name}`}
+                {isAllBranches
+                  ? "Consolidando el turno activo de las sucursales de Brito"
+                  : `Sucursal ${currentBranch?.name || "Asignada"} • Información exclusiva de tu turno (desde apertura hasta cierre)`}
               </p>
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-1.5 bg-stone-100 p-1 rounded-xl self-start sm:self-auto max-w-full">
-            <button
-              onClick={() => setSelectedPeriod("hoy")}
-              className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all ${
-                selectedPeriod === "hoy"
-                  ? "bg-white text-stone-900 shadow-sm"
-                  : "text-stone-500 hover:text-stone-900"
-              }`}
-            >
-              Hoy en Vivo
-            </button>
-            <button
-              onClick={() => setSelectedPeriod("semana")}
-              className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all ${
-                selectedPeriod === "semana"
-                  ? "bg-white text-stone-900 shadow-sm"
-                  : "text-stone-500 hover:text-stone-900"
-              }`}
-            >
-              Esta Semana
-            </button>
-            <button
-              onClick={() => setSelectedPeriod("mes")}
-              className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all ${
-                selectedPeriod === "mes"
-                  ? "bg-white text-stone-900 shadow-sm"
-                  : "text-stone-500 hover:text-stone-900"
-              }`}
-            >
-              Este Mes
-            </button>
+          <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto max-w-full">
+            <div className={`px-3.5 py-1.5 rounded-xl text-xs font-black border flex items-center gap-2 ${
+              isUserShiftClosed
+                ? "bg-stone-100 text-stone-700 border-stone-300"
+                : "bg-emerald-50 text-emerald-800 border-emerald-200 shadow-2xs"
+            }`}>
+              <Clock className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+              <span>{activeShiftName.split("(")[0].trim()}</span>
+              <span className="text-stone-300">•</span>
+              <span>{isUserShiftClosed ? "Turno Cerrado (Corte Realizado)" : "Turno Activo (Apertura a Cierre)"}</span>
+            </div>
           </div>
         </div>
 
         {/* 3 Hero KPI Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-5">
-          {/* Card 1: Ventas Totales */}
+          {/* Card 1: Ventas Totales del Turno */}
           <div className="bg-stone-50/70 hover:bg-white p-5 sm:p-6 rounded-3xl border border-stone-200/90 hover:border-orange-400 shadow-sm hover:shadow-md transition-all space-y-3">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-black text-stone-500 uppercase tracking-wider">Ventas Totales</span>
+              <span className="text-xs font-black text-stone-500 uppercase tracking-wider">Ventas de tu Turno</span>
               <div className="p-2.5 rounded-2xl bg-emerald-50 text-emerald-600 border border-emerald-200">
                 <DollarSign className="w-5 h-5" />
               </div>
@@ -441,10 +597,10 @@ export default function Home() {
                 {formatCurrency(activeCash)}
               </p>
               <p className="text-xs text-stone-600 mt-1 font-semibold">
-                {isAllBranches ? "3 cajas de mostrador activas" : `${currentBranch?.currentShift.name.split("(")[0]}`}
+                {isAllBranches ? `${branches.length} cajas de mostrador activas` : `${activeShiftName.split("(")[0].trim()}`}
               </p>
               <div className="pt-2 mt-2 border-t border-stone-100 flex items-center justify-between text-[11px] text-stone-500">
-                <span>{isAllBranches ? "Total disponible" : `Cajero: ${currentBranch?.currentShift.cashier}`}</span>
+                <span>{isAllBranches ? "Total disponible en turnos" : `Cajero: ${activeShiftCashier}`}</span>
                 <Link href="/caja" className="text-orange-600 font-black hover:underline flex items-center gap-0.5">
                   Arqueo <ArrowRight className="w-3 h-3" />
                 </Link>
@@ -466,11 +622,11 @@ export default function Home() {
               </p>
               <p className="text-xs text-emerald-700 font-semibold mt-1 flex items-center gap-1">
                 <ArrowUpRight className="w-3.5 h-3.5" />
-                +8.4% vs semana previa
+                {activePieces} piezas vendidas en tu turno
               </p>
               <div className="pt-2 mt-2 border-t border-stone-100 flex items-center justify-between text-[11px] text-stone-500">
-                <span>Canasta estimada</span>
-                <span className="font-extrabold text-stone-800">~8.5 pzas / ticket</span>
+                <span>Canasta real del turno</span>
+                <span className="font-extrabold text-stone-800">{avgPiecesPerTicket} pzas / ticket</span>
               </div>
             </div>
           </div>
@@ -492,13 +648,13 @@ export default function Home() {
                 {isAdmin ? "Matriz de Desempeño por Sucursal" : "Desempeño de tu Sucursal Asignada"}
               </h2>
               <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-orange-100 text-orange-800">
-                {isAdmin ? `${branches.length} Tiendas Activas` : "1 Tienda Asignada"}
+                {isAdmin ? `${branches.length} Tiendas Activas` : "Tu Turno Activo"}
               </span>
             </div>
             <p className="text-xs text-stone-500 mt-0.5">
               {isAdmin
-                ? "Comparativa de ventas en tiempo real, ticket promedio, arqueo y métodos de cobro."
-                : "Ventas en tiempo real, ticket promedio, arqueo y métodos de cobro de tu tienda."}
+                ? "Comparativa de ventas del turno activo en tiempo real, ticket promedio, arqueo y métodos de cobro."
+                : "Ventas de tu turno en tiempo real (desde apertura hasta cierre), ticket promedio, arqueo y métodos de cobro."}
             </p>
           </div>
 
@@ -521,29 +677,38 @@ export default function Home() {
             const isSelected = !isAllBranches && currentBranch?.id === b.id;
             const isTopRank = idx === 0;
 
-            // Ticket promedio exacto
-            const avgTicket = b.todayTickets > 0 ? b.todaySales / b.todayTickets : 0;
+            const branchShiftSales = (!isAdmin && isUserShiftClosed) ? 0 : b.todaySales;
+            const branchShiftTickets = (!isAdmin && isUserShiftClosed) ? 0 : b.todayTickets;
+            const branchShiftCashInDrawer = (!isAdmin && isUserShiftClosed) ? 0 : b.cashInDrawer;
+            const branchInitialFund = (!isAdmin && isUserShiftClosed) ? 0 : (b.currentShift?.initialFund ?? 0);
 
-            // Producto más vendido de la sucursal
-            const topProd = b.topProduct || (
-              b.id?.includes("matriz") || b.code?.includes("MAT")
-                ? { name: "Bolillo Tradicional", piecesSold: 185, category: "Pan Salado", icon: "🥖" }
-                : b.id?.includes("benito") || b.code?.includes("BEN")
-                ? { name: "Bolillo de Sal", piecesSold: 210, category: "Pan Salado", icon: "🥖" }
-                : b.id?.includes("flores") || b.code?.includes("FLO")
-                ? { name: "Cuerno de Mantequilla", piecesSold: 94, category: "Hojaldre", icon: "🥐" }
-                : { name: "Concha de Vainilla", piecesSold: 120, category: "Pan Dulce", icon: "🥖" }
-            );
+            // Ticket promedio exacto del turno
+            const branchAvgTicket = branchShiftTickets > 0 ? branchShiftSales / branchShiftTickets : 0;
 
-            // Desglose exacto de cobros
-            const cashSales = b.currentShift?.cashSales || 0;
-            const cardSales = b.currentShift?.cardSales || 0;
-            const transferSales = b.currentShift?.transferSales || 0;
-            const totalShiftSales = Math.max(1, cashSales + cardSales + transferSales);
+            // Producto más vendido real del turno en la sucursal
+            const topProd = (!isAdmin && realTopProducts.length > 0)
+              ? {
+                  name: realTopProducts[0].name,
+                  piecesSold: realTopProducts[0].piecesSold,
+                  category: realTopProducts[0].categoryLabel,
+                  icon: realTopProducts[0].icon,
+                }
+              : (b.topProduct && b.topProduct.piecesSold > 0)
+              ? b.topProduct
+              : { name: "Sin ventas en el turno", piecesSold: 0, category: "Panadería", icon: "🥖" };
 
-            const cashPct = Math.round((cashSales / totalShiftSales) * 100);
-            const cardPct = Math.round((cardSales / totalShiftSales) * 100);
-            const transferPct = Math.max(0, 100 - cashPct - cardPct);
+            // Desglose exacto de cobros del turno (0% cuando no hay ventas)
+            const cashSales = (!isAdmin && isUserShiftClosed) ? 0 : (b.currentShift?.cashSales || 0);
+            const cardSales = (!isAdmin && isUserShiftClosed) ? 0 : (b.currentShift?.cardSales || 0);
+            const transferSales = (!isAdmin && isUserShiftClosed) ? 0 : (b.currentShift?.transferSales || 0);
+            const totalShiftSalesRaw = cashSales + cardSales + transferSales;
+
+            const cashPct = totalShiftSalesRaw > 0 ? Math.round((cashSales / totalShiftSalesRaw) * 100) : 0;
+            const cardPct = totalShiftSalesRaw > 0 ? Math.round((cardSales / totalShiftSalesRaw) * 100) : 0;
+            const transferPct = totalShiftSalesRaw > 0 ? Math.max(0, 100 - cashPct - cardPct) : 0;
+
+            const cardShiftName = !isAdmin ? activeShiftName : b.currentShift.name;
+            const cardShiftCashier = !isAdmin ? activeShiftCashier : b.currentShift.cashier;
 
             return (
               <div 
@@ -601,21 +766,21 @@ export default function Home() {
                       </button>
                     ) : (
                       <span className="text-[10px] font-black px-2.5 py-1 rounded-xl bg-orange-600 text-white shadow-sm flex items-center gap-1 select-none">
-                        <Lock className="w-2.5 h-2.5" /> Tu Tienda
+                        <Lock className="w-2.5 h-2.5" /> Tu Turno
                       </span>
                     )}
                   </div>
 
-                  {/* Venta Acumulada y Tickets */}
+                  {/* Venta del Turno y Tickets */}
                   <div className="bg-stone-50/80 rounded-2xl p-3.5 border border-stone-100 flex items-center justify-between gap-2">
                     <div>
-                      <span className="text-[10px] uppercase tracking-wider font-extrabold text-stone-400 block">Venta de hoy</span>
-                      <span className="text-2xl font-black text-stone-900 tracking-tight">{formatCurrency(b.todaySales)}</span>
+                      <span className="text-[10px] uppercase tracking-wider font-extrabold text-stone-400 block">Venta del turno</span>
+                      <span className="text-2xl font-black text-stone-900 tracking-tight">{formatCurrency(branchShiftSales)}</span>
                     </div>
                     <div className="text-right">
                       <span className="text-[10px] uppercase tracking-wider font-extrabold text-stone-400 block">Transacciones</span>
                       <span className="text-xs font-black text-stone-800 bg-stone-100 px-2.5 py-1 rounded-lg border border-stone-200 inline-block">
-                        {b.todayTickets} tickets
+                        {branchShiftTickets} tickets
                       </span>
                     </div>
                   </div>
@@ -624,14 +789,14 @@ export default function Home() {
                   <div className="grid grid-cols-2 gap-2 text-xs">
                     <div className="bg-stone-50/60 rounded-xl p-2.5 border border-stone-200/70">
                       <span className="text-[10px] font-semibold text-stone-400 block">Ticket Promedio</span>
-                      <span className="font-black text-stone-900 text-sm">{formatCurrency(avgTicket)}</span>
+                      <span className="font-black text-stone-900 text-sm">{formatCurrency(branchAvgTicket)}</span>
                       <span className="text-[10px] text-stone-500 block mt-0.5">Por transacción</span>
                     </div>
 
                     <div className="bg-stone-50/60 rounded-xl p-2.5 border border-stone-200/70">
                       <span className="text-[10px] font-semibold text-stone-400 block">Efectivo en Caja</span>
-                      <span className="font-black text-emerald-700 text-sm">{formatCurrency(b.cashInDrawer)}</span>
-                      <span className="text-[10px] text-stone-500 block mt-0.5">Fondo ini: {formatCurrency(b.currentShift?.initialFund || 1000)}</span>
+                      <span className="font-black text-emerald-700 text-sm">{formatCurrency(branchShiftCashInDrawer)}</span>
+                      <span className="text-[10px] text-stone-500 block mt-0.5">Fondo ini: {formatCurrency(branchInitialFund)}</span>
                     </div>
                   </div>
 
@@ -642,7 +807,7 @@ export default function Home() {
                         <Receipt className="w-3.5 h-3.5 text-stone-400" />
                         Desglose de Formas de Pago
                       </span>
-                      <span className="text-[10px] font-normal text-stone-400">{formatCurrency(totalShiftSales)}</span>
+                      <span className="text-[10px] font-normal text-stone-400">{formatCurrency(totalShiftSalesRaw)}</span>
                     </div>
 
                     {/* Barra proporcional de 3 métodos */}
@@ -712,19 +877,19 @@ export default function Home() {
 
                     {/* Turno y Cajero */}
                     <div className="flex items-center justify-between text-[11px] text-stone-500 px-1">
-                      <span className="flex items-center gap-1 truncate" title={`Turno: ${b.currentShift.name}`}>
+                      <span className="flex items-center gap-1 truncate" title={`Turno: ${cardShiftName}`}>
                         <Clock className="w-3 h-3 text-stone-400 shrink-0" />
-                        <span>{b.currentShift.name.split("(")[0]} ({b.currentShift.openedAt})</span>
+                        <span>{cardShiftName.split("(")[0]} ({b.currentShift.openedAt})</span>
                       </span>
-                      <span className="font-semibold text-stone-700 truncate max-w-[120px]" title={`Cajero: ${b.currentShift.cashier}`}>
-                        {b.currentShift.cashier}
+                      <span className="font-semibold text-stone-700 truncate max-w-[120px]" title={`Cajero: ${cardShiftCashier}`}>
+                        {cardShiftCashier}
                       </span>
                     </div>
 
                     {/* Responsable y Teléfono */}
                     <div className="flex items-center justify-between text-[11px] text-stone-400 px-1">
-                      <span className="truncate max-w-[140px]" title={`Responsable: ${b.manager}`}>
-                        Resp: <strong className="text-stone-600 font-medium">{b.manager}</strong>
+                      <span className="truncate max-w-[140px]" title={`Responsable: ${cardShiftCashier || b.manager}`}>
+                        Resp: <strong className="text-stone-600 font-medium">{!isAdmin ? cardShiftCashier : b.manager}</strong>
                       </span>
                       <span className="flex items-center gap-1 text-stone-500 font-medium">
                         <Phone className="w-3 h-3 text-stone-400" />
@@ -752,7 +917,7 @@ export default function Home() {
               Los Panes Más Vendidos en Mostrador
             </h2>
             <p className="text-xs text-stone-500">
-              Ranking de salida de piezas en mostrador y aporte a ingresos del día.
+              Ranking de salida de piezas en mostrador y aporte a ingresos durante tu turno activo (desde apertura hasta cierre).
             </p>
           </div>
 
