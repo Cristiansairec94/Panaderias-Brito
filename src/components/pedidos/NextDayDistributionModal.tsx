@@ -689,7 +689,7 @@ export default function NextDayDistributionModal({
         </div>
 
         {/* Tarjetas KPI Resumen del Día */}
-        <div className="p-3 sm:p-4 bg-[#f8f5ef] border-b border-[#e8ded2] grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 shrink-0">
+        <div className="p-3 sm:p-4 bg-[#f8f5ef] border-b border-[#e8ded2] grid grid-cols-2 gap-2 sm:gap-3 shrink-0">
           <div className="bg-white p-2.5 sm:p-3 rounded-2xl border border-emerald-200/90 shadow-2xs flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-800 font-black text-xl flex items-center justify-center shrink-0">
               🥖
@@ -714,34 +714,6 @@ export default function NextDayDistributionModal({
               </span>
               <span className="text-xl sm:text-2xl font-black text-stone-900 block tabular-nums">
                 {totalGlobalOrders} <span className="text-xs font-bold text-stone-500">pedidos</span>
-              </span>
-            </div>
-          </div>
-
-          <div className="bg-white p-2.5 sm:p-3 rounded-2xl border border-sky-200/90 shadow-2xs flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-sky-100 text-sky-900 font-black text-xl flex items-center justify-center shrink-0">
-              🏬
-            </div>
-            <div className="min-w-0">
-              <span className="text-[10px] uppercase font-bold text-stone-400 block leading-tight">
-                Sucursales con Entregas
-              </span>
-              <span className="text-xl sm:text-2xl font-black text-sky-950 block tabular-nums">
-                {activeBranchesCount} <span className="text-xs font-bold text-stone-500">tiendas</span>
-              </span>
-            </div>
-          </div>
-
-          <div className="bg-white p-2.5 sm:p-3 rounded-2xl border border-orange-200/90 shadow-2xs flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-orange-100 text-orange-900 font-black text-xl flex items-center justify-center shrink-0">
-              🥐
-            </div>
-            <div className="min-w-0">
-              <span className="text-[10px] uppercase font-bold text-stone-400 block leading-tight">
-                Variedades de Pan
-              </span>
-              <span className="text-xl sm:text-2xl font-black text-orange-950 block tabular-nums">
-                {globalConsolidated.length} <span className="text-xs font-bold text-stone-500">tipos</span>
               </span>
             </div>
           </div>
