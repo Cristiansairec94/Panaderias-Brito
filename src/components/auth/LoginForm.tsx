@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import { Lock, User as UserIcon, ArrowRight, Eye, EyeOff, AlertCircle, Sparkles, ShieldCheck, ShieldAlert } from "lucide-react";
+import { Lock, User as UserIcon, ArrowRight, Eye, EyeOff, AlertCircle, Sparkles, ShieldAlert } from "lucide-react";
 import { useAuth, getFriendlyName, User } from "@/context/AuthContext";
 import { useNotifications } from "@/context/NotificationContext";
 import { getEffectiveAvatar, isAdminCashier, isAfternoonShift } from "@/lib/utils";
@@ -20,7 +20,6 @@ export default function LoginForm() {
   const [isLoading, setIsLoading] = useState(false);
   const [welcomeUser, setWelcomeUser] = useState<User | null>(null);
   const [isLogoSpinning, setIsLogoSpinning] = useState(false);
-  const [redirectTarget, setRedirectTarget] = useState<string | null>(null);
 
   // Seguridad: Control de intentos fallidos y bloqueo temporal anti-fuerza bruta
   const [failedAttempts, setFailedAttempts] = useState(0);
@@ -32,10 +31,6 @@ export default function LoginForm() {
       if (savedUser) {
         setIdentifier(savedUser);
         setRememberMe(true);
-      }
-      const pendingUrl = sessionStorage.getItem("brito_redirect_url");
-      if (pendingUrl && pendingUrl !== "/") {
-        setRedirectTarget(pendingUrl);
       }
 
       // Verificar si existía un bloqueo temporal vigente
@@ -292,14 +287,6 @@ export default function LoginForm() {
 
             {/* Form */}
             <div className="px-5 sm:px-8 pb-8 sm:pb-10 pt-1 sm:pt-2 space-y-3.5 sm:space-y-4">
-              {redirectTarget && (
-                <div className="p-3.5 bg-amber-500/15 border border-amber-500/40 text-amber-200 text-xs rounded-2xl font-medium flex items-center gap-2.5 animate-in fade-in duration-200 shadow-lg">
-                  <ShieldCheck className="w-5 h-5 text-amber-400 shrink-0" />
-                  <p className="leading-snug">
-                    <strong className="text-white">Seguridad de Acceso:</strong> Por protección de la panadería, debes iniciar sesión en esta ventana para acceder a <span className="text-amber-400 font-bold">{redirectTarget}</span>.
-                  </p>
-                </div>
-              )}
 
               {error && (
                 <div className="p-3.5 bg-rose-500/15 border border-rose-500/35 text-rose-200 text-xs rounded-2xl font-semibold flex items-center gap-2.5 animate-in fade-in duration-200">
