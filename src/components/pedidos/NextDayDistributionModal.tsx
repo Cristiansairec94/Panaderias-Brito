@@ -222,6 +222,18 @@ export default function NextDayDistributionModal({
   const [expandedBranches, setExpandedBranches] = useState<Record<string, boolean>>({});
   const [expandedOrdersList, setExpandedOrdersList] = useState<Record<string, boolean>>({});
 
+  // Categorías de pan
+  const [storedCategories, setStoredCategories] = useState<ProductCategory[]>([]);
+  const [storedProducts, setStoredProducts] = useState<Product[]>([]);
+  const [breadCategoryFilter, setBreadCategoryFilter] = useState<string>("all");
+
+  useEffect(() => {
+    if (isOpen) {
+      setStoredCategories(getStoredCategories());
+      setStoredProducts(getStoredProducts());
+    }
+  }, [isOpen]);
+
   const printableRef = useRef<HTMLDivElement>(null);
 
   // Limpiar cachés obsoletas del Service Worker automáticamente
