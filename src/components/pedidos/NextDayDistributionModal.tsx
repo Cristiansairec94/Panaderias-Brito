@@ -1047,31 +1047,11 @@ export default function NextDayDistributionModal({
             </div>
           </div>
 
-          {totalGlobalPieces === 0 ? (
-            <div className="py-12 px-4 text-center bg-white rounded-3xl border-2 border-dashed border-stone-200 space-y-3">
-              <div className="w-16 h-16 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center text-3xl mx-auto">
-                🥖
-              </div>
-              <h4 className="text-base sm:text-lg font-black text-stone-800">
-                No hay pedidos de pan programados para repartir el {formatLongDateSpanish(selectedDate)}
-              </h4>
-              <p className="text-xs text-stone-500 max-w-md mx-auto">
-                No se registraron pedidos activos con fecha de entrega para este día. Si los clientes encargaron pedidos para hoy o días posteriores, puedes seleccionar otra fecha arriba.
-              </p>
-              <div className="pt-2 flex items-center justify-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setSelectedDate(dayAfterTomorrowISO)}
-                  className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-xl shadow-xs transition-colors cursor-pointer"
-                >
-                  Ver Pasado Mañana ({dayAfterTomorrowISO.slice(5)})
-                </button>
-              </div>
+          {filteredBranchGroups.length === 0 ? (
+            <div className="py-8 px-4 text-center bg-white rounded-2xl border border-stone-200 text-stone-500 text-xs">
+              No se encontraron sucursales o pedidos para esta fecha.
             </div>
           ) : (
-            /* ========================================================================= */
-            /* MODO 1: DESGLOSE POR SUCURSAL (CON LISTA DE PANES Y DETALLE EXPANDIBLE)   */
-            /* ========================================================================= */
             <div className="space-y-4">
               {filteredBranchGroups.map((group) => {
                 const hasPieces = group.totalPieces > 0;
