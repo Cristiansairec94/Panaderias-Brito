@@ -24,9 +24,9 @@ import {
   Filter,
   Eye
 } from "lucide-react";
-import { CustomOrder, Branch } from "@/types";
+import { CustomOrder, Branch, Product } from "@/types";
 import { formatCurrency, formatDeliveryDateDisplay } from "@/lib/utils";
-import { getStoredCategories, getStoredProducts, ProductCategory, Product } from "@/lib/products";
+import { getStoredCategories, getStoredProducts, ProductCategory } from "@/lib/products";
 
 interface NextDayDistributionModalProps {
   isOpen: boolean;
