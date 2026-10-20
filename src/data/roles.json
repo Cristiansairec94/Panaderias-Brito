@@ -58,7 +58,7 @@
       "canAccessIngresos": false,
       "canAccessGastos": false,
       "canAccessFinanzas": false,
-      "canAccessCaja": true,
+      "canAccessCaja": false,
       "canViewProfitMargins": false,
       "canAccessReportes": false,
       "canAccessConfiguracion": false,

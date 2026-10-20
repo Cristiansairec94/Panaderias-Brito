@@ -196,6 +196,9 @@ export default function Sidebar() {
       if (item.id === "ingresos" && (user?.role === "cajero" || !permissions?.canAccessIngresos)) {
         return null;
       }
+      if (item.id === "finanzas" && (user?.role === "cajero" || (!permissions?.canAccessCaja && !permissions?.canAccessFinanzas))) {
+        return null;
+      }
       const allowedChildren = item.items.filter((sub) => {
         const [cleanHref] = sub.href.split("?");
         if (cleanHref === "/configuracion") {
