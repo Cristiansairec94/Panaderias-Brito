@@ -1237,6 +1237,51 @@ export default function Home() {
           </div>
         )}
       </div>
+
+      {/* ========================================================= */}
+      {/* 8. DIRECT ERP CORE LINKS (Oculto para rol de cajeros)     */}
+      {/* ========================================================= */}
+      {user?.role !== "cajero" && !user?.roleLabel?.toLowerCase().includes("cajer") && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          {/* Clientes Card */}
+          <Link 
+            href="/clientes" 
+            className="group bg-white p-6 rounded-3xl border border-stone-200/90 shadow-sm hover:border-orange-500 hover:shadow-xl transition-all flex flex-col justify-between"
+          >
+            <div>
+              <div className="w-12 h-12 bg-blue-100 rounded-2xl flex items-center justify-center text-blue-700 mb-4 group-hover:scale-110 transition-transform">
+                <Users className="w-6 h-6" />
+              </div>
+              <h3 className="font-extrabold text-base text-stone-900">Clientes & Mayoristas</h3>
+              <p className="text-xs text-stone-500 mt-1.5 leading-relaxed">
+                Público general, tienditas de la esquina que compran bolillo al mayoreo, saldo y créditos.
+              </p>
+            </div>
+            <div className="mt-6 flex items-center gap-2 text-xs font-black text-blue-600 group-hover:translate-x-1 transition-transform">
+              Ver Directorio <ArrowRight className="w-4 h-4" />
+            </div>
+          </Link>
+
+          {/* Caja Card */}
+          <Link 
+            href="/caja" 
+            className="group bg-white p-6 rounded-3xl border border-stone-200/90 shadow-sm hover:border-orange-500 hover:shadow-xl transition-all flex flex-col justify-between"
+          >
+            <div>
+              <div className="w-12 h-12 bg-emerald-100 rounded-2xl flex items-center justify-center text-emerald-700 mb-4 group-hover:scale-110 transition-transform">
+                <Wallet className="w-6 h-6" />
+              </div>
+              <h3 className="font-extrabold text-base text-stone-900">Caja & Flujo de Dinero</h3>
+              <p className="text-xs text-stone-500 mt-1.5 leading-relaxed">
+                Control de turnos, gastos menores (gas, bolsas kraft), retiros de Don Toño y arqueo de caja.
+              </p>
+            </div>
+            <div className="mt-6 flex items-center gap-2 text-xs font-black text-emerald-600 group-hover:translate-x-1 transition-transform">
+              Administrar Caja <ArrowRight className="w-4 h-4" />
+            </div>
+          </Link>
+        </div>
+      )}
     </div>
   );
 }
