@@ -131,6 +131,21 @@ export default function PedidosPage() {
     (user.name && user.name.toLowerCase().includes("paulina")) ||
     (user.name && (user.name.toLowerCase().includes("toño") || user.name.toLowerCase().includes("tono")))
   );
+  // Control estricto de perfiles administrativos para funciones maestras (reparto de pan, producción multi-sucursal):
+  // Exclusivo para Don Toño, Paulina, Roberto Morales y perfiles directivos/administradores generales.
+  // Cualquier cajero(a), empleado o encargado de mostrador tiene esto estrictamente bloqueado y oculto.
+  const isAdministrativeProfile = Boolean(
+    isAdmin &&
+    user?.role !== "cajero" &&
+    user?.role !== "empleado" &&
+    user?.role !== "mostrador" &&
+    user?.role !== "panadero" &&
+    !user?.username?.toLowerCase().includes("cajer") &&
+    !user?.name?.toLowerCase().includes("cajer") &&
+    !user?.name?.toLowerCase().includes("andres") &&
+    !user?.name?.toLowerCase().includes("sanchez")
+  );
+
   const canFilterBranches = isAdmin;
   const userBranchId = (
     user?.assignedBranchId ||
@@ -1516,8 +1531,9 @@ export default function PedidosPage() {
           </div>
 
           <div className="flex items-center gap-2 self-end sm:self-auto flex-wrap">
-            {/* Botón Resumen de Reparto y Producción de Pan para el Día Siguiente */}
-            <button
+            {/* Botón Resumen de Reparto y Producción de Pan para el Día Siguiente (ESTRICTAMENTE ADMINISTRADORES) */}
+            {isAdministrativeProfile && (
+              <button
               type="button"
               onClick={() => setIsDistributionModalOpen(true)}
               className="flex items-center justify-center gap-1.5 bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-700 hover:to-teal-800 text-white font-black px-3.5 py-2 rounded-xl shadow-md hover:shadow-lg transition-all text-xs tracking-wide shrink-0 cursor-pointer active:scale-95 border border-emerald-400/30"
@@ -1531,7 +1547,7 @@ export default function PedidosPage() {
                 </span>
               )}
             </button>
-
+            )}
 
             <button
               type="button"
@@ -1888,8 +1904,9 @@ export default function PedidosPage() {
         </div>
       </div>
 
-      {/* Banner Informativo y Acceso Rápido a Resumen de Reparto para el Día Siguiente */}
-      <div className="bg-gradient-to-r from-emerald-900 via-teal-900 to-emerald-950 text-white p-3 sm:p-3.5 px-4 sm:px-5 rounded-2xl shadow-md border border-emerald-700/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-in fade-in duration-200">
+      {/* Banner Informativo y Acceso Rápido a Resumen de Reparto para el Día Siguiente (ESTRICTAMENTE ADMINISTRADORES) */}
+      {isAdministrativeProfile && (
+        <div className="bg-gradient-to-r from-emerald-900 via-teal-900 to-emerald-950 text-white p-3 sm:p-3.5 px-4 sm:px-5 rounded-2xl shadow-md border border-emerald-700/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-in fade-in duration-200">
         <div className="flex items-center gap-3 min-w-0">
           <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 flex items-center justify-center text-xl shrink-0 shadow-inner">
             🥖
@@ -1922,7 +1939,8 @@ export default function PedidosPage() {
             <ChevronRight className="w-3.5 h-3.5" />
           </button>
         </div>
-      </div>
+        </div>
+      )}
 
       {/* Barra Destacada de Historial con 2 Apartados: Pedidos entregados con éxito y Pedidos dados de baja */}
       <div className="bg-gradient-to-r from-stone-900 via-stone-850 to-stone-900 text-white p-3 sm:p-3.5 px-4 sm:px-5 rounded-2xl shadow-md border border-stone-800 flex flex-col lg:flex-row lg:items-center justify-between gap-3 animate-in fade-in duration-200">
@@ -4436,8 +4454,10 @@ export default function PedidosPage() {
           }
         }}
       />
-      {/* Modal de Resumen de Reparto y Producción de Pan para el Día Siguiente */}
-      <NextDayDistributionModal
+      {/* Modal de Resumen de Reparto y Producción de Pan para el Día Siguiente (ESTRICTAMENTE ADMINISTRADORES) */}
+      {isAdministrativeProfile && (
+        <NextDayDistributionModal
+          isAdmin={isAdministrativeProfile}
         isOpen={isDistributionModalOpen}
         onClose={() => setIsDistributionModalOpen(false)}
         orders={orders}
@@ -4445,7 +4465,8 @@ export default function PedidosPage() {
         onViewOrderDetail={(order) => {
           setSelectedOrderForDetail(order);
         }}
-      />
+        />
+      )}
     </div>
   );
 }

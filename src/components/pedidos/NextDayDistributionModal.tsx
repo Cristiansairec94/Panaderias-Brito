@@ -33,6 +33,7 @@ interface NextDayDistributionModalProps {
   orders: CustomOrder[];
   branches: Branch[];
   onViewOrderDetail?: (order: CustomOrder) => void;
+  isAdmin?: boolean;
 }
 
 // Interfaz para cada producto de pan extraído y sumado
@@ -171,7 +172,10 @@ export default function NextDayDistributionModal({
   orders,
   branches,
   onViewOrderDetail,
+  isAdmin = true,
 }: NextDayDistributionModalProps) {
+  if (!isOpen || isAdmin === false) return null;
+
   const tomorrowISO = useMemo(() => getTomorrowDateISO(), []);
   const todayISO = useMemo(() => getLocalDateISO(), []);
   const dayAfterTomorrowISO = useMemo(() => getDayAfterTomorrowDateISO(), []);

@@ -104,11 +104,11 @@ export function BarcodeScannerModal({
           return;
         }
 
-        setCameras(devices.map((d) => ({ id: d.id, label: d.label || `Cámara ${d.id}` })));
+        setCameras(devices.map((d: any) => ({ id: d.id, label: d.label || `Cámara ${d.id}` })));
 
         // Prefer rear / back camera on mobile phones
         const backCamera = devices.find(
-          (d) =>
+          (d: any) =>
             d.label.toLowerCase().includes("back") ||
             d.label.toLowerCase().includes("trasera") ||
             d.label.toLowerCase().includes("rear") ||
@@ -162,7 +162,7 @@ export function BarcodeScannerModal({
           qrbox: { width: 280, height: 160 },
           aspectRatio: 1.333333,
         },
-        (decodedText) => {
+        (decodedText: string) => {
           handleBarcodeDetected(decodedText);
         },
         () => {
