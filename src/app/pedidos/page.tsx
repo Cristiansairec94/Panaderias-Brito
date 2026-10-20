@@ -913,6 +913,19 @@ export default function PedidosPage() {
   }, [orders, effectiveBranchFilter, todayStr, checkOrderMatchesBranch]);
 
   // Conteo automático de piezas de pan para reparto de mañana (al día siguiente)
+  const [plannedBreadTrigger, setPlannedBreadTrigger] = useState(0);
+
+  useEffect(() => {
+    const handler = () => setPlannedBreadTrigger((prev) => prev + 1);
+    window.addEventListener("brito_planned_bread_updated", handler);
+    window.addEventListener("storage", handler);
+    return () => {
+      window.removeEventListener("brito_planned_bread_updated", handler);
+      window.removeEventListener("storage", handler);
+    };
+  }, []);
+
+  // Conteo automático de piezas de pan para reparto de mañana (al día siguiente)
   const tomorrowBreadStats = useMemo(() => {
     let totalPieces = 0;
     let ordersCount = 0;
@@ -933,13 +946,33 @@ export default function PedidosPage() {
       }
     });
 
+    let plannedPieces = 0;
+    if (typeof window !== "undefined") {
+      try {
+        const raw = localStorage.getItem("brito_planned_bread_" + tomorrowStr);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed && typeof parsed === "object") {
+            Object.values(parsed).forEach((val) => {
+              const n = Number(val);
+              if (n > 0) plannedPieces += n;
+            });
+          }
+        }
+      } catch {}
+    }
+
+    const grandTotal = totalPieces + plannedPieces;
+
     return {
       tomorrowStr,
-      totalPieces,
+      totalPieces: grandTotal,
+      ordersPieces: totalPieces,
+      plannedPieces,
       ordersCount,
       activeBranchesCount: branchesWithOrders.size,
     };
-  }, [orders, tomorrowStr]);
+  }, [orders, tomorrowStr, plannedBreadTrigger]);
 
   // Desglose de sumas por sucursal (para que las sumas de pedidos estén separadas por tienda y no revueltas)
   const branchOrdersBreakdown = useMemo(() => {
