@@ -1413,23 +1413,39 @@ export default function NextDayDistributionModal({
             )}
           </div>
 
-          {/* Card 2: Pedidos Programados / de Clientes */}
-          <div className="bg-white p-2.5 sm:p-3 rounded-2xl border border-amber-200/90 shadow-2xs flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-900 font-black text-xl flex items-center justify-center shrink-0">
-              📦
+          {/* Card 2: Pedidos (Botón Clickeable) */}
+          <button
+            type="button"
+            onClick={() => setViewMode("branch")}
+            className={`w-full text-left p-2.5 sm:p-3 rounded-2xl border-2 transition-all flex items-center justify-between gap-3 cursor-pointer group shadow-2xs hover:shadow-md ${
+              viewMode === "branch"
+                ? "bg-amber-50 border-amber-500 ring-2 ring-amber-400/40"
+                : "bg-white border-amber-200/90 hover:border-amber-400"
+            }`}
+            title="Toca para ver los pedidos programados"
+          >
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-900 font-black text-xl flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform shadow-2xs">
+                📦
+              </div>
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="text-[10px] uppercase font-bold text-stone-400 block leading-tight">
+                    Pedidos
+                  </span>
+                  <span className="text-[9px] font-black bg-amber-100 text-amber-900 px-2 py-0.5 rounded-full inline-flex items-center gap-1 border border-amber-200">
+                    <span>{viewMode === "branch" ? "✓ Viendo pedidos" : "Ver pedidos"}</span>
+                  </span>
+                </div>
+                <span className="text-xl sm:text-2xl font-black text-stone-900 block tabular-nums leading-tight">
+                  {totalGlobalOrders} <span className="text-xs font-bold text-stone-500">pedidos</span>
+                </span>
+                <span className="text-[10px] font-bold text-amber-800 block truncate">
+                  {totalGlobalPieces} pzas encargadas
+                </span>
+              </div>
             </div>
-            <div className="min-w-0">
-              <span className="text-[10px] uppercase font-bold text-stone-400 block leading-tight">
-                Pedidos de Clientes
-              </span>
-              <span className="text-xl sm:text-2xl font-black text-stone-900 block tabular-nums leading-tight">
-                {totalGlobalOrders} <span className="text-xs font-bold text-stone-500">pedidos</span>
-              </span>
-              <span className="text-[10px] font-bold text-amber-800 block truncate">
-                {totalGlobalPieces} pzas encargadas en {activeBranchesCount} sucursales
-              </span>
-            </div>
-          </div>
+          </button>
         </div>
 
         {/* Contenido Principal con Scroll */}
