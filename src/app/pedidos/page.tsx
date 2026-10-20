@@ -1534,19 +1534,27 @@ export default function PedidosPage() {
             {/* Botón Resumen de Reparto y Producción de Pan para el Día Siguiente (ESTRICTAMENTE ADMINISTRADORES) */}
             {isAdministrativeProfile && (
               <button
-              type="button"
-              onClick={() => setIsDistributionModalOpen(true)}
-              className="flex items-center justify-center gap-1.5 bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-700 hover:to-teal-800 text-white font-black px-3.5 py-2 rounded-xl shadow-md hover:shadow-lg transition-all text-xs tracking-wide shrink-0 cursor-pointer active:scale-95 border border-emerald-400/30"
-              title="Ver el resumen total de piezas de pan a hornear y repartir por sucursal para el día siguiente"
-            >
-              <Truck className="w-4 h-4 text-emerald-100 shrink-0" />
-              <span>🥖 Resumen de Reparto (Día Siguiente)</span>
-              {tomorrowBreadStats.totalPieces > 0 && (
-                <span className="bg-white text-emerald-950 text-[10px] font-black px-1.5 py-0.5 rounded-full shadow-2xs ml-0.5">
-                  {tomorrowBreadStats.totalPieces} pzas
+                type="button"
+                onClick={() => setIsDistributionModalOpen(true)}
+                className="flex items-center justify-center gap-2 sm:gap-2.5 bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-500 hover:via-teal-500 hover:to-emerald-600 text-white font-black px-4 sm:px-6 py-2.5 sm:py-3 rounded-2xl shadow-lg hover:shadow-xl hover:shadow-emerald-900/40 hover:-translate-y-0.5 transition-all text-sm sm:text-base tracking-tight shrink-0 cursor-pointer active:scale-95 border-2 border-emerald-300/60 ring-2 ring-emerald-400/40"
+                title="Ver el resumen total de piezas de pan a hornear y repartir por sucursal para el día siguiente"
+              >
+                <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-white/20 flex items-center justify-center shrink-0 shadow-inner">
+                  <Truck className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
+                </div>
+                <span className="font-black text-sm sm:text-base tracking-tight drop-shadow-xs">
+                  🥖 Resumen de Reparto (Día Siguiente)
                 </span>
-              )}
-            </button>
+                {tomorrowBreadStats.totalPieces > 0 ? (
+                  <span className="bg-amber-300 text-stone-950 text-xs sm:text-sm font-black px-2.5 py-0.5 rounded-full shadow-sm border border-amber-400">
+                    {tomorrowBreadStats.totalPieces} pzas
+                  </span>
+                ) : (
+                  <span className="bg-white/25 text-emerald-100 text-[10px] sm:text-xs font-bold px-2 py-0.5 rounded-full border border-white/30 hidden sm:inline-block">
+                    Ver Hoja
+                  </span>
+                )}
+              </button>
             )}
 
             <button

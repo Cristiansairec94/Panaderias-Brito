@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import { CustomOrder, Branch } from "@/types";
 import { formatCurrency, formatDeliveryDateDisplay } from "@/lib/utils";
+import { getStoredCategories, getStoredProducts, ProductCategory, Product } from "@/lib/products";
 
 interface NextDayDistributionModalProps {
   isOpen: boolean;
