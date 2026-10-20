@@ -165,18 +165,22 @@ const mapProductCategoryToBreadCat = (catId?: string, availableCats: ProductCate
   return catId;
 };
 
-const getCategoryLabel = (cat: string): string => {
+const getCategoryLabel = (cat: string, availableCats: ProductCategory[] = []): string => {
+  const match = availableCats.find((c) => c.id === cat || c.label.toLowerCase() === cat.toLowerCase());
+  if (match) return match.label;
   switch (cat) {
     case "pan_blanco": return "Pan Blanco & Sal";
     case "pan_dulce": return "Pan Dulce Tradicional";
     case "hojaldre": return "Hojaldres & Rellenos";
     case "pasteleria": return "Pastelería & Repostería";
     case "temporada": return "Especiales de Temporada";
-    default: return "Otras Variedades";
+    default: return cat.charAt(0).toUpperCase() + cat.slice(1).replace(/_/g, " ");
   }
 };
 
-const getCategoryIcon = (cat: string): string => {
+const getCategoryIcon = (cat: string, availableCats: ProductCategory[] = []): string => {
+  const match = availableCats.find((c) => c.id === cat || c.label.toLowerCase() === cat.toLowerCase());
+  if (match && match.icon) return match.icon;
   switch (cat) {
     case "pan_blanco": return "🥖";
     case "pan_dulce": return "🥐";
@@ -312,11 +316,63 @@ export default function NextDayDistributionModal({
   // Estados de Desglose de Tipos de Pan y Piezas Añadidas
   const [extraBreadMap, setExtraBreadMap] = useState<Record<string, number>>({});
   const [customVarieties, setCustomVarieties] = useState<BreadVariety[]>([]);
-  const [breadCategoryFilter, setBreadCategoryFilter] = useState<string>("all");
+    const [breadCategoryFilter, setBreadCategoryFilter] = useState<string>("all");
   const [isAddVarietyModalOpen, setIsAddVarietyModalOpen] = useState(false);
   const [newVarietyName, setNewVarietyName] = useState("");
-  const [newVarietyCategory, setNewVarietyCategory] = useState<BreadVariety["category"]>("pan_dulce");
+  const [newVarietyCategory, setNewVarietyCategory] = useState<string>("pan_dulce");
   const [newVarietyInitialPieces, setNewVarietyInitialPieces] = useState<number>(20);
+
+  // Categorías de pan dinámicas del sistema Brito (reactivas a nuevas categorías añadidas)
+  const [storedCategories, setStoredCategories] = useState<ProductCategory[]>(() => {
+    return typeof window !== "undefined" ? getStoredCategories() : [];
+  });
+  const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false);
+  const [isCreateCategoryModalOpen, setIsCreateCategoryModalOpen] = useState(false);
+  const [newCatLabel, setNewCatLabel] = useState("");
+  const [newCatIcon, setNewCatIcon] = useState("🥖");
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleCategoriesUpdate = () => {
+      setStoredCategories(getStoredCategories());
+    };
+    handleCategoriesUpdate();
+    window.addEventListener("brito_categories_updated", handleCategoriesUpdate);
+    window.addEventListener("storage", handleCategoriesUpdate);
+    return () => {
+      window.removeEventListener("brito_categories_updated", handleCategoriesUpdate);
+      window.removeEventListener("storage", handleCategoriesUpdate);
+    };
+  }, []);
+
+  // Cerrar desplegable al hacer clic fuera
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setIsCategoryDropdownOpen(false);
+      }
+    };
+    if (isCategoryDropdownOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [isCategoryDropdownOpen]);
+
+  // Crear y guardar una nueva categoría de pan
+  const handleCreateCategory = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newCatLabel.trim()) return;
+    const created = addCategory({
+      label: newCatLabel.trim(),
+      icon: newCatIcon || "🥖",
+    });
+    setNewCatLabel("");
+    setNewCatIcon("🥖");
+    setIsCreateCategoryModalOpen(false);
+    setBreadCategoryFilter(created.id);
+  };
 
   const printableRef = useRef<HTMLDivElement>(null);
 
@@ -430,7 +486,7 @@ export default function NextDayDistributionModal({
       id: newId,
       name: trimmed,
       category: cat,
-      categoryLabel: getCategoryLabel(cat),
+      categoryLabel: getCategoryLabel(cat, storedCategories),
       icon: getCategoryIcon(cat),
     };
 
@@ -681,7 +737,7 @@ export default function NextDayDistributionModal({
       catalogProds.forEach((p) => {
         if (!p || !p.name) return;
         const key = normalizeProductName(p.name);
-        const cat = mapProductCategoryToBreadCat(p.category);
+        const cat = mapProductCategoryToBreadCat(p.category, storedCategories);
         if (!map.has(key)) {
           map.set(key, {
             key,
@@ -689,7 +745,7 @@ export default function NextDayDistributionModal({
             name: p.name,
             category: cat,
             categoryLabel: getCategoryLabel(cat),
-            icon: p.icon || getCategoryIcon(cat),
+            icon: p.icon || getCategoryIcon(cat, storedCategories),
             price: p.price,
             orderPieces: 0,
             ordersCount: 0,
@@ -766,8 +822,42 @@ export default function NextDayDistributionModal({
       return a.name.localeCompare(b.name);
     });
 
-    return list;
-  }, [globalConsolidated, customVarieties, extraBreadMap]);
+        return list;
+  }, [globalConsolidated, customVarieties, extraBreadMap, storedCategories]);
+
+  // Todas las categorías de pan dinámicas (integrando existentes y todas las que se añadan)
+  const allBreadCategories = useMemo(() => {
+    const map = new Map<string, { id: string; label: string; icon: string }>();
+
+    // 1. Categorías del sistema Brito (brito_categories_v1)
+    storedCategories.forEach((cat) => {
+      map.set(cat.id, {
+        id: cat.id,
+        label: cat.label,
+        icon: cat.icon || "🥖",
+      });
+    });
+
+    // 2. Variedades base tradicionales por si acaso
+    if (!map.has("pan_dulce")) map.set("pan_dulce", { id: "pan_dulce", label: "Pan Dulce Tradicional", icon: "🥐" });
+    if (!map.has("pan_blanco")) map.set("pan_blanco", { id: "pan_blanco", label: "Bolillo & Telera", icon: "🥖" });
+    if (!map.has("hojaldre")) map.set("hojaldre", { id: "hojaldre", label: "Hojaldres & Rellenos", icon: "🥟" });
+    if (!map.has("pasteleria")) map.set("pasteleria", { id: "pasteleria", label: "Pastelería & Repostería", icon: "🍰" });
+    if (!map.has("temporada")) map.set("temporada", { id: "temporada", label: "Especiales de Temporada", icon: "✨" });
+
+    // 3. Cualquier categoría registrada en customVarieties
+    customVarieties.forEach((v) => {
+      if (v.category && !map.has(v.category)) {
+        map.set(v.category, {
+          id: v.category,
+          label: v.categoryLabel || v.category,
+          icon: v.icon || "🍞",
+        });
+      }
+    });
+
+    return Array.from(map.values());
+  }, [storedCategories, customVarieties]);
 
   // Totales combinados
   const totalExtraPieces = useMemo(() => {
@@ -781,6 +871,39 @@ export default function NextDayDistributionModal({
   const activeVarietiesCount = useMemo(() => {
     return unifiedBreadList.filter((item) => item.totalPieces > 0).length;
   }, [unifiedBreadList]);
+
+  // Cálculo de piezas desglosadas por categoría
+  const categoryStats = useMemo(() => {
+    const stats: Record<string, { totalPieces: number; orderPieces: number; extraPieces: number; count: number }> = {};
+    allBreadCategories.forEach((cat) => {
+      stats[cat.id] = { totalPieces: 0, orderPieces: 0, extraPieces: 0, count: 0 };
+    });
+
+    unifiedBreadList.forEach((row) => {
+      const catId = row.category;
+      if (!stats[catId]) {
+        stats[catId] = { totalPieces: 0, orderPieces: 0, extraPieces: 0, count: 0 };
+      }
+      stats[catId].totalPieces += row.totalPieces;
+      stats[catId].orderPieces += row.orderPieces;
+      stats[catId].extraPieces += row.extraPieces;
+      stats[catId].count += 1;
+    });
+
+    return stats;
+  }, [allBreadCategories, unifiedBreadList]);
+
+  // Información de la categoría seleccionada actualmente
+  const selectedCatInfo = useMemo(() => {
+    if (breadCategoryFilter === "all" || breadCategoryFilter === "active") return null;
+    return allBreadCategories.find((c) => c.id === breadCategoryFilter) || null;
+  }, [breadCategoryFilter, allBreadCategories]);
+
+  // Piezas a mostrar en la tarjeta según filtro activo
+  const displayedPieces = useMemo(() => {
+    if (breadCategoryFilter === "all" || breadCategoryFilter === "active") return totalCombinedPieces;
+    return categoryStats[breadCategoryFilter]?.totalPieces || 0;
+  }, [breadCategoryFilter, totalCombinedPieces, categoryStats]);
 
   // Filtrado de la lista desglosada por búsqueda y categoría
   const filteredUnifiedBreadList = useMemo(() => {
@@ -1117,46 +1240,180 @@ export default function NextDayDistributionModal({
           </div>
         </div>
 
-        {/* Tarjetas KPI Resumen del Día (Total Interactivo y Desglosable) */}
-        <div className="p-3 sm:p-4 bg-[#f8f5ef] border-b border-[#e8ded2] grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 shrink-0">
-          {/* Card 1: TOTAL PIEZAS DE PAN (Clickeable para ver y añadir opciones) */}
-          <div
-            onClick={() => setViewMode("bread_options")}
-            className={`p-2.5 sm:p-3 rounded-2xl border-2 transition-all flex items-center justify-between gap-2 cursor-pointer group shadow-2xs hover:shadow-md ${
-              viewMode === "bread_options"
-                ? "bg-emerald-50 border-emerald-500 ring-2 ring-emerald-400/40"
-                : "bg-white border-emerald-300 hover:border-emerald-500"
-            }`}
-            title="Toca para desglosar y programar todas las opciones y tipos de pan"
-          >
-            <div className="flex items-center gap-3 min-w-0">
-              <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-800 font-black text-xl flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
-                🥖
-              </div>
-              <div className="min-w-0">
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  <span className="text-[10px] uppercase font-bold text-stone-400 block leading-tight">
-                    Total Piezas de Pan
+        {/* Tarjetas KPI Resumen del Día: Total con Desplegable Dinámico de Categorías */}
+        <div className="p-3 sm:p-4 bg-[#f8f5ef] border-b border-[#e8ded2] grid grid-cols-2 gap-2 sm:gap-3 shrink-0">
+          {/* Card 1: TOTAL PIEZAS DE PAN (DESPLEGABLE CON TODAS LAS CATEGORÍAS) */}
+          <div ref={dropdownRef} className="relative">
+            <div
+              onClick={() => setIsCategoryDropdownOpen((prev) => !prev)}
+              className={`p-2.5 sm:p-3 rounded-2xl border-2 transition-all flex items-center justify-between gap-2 cursor-pointer group shadow-2xs hover:shadow-md ${
+                isCategoryDropdownOpen
+                  ? "bg-emerald-50 border-emerald-600 ring-2 ring-emerald-400/40"
+                  : breadCategoryFilter !== "all"
+                  ? "bg-emerald-50/70 border-emerald-500 ring-1 ring-emerald-300"
+                  : "bg-white border-emerald-300 hover:border-emerald-500"
+              }`}
+              title="Toca para desplegar todas las categorías de pan disponibles"
+            >
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-800 font-black text-xl flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform shadow-2xs">
+                  {selectedCatInfo?.icon || "🥖"}
+                </div>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="text-[10px] uppercase font-bold text-stone-400 block leading-tight">
+                      Total Piezas de Pan
+                    </span>
+                    <span className="text-[9px] font-black bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full inline-flex items-center gap-1 border border-emerald-200">
+                      <span>{breadCategoryFilter === "all" ? "Todas las Categorías" : (selectedCatInfo?.label || "Categoría")}</span>
+                      <ChevronDown className={`w-3 h-3 text-emerald-700 transition-transform ${isCategoryDropdownOpen ? "rotate-180" : ""}`} />
+                    </span>
+                  </div>
+                  <span className="text-xl sm:text-2xl font-black text-emerald-950 block tabular-nums leading-tight">
+                    {displayedPieces} <span className="text-xs font-bold text-stone-500">pzas</span>
                   </span>
-                  <span className="text-[9px] font-black bg-emerald-100 text-emerald-800 px-1.5 py-0.2 rounded-full hidden sm:inline-block">
-                    {viewMode === "bread_options" ? "✓ Desglosando" : "Desglosar ▾"}
+                  <span className="text-[10px] font-bold text-emerald-700 block truncate">
+                    {breadCategoryFilter !== "all"
+                      ? `${displayedPieces} piezas de ${selectedCatInfo?.label || "esta categoría"}`
+                      : totalExtraPieces > 0
+                      ? `${totalGlobalPieces} pedidos + ${totalExtraPieces} añadidos`
+                      : totalGlobalPieces > 0
+                      ? `${totalGlobalPieces} pzas en pedidos`
+                      : "Desplegable de categorías"}
                   </span>
                 </div>
-                <span className="text-xl sm:text-2xl font-black text-emerald-950 block tabular-nums leading-tight">
-                  {totalCombinedPieces} <span className="text-xs font-bold text-stone-500">pzas</span>
-                </span>
-                <span className="text-[10px] font-bold text-emerald-700 block truncate">
-                  {totalExtraPieces > 0
-                    ? `${totalGlobalPieces} pedidos + ${totalExtraPieces} añadidos`
-                    : totalGlobalPieces > 0
-                    ? `${totalGlobalPieces} pzas en pedidos`
-                    : "Toca para añadir panes"}
-                </span>
               </div>
             </div>
+
+            {/* Menú Desplegable Flotante con TODAS las Categorías de Pan y las que se vayan añadiendo */}
+            {isCategoryDropdownOpen && (
+              <div className="absolute top-full left-0 mt-2 z-50 w-full min-w-[290px] sm:min-w-[360px] bg-white rounded-2xl border-2 border-emerald-500 shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+                <div className="p-3 bg-gradient-to-r from-emerald-800 to-teal-900 text-white flex items-center justify-between">
+                  <div>
+                    <span className="text-[10px] uppercase tracking-wider font-extrabold text-emerald-200 block">
+                      Categorías de Pan
+                    </span>
+                    <p className="text-xs font-bold text-white">
+                      Desglose y filtro por variedad
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setIsCreateCategoryModalOpen(true);
+                      setIsCategoryDropdownOpen(false);
+                    }}
+                    className="text-[10px] font-black bg-emerald-700 hover:bg-emerald-600 text-white px-2 py-1 rounded-lg flex items-center gap-1 transition-colors cursor-pointer border border-emerald-500 shadow-2xs"
+                    title="Añadir una nueva categoría de pan al sistema Brito"
+                  >
+                    <Plus className="w-3 h-3" />
+                    <span>+ Añadir Categoría</span>
+                  </button>
+                </div>
+
+                <div className="max-h-72 overflow-y-auto p-1.5 space-y-1 divide-y divide-stone-100">
+                  {/* Opción 1: Todas las Categorías */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setBreadCategoryFilter("all");
+                      setIsCategoryDropdownOpen(false);
+                    }}
+                    className={`w-full text-left p-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-between cursor-pointer ${
+                      breadCategoryFilter === "all"
+                        ? "bg-emerald-100/90 text-emerald-950 font-black border border-emerald-300"
+                        : "hover:bg-stone-100 text-stone-700"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <span className="text-lg">🧺</span>
+                      <div>
+                        <span className="block leading-tight font-black">Todas las Categorías de Pan</span>
+                        <span className="text-[10px] text-stone-400 font-medium">
+                          {unifiedBreadList.length} tipos de pan en catálogo
+                        </span>
+                      </div>
+                    </div>
+                    <span className="text-xs font-black text-emerald-900 tabular-nums bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+                      {totalCombinedPieces} pzas
+                    </span>
+                  </button>
+
+                  {/* Lista dinámica de categorías de pan y las que se vayan añadiendo */}
+                  {allBreadCategories.map((cat) => {
+                    const stats = categoryStats[cat.id] || { totalPieces: 0, orderPieces: 0, extraPieces: 0, count: 0 };
+                    const isSelected = breadCategoryFilter === cat.id;
+                    return (
+                      <button
+                        key={cat.id}
+                        type="button"
+                        onClick={() => {
+                          setBreadCategoryFilter(cat.id);
+                          setIsCategoryDropdownOpen(false);
+                          if (viewMode !== "bread_options") setViewMode("bread_options");
+                        }}
+                        className={`w-full text-left p-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-between cursor-pointer ${
+                          isSelected
+                            ? "bg-emerald-100/90 text-emerald-950 font-black border border-emerald-300 shadow-2xs"
+                            : "hover:bg-stone-50 text-stone-800"
+                        }`}
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <span className="text-lg shrink-0">{cat.icon}</span>
+                          <div className="min-w-0">
+                            <span className="block leading-tight font-bold truncate">
+                              {cat.label}
+                            </span>
+                            <span className="text-[10px] text-stone-400 font-medium block">
+                              {stats.count} variedades {stats.orderPieces > 0 ? `· ${stats.orderPieces} en pedidos` : ""}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="text-right shrink-0 ml-2">
+                          <span className={`text-xs font-black tabular-nums px-2 py-0.5 rounded-md ${
+                            stats.totalPieces > 0
+                              ? "bg-emerald-600 text-white shadow-2xs"
+                              : "bg-stone-100 text-stone-500"
+                          }`}>
+                            {stats.totalPieces} pzas
+                          </span>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div className="p-2 bg-stone-50 border-t border-stone-100 flex items-center justify-between text-[11px]">
+                  {breadCategoryFilter !== "all" && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setBreadCategoryFilter("all");
+                        setIsCategoryDropdownOpen(false);
+                      }}
+                      className="text-stone-500 hover:text-stone-800 font-bold underline cursor-pointer"
+                    >
+                      Quitar filtro de categoría
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsCreateCategoryModalOpen(true);
+                      setIsCategoryDropdownOpen(false);
+                    }}
+                    className="ml-auto text-emerald-800 hover:text-emerald-950 font-black flex items-center gap-1 cursor-pointer"
+                  >
+                    <Plus className="w-3 h-3" />
+                    <span>+ Nueva Categoría</span>
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
-          {/* Card 2: Pedidos Programados */}
+          {/* Card 2: Pedidos Programados / de Clientes */}
           <div className="bg-white p-2.5 sm:p-3 rounded-2xl border border-amber-200/90 shadow-2xs flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-900 font-black text-xl flex items-center justify-center shrink-0">
               📦
@@ -1169,53 +1426,7 @@ export default function NextDayDistributionModal({
                 {totalGlobalOrders} <span className="text-xs font-bold text-stone-500">pedidos</span>
               </span>
               <span className="text-[10px] font-bold text-amber-800 block truncate">
-                {totalGlobalPieces} pzas encargadas
-              </span>
-            </div>
-          </div>
-
-          {/* Card 3: Sucursales con Entregas */}
-          <div className="bg-white p-2.5 sm:p-3 rounded-2xl border border-sky-200/90 shadow-2xs flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-sky-100 text-sky-900 font-black text-xl flex items-center justify-center shrink-0">
-              🏬
-            </div>
-            <div className="min-w-0">
-              <span className="text-[10px] uppercase font-bold text-stone-400 block leading-tight">
-                Sucursales Entrega
-              </span>
-              <span className="text-xl sm:text-2xl font-black text-sky-950 block tabular-nums leading-tight">
-                {activeBranchesCount} <span className="text-xs font-bold text-stone-500">tiendas</span>
-              </span>
-              <span className="text-[10px] font-bold text-sky-800 block truncate">
-                de {branches.length} activas
-              </span>
-            </div>
-          </div>
-
-          {/* Card 4: Variedades de Pan (Clickeable) */}
-          <div
-            onClick={() => setViewMode("bread_options")}
-            className={`p-2.5 sm:p-3 rounded-2xl border-2 transition-all flex items-center gap-3 cursor-pointer group shadow-2xs hover:shadow-md ${
-              viewMode === "bread_options"
-                ? "bg-orange-50 border-orange-400"
-                : "bg-white border-orange-200/90 hover:border-orange-400"
-            }`}
-            title="Toca para ver el desglose de todas las variedades"
-          >
-            <div className="w-10 h-10 rounded-xl bg-orange-100 text-orange-900 font-black text-xl flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
-              🥐
-            </div>
-            <div className="min-w-0">
-              <div className="flex items-center gap-1">
-                <span className="text-[10px] uppercase font-bold text-stone-400 block leading-tight">
-                  Variedades de Pan
-                </span>
-              </div>
-              <span className="text-xl sm:text-2xl font-black text-orange-950 block tabular-nums leading-tight">
-                {activeVarietiesCount} <span className="text-xs font-bold text-stone-500">activas</span>
-              </span>
-              <span className="text-[10px] font-bold text-stone-400 block truncate">
-                de {unifiedBreadList.length} en catálogo
+                {totalGlobalPieces} pzas encargadas en {activeBranchesCount} sucursales
               </span>
             </div>
           </div>
@@ -1296,7 +1507,7 @@ export default function NextDayDistributionModal({
                 </div>
               </div>
 
-              {/* Filtro por Categorías de Pan */}
+              {/* Filtro por Categorías de Pan (Dinámico y Actualizable) */}
               <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
                 <button
                   type="button"
@@ -1312,58 +1523,6 @@ export default function NextDayDistributionModal({
 
                 <button
                   type="button"
-                  onClick={() => setBreadCategoryFilter("pan_blanco")}
-                  className={`px-3 py-1.5 rounded-xl font-bold transition-all shrink-0 cursor-pointer flex items-center gap-1 ${
-                    breadCategoryFilter === "pan_blanco"
-                      ? "bg-amber-700 text-white shadow-2xs font-black"
-                      : "bg-white border border-stone-200 text-stone-600 hover:bg-stone-50"
-                  }`}
-                >
-                  <span>🥖</span>
-                  <span>Pan Blanco & Sal</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setBreadCategoryFilter("pan_dulce")}
-                  className={`px-3 py-1.5 rounded-xl font-bold transition-all shrink-0 cursor-pointer flex items-center gap-1 ${
-                    breadCategoryFilter === "pan_dulce"
-                      ? "bg-amber-700 text-white shadow-2xs font-black"
-                      : "bg-white border border-stone-200 text-stone-600 hover:bg-stone-50"
-                  }`}
-                >
-                  <span>🥐</span>
-                  <span>Pan Dulce</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setBreadCategoryFilter("hojaldre")}
-                  className={`px-3 py-1.5 rounded-xl font-bold transition-all shrink-0 cursor-pointer flex items-center gap-1 ${
-                    breadCategoryFilter === "hojaldre"
-                      ? "bg-amber-700 text-white shadow-2xs font-black"
-                      : "bg-white border border-stone-200 text-stone-600 hover:bg-stone-50"
-                  }`}
-                >
-                  <span>🥟</span>
-                  <span>Hojaldres & Rellenos</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setBreadCategoryFilter("pasteleria")}
-                  className={`px-3 py-1.5 rounded-xl font-bold transition-all shrink-0 cursor-pointer flex items-center gap-1 ${
-                    breadCategoryFilter === "pasteleria"
-                      ? "bg-amber-700 text-white shadow-2xs font-black"
-                      : "bg-white border border-stone-200 text-stone-600 hover:bg-stone-50"
-                  }`}
-                >
-                  <span>🍰</span>
-                  <span>Pastelería</span>
-                </button>
-
-                <button
-                  type="button"
                   onClick={() => setBreadCategoryFilter("active")}
                   className={`px-3 py-1.5 rounded-xl font-bold transition-all shrink-0 cursor-pointer flex items-center gap-1 ${
                     breadCategoryFilter === "active"
@@ -1372,7 +1531,45 @@ export default function NextDayDistributionModal({
                   }`}
                 >
                   <span>⭐</span>
-                  <span>Con Piezas Programadas ({activeVarietiesCount})</span>
+                  <span>Con Piezas ({activeVarietiesCount})</span>
+                </button>
+
+                {allBreadCategories.map((cat) => {
+                  const stats = categoryStats[cat.id];
+                  const pieces = stats?.totalPieces || 0;
+                  const isSelected = breadCategoryFilter === cat.id;
+                  return (
+                    <button
+                      key={cat.id}
+                      type="button"
+                      onClick={() => setBreadCategoryFilter(cat.id)}
+                      className={`px-3 py-1.5 rounded-xl font-bold transition-all shrink-0 cursor-pointer flex items-center gap-1.5 ${
+                        isSelected
+                          ? "bg-amber-700 text-white shadow-2xs font-black"
+                          : "bg-white border border-stone-200 text-stone-700 hover:bg-stone-50"
+                      }`}
+                    >
+                      <span>{cat.icon}</span>
+                      <span>{cat.label}</span>
+                      {pieces > 0 && (
+                        <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-black ${
+                          isSelected ? "bg-amber-900 text-white" : "bg-emerald-100 text-emerald-800"
+                        }`}>
+                          {pieces}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+
+                <button
+                  type="button"
+                  onClick={() => setIsCreateCategoryModalOpen(true)}
+                  className="px-2.5 py-1.5 rounded-xl border border-dashed border-stone-300 hover:border-emerald-500 text-stone-600 hover:text-emerald-800 font-bold transition-all shrink-0 cursor-pointer flex items-center gap-1 bg-stone-50"
+                  title="Añadir una nueva categoría de pan"
+                >
+                  <Plus className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>+ Nueva Categoría</span>
                 </button>
               </div>
 
@@ -1987,15 +2184,14 @@ export default function NextDayDistributionModal({
                   </label>
                   <select
                     value={newVarietyCategory}
-                    onChange={(e) => setNewVarietyCategory(e.target.value as any)}
+                    onChange={(e) => setNewVarietyCategory(e.target.value)}
                     className="w-full px-3 py-2 rounded-xl border border-stone-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 font-bold text-stone-800 bg-white"
                   >
-                    <option value="pan_dulce">🥐 Pan Dulce Tradicional</option>
-                    <option value="pan_blanco">🥖 Pan Blanco & Sal</option>
-                    <option value="hojaldre">🥟 Hojaldres & Rellenos</option>
-                    <option value="pasteleria">🍰 Pastelería & Repostería</option>
-                    <option value="temporada">✨ Especiales de Temporada</option>
-                    <option value="otro">🍞 Otras Variedades</option>
+                    {allBreadCategories.map((cat) => (
+                      <option key={cat.id} value={cat.id}>
+                        {cat.icon} {cat.label}
+                      </option>
+                    ))}
                   </select>
                 </div>
 
@@ -2029,6 +2225,91 @@ export default function NextDayDistributionModal({
                     className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black cursor-pointer shadow-xs"
                   >
                     Guardar y Añadir a la Lista
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+        {/* Modal Emergente para Crear Nueva Categoría de Pan */}
+        {isCreateCategoryModalOpen && (
+          <div className="fixed inset-0 z-70 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">
+            <div
+              className="bg-white rounded-3xl p-5 border border-stone-200 shadow-2xl max-w-sm w-full space-y-4"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between border-b pb-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-xl">🏷️</span>
+                  <h4 className="text-base font-black text-stone-900">
+                    Nueva Categoría de Pan
+                  </h4>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsCreateCategoryModalOpen(false)}
+                  className="w-7 h-7 rounded-full bg-stone-100 hover:bg-stone-200 flex items-center justify-center text-stone-600 cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <form onSubmit={handleCreateCategory} className="space-y-3.5 text-xs">
+                <div>
+                  <label className="block font-bold text-stone-700 mb-1">
+                    Nombre de la Categoría:
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Ej. Pan Rústico, Baguettes, Galletas..."
+                    value={newCatLabel}
+                    onChange={(e) => setNewCatLabel(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-stone-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 font-bold text-stone-900"
+                    autoFocus
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-bold text-stone-700 mb-1">
+                    Icono / Emoji:
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      maxLength={4}
+                      value={newCatIcon}
+                      onChange={(e) => setNewCatIcon(e.target.value)}
+                      className="w-16 text-center text-xl px-2 py-1.5 rounded-xl border border-stone-200 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    />
+                    <div className="flex items-center gap-1 overflow-x-auto text-lg p-1 bg-stone-50 rounded-xl border border-stone-200">
+                      {["🥖", "🥐", "🍞", "🥟", "🍰", "🧁", "🍪", "✨", "🌾"].map((emoji) => (
+                        <button
+                          key={emoji}
+                          type="button"
+                          onClick={() => setNewCatIcon(emoji)}
+                          className="hover:scale-125 transition-transform p-1 cursor-pointer"
+                        >
+                          {emoji}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="pt-2 flex items-center justify-end gap-2 border-t">
+                  <button
+                    type="button"
+                    onClick={() => setIsCreateCategoryModalOpen(false)}
+                    className="px-3.5 py-2 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 font-bold cursor-pointer"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black cursor-pointer shadow-xs"
+                  >
+                    Guardar Categoría
                   </button>
                 </div>
               </form>
