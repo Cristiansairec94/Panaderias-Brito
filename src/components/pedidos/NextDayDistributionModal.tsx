@@ -9,9 +9,7 @@ import {
   Check,
   Calendar,
   Clock,
-  Store,
   ShoppingBag,
-  ChefHat,
   ChevronDown,
   ChevronUp,
   Search,
@@ -411,7 +409,6 @@ export default function NextDayDistributionModal({
   // Filtros
   const [selectedDate, setSelectedDate] = useState<string>(tomorrowISO);
   const [selectedBranchId, setSelectedBranchId] = useState<string>("all");
-  const [viewMode, setViewMode] = useState<"branch" | "consolidated">("branch");
   const [searchProduct, setSearchProduct] = useState("");
   const [includeDelivered, setIncludeDelivered] = useState(false);
   const [copiedToast, setCopiedToast] = useState(false);
@@ -725,20 +722,7 @@ export default function NextDayDistributionModal({
       .filter((g) => (breadCategoryFilter === "all" && !searchProduct.trim()) || g.items.length > 0);
   }, [branchGroups, selectedBranchId, breadCategoryFilter, searchProduct, storedProducts]);
 
-  // Filtrado de lista consolidada global por categoría y buscador
-  const filteredConsolidated = useMemo(() => {
-    return globalConsolidated.filter((it) => {
-      if (breadCategoryFilter !== "all") {
-        const cat = it.categoryId || resolveBreadCategory(it.name, undefined, storedProducts);
-        if (cat !== breadCategoryFilter) return false;
-      }
-      if (searchProduct.trim()) {
-        const q = normalizeProductName(searchProduct);
-        if (!normalizeProductName(it.name).includes(q)) return false;
-      }
-      return true;
-    });
-  }, [globalConsolidated, breadCategoryFilter, searchProduct, storedProducts]);
+
 
   // Conteo de sucursales activas (con al menos 1 pieza de pan)
   const activeBranchesCount = useMemo(() => {
@@ -938,39 +922,9 @@ export default function NextDayDistributionModal({
 
           {/* Segunda Fila: Modos de Vista, Filtro de Sucursal y Buscador */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pt-2 border-t border-stone-100">
-            {/* Toggle de Modo: Por Sucursal vs Consolidado General */}
-            <div className="flex items-center bg-stone-100 p-1 rounded-xl shrink-0">
-              <button
-                type="button"
-                onClick={() => setViewMode("branch")}
-                className={`px-3 py-1 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer ${
-                  viewMode === "branch"
-                    ? "bg-white text-stone-900 shadow-2xs"
-                    : "text-stone-500 hover:text-stone-800"
-                }`}
-              >
-                <Store className="w-3.5 h-3.5" />
-                <span>Desglose por Sucursal</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setViewMode("consolidated")}
-                className={`px-3 py-1 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer ${
-                  viewMode === "consolidated"
-                    ? "bg-white text-stone-900 shadow-2xs"
-                    : "text-stone-500 hover:text-stone-800"
-                }`}
-              >
-                <ChefHat className="w-3.5 h-3.5" />
-                <span>Consolidado para Horneado ({globalConsolidated.length} panes)</span>
-              </button>
-            </div>
-
             {/* Filtros de Sucursal y Búsqueda */}
             <div className="flex items-center gap-2 flex-wrap">
-              {viewMode === "branch" && (
-                <div className="relative">
+                              <div className="relative">
                   <select
                     value={selectedBranchId}
                     onChange={(e) => setSelectedBranchId(e.target.value)}
@@ -985,7 +939,6 @@ export default function NextDayDistributionModal({
                   </select>
                   <ChevronDown className="w-3.5 h-3.5 text-stone-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
                 </div>
-              )}
 
               {/* Buscador de pan específico */}
               <div className="relative min-w-[160px] sm:min-w-[200px]">
@@ -1113,89 +1066,6 @@ export default function NextDayDistributionModal({
                 >
                   Ver Pasado Mañana ({dayAfterTomorrowISO.slice(5)})
                 </button>
-              </div>
-            </div>
-          ) : viewMode === "consolidated" ? (
-            /* ========================================================================= */
-            /* MODO 2: CONSOLIDADO GENERAL PARA EL TALLER / HORNEADO                     */
-            /* ========================================================================= */
-            <div className="space-y-3">
-              <div className="bg-amber-50/90 border border-amber-200/90 p-3 sm:p-3.5 rounded-2xl flex items-center justify-between flex-wrap gap-2">
-                <div className="flex items-center gap-2">
-                  <ChefHat className="w-5 h-5 text-amber-700 shrink-0" />
-                  <div>
-                    <h4 className="text-xs sm:text-sm font-black text-amber-950">
-                      Lista Maestra de Horneado y Material Necesario
-                    </h4>
-                    <p className="text-[11px] text-amber-800 font-medium">
-                      Suma global de todas las piezas requeridas para todas las sucursales el {formatLongDateSpanish(selectedDate)}
-                    </p>
-                  </div>
-                </div>
-
-                <span className="font-mono text-xs font-black bg-white px-3 py-1 rounded-xl text-amber-900 border border-amber-300 shadow-2xs">
-                  {totalGlobalPieces} piezas en total
-                </span>
-              </div>
-
-              <div className="bg-white rounded-2xl border border-stone-200 overflow-hidden shadow-xs">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left border-collapse text-xs">
-                    <thead>
-                      <tr className="bg-stone-100 text-stone-600 border-b border-stone-200 text-[11px] font-black uppercase tracking-wider">
-                        <th className="py-2.5 px-3">#</th>
-                        <th className="py-2.5 px-3">Tipo de Pan / Producto</th>
-                        <th className="py-2.5 px-3 text-center">Total Piezas a Hornear</th>
-                        <th className="py-2.5 px-3 text-center">Pedidos</th>
-                        <th className="py-2.5 px-3">Desglose por Sucursal de Destino</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-stone-100">
-                      {filteredConsolidated.map((item, idx) => {
-                        // Calcular desglose de cuántas piezas van para cada sucursal
-                        const branchCounts: Record<string, number> = {};
-                        item.ordersDetails.forEach((od) => {
-                          const bName = od.order.branchName || "Matriz";
-                          branchCounts[bName] = (branchCounts[bName] || 0) + od.quantity;
-                        });
-
-                        return (
-                          <tr key={idx} className="hover:bg-amber-50/50 transition-colors">
-                            <td className="py-2.5 px-3 text-stone-400 font-mono font-bold">
-                              {idx + 1}
-                            </td>
-                            <td className="py-2.5 px-3">
-                              <span className="font-black text-stone-900 text-xs sm:text-[13px] block">
-                                {item.name}
-                              </span>
-                            </td>
-                            <td className="py-2.5 px-3 text-center">
-                              <span className="inline-flex items-center justify-center font-mono font-black text-xs sm:text-sm px-2.5 py-0.5 rounded-lg bg-emerald-100 text-emerald-950 border border-emerald-300 shadow-2xs">
-                                {item.totalPieces} pzas
-                              </span>
-                            </td>
-                            <td className="py-2.5 px-3 text-center font-bold text-stone-500">
-                              {item.ordersCount} encargo{item.ordersCount === 1 ? "" : "s"}
-                            </td>
-                            <td className="py-2.5 px-3">
-                              <div className="flex items-center gap-1.5 flex-wrap">
-                                {Object.entries(branchCounts).map(([bName, qty], bIdx) => (
-                                  <span
-                                    key={bIdx}
-                                    className="inline-flex items-center gap-1 text-[10px] font-bold bg-stone-100 text-stone-800 border border-stone-200 px-2 py-0.5 rounded-md"
-                                  >
-                                    <span className="text-amber-800 font-extrabold">{qty}x</span>
-                                    <span>{bName.replace(/^Sucursal\s+/i, "")}</span>
-                                  </span>
-                                ))}
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
               </div>
             </div>
           ) : (
