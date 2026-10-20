@@ -40,7 +40,9 @@ import {
   Building2,
   Lock,
   X,
-  XCircle
+  XCircle,
+  Truck,
+  ChefHat
 } from "lucide-react";
 import { CustomOrder } from "@/types";
 import { formatCurrency, playScanBeep, formatOrderCreation, formatDeliveryDateDisplay, resolveBranchId } from "@/lib/utils";
@@ -66,6 +68,7 @@ import EditOrderModal from "@/components/pedidos/EditOrderModal";
 import OrderDetailModal from "@/components/pedidos/OrderDetailModal";
 import OrderHistoryDashboardModal from "@/components/pedidos/OrderHistoryDashboardModal";
 import DeliverOrderConfirmModal from "@/components/pedidos/DeliverOrderConfirmModal";
+import NextDayDistributionModal from "@/components/pedidos/NextDayDistributionModal";
 
 // Helper functions for date and time calculations in local timezone
 const getLocalDateISO = (d: Date = new Date()): string => {
@@ -193,6 +196,7 @@ export default function PedidosPage() {
   const [orderToDeliver, setOrderToDeliver] = useState<CustomOrder | null>(null);
   const [isHistoryDashboardOpen, setIsHistoryDashboardOpen] = useState(false);
   const [historyDashboardTab, setHistoryDashboardTab] = useState<"todos" | "entregados" | "cancelados">("todos");
+  const [isDistributionModalOpen, setIsDistributionModalOpen] = useState(false);
 
   // Cargar pedidos desde almacenamiento local y asegurar vinculación 100% con notificaciones
   const loadOrders = useCallback(() => {
@@ -893,6 +897,35 @@ export default function PedidosPage() {
     };
   }, [orders, effectiveBranchFilter, todayStr, checkOrderMatchesBranch]);
 
+  // Conteo automático de piezas de pan para reparto de mañana (al día siguiente)
+  const tomorrowBreadStats = useMemo(() => {
+    let totalPieces = 0;
+    let ordersCount = 0;
+    const branchesWithOrders = new Set<string>();
+
+    orders.forEach((o) => {
+      if (o.status === "cancelado" || o.status === "entregado") return;
+      const oDate = normalizeDateStr(o.deliveryDate);
+      if (oDate === tomorrowStr) {
+        ordersCount++;
+        const targetB = o.branchId || o.operatingBranchId || "branch-matriz";
+        branchesWithOrders.add(targetB);
+        if (Array.isArray(o.items) && o.items.length > 0) {
+          totalPieces += o.items.reduce((sum, it) => sum + (Number(it.quantity) || 1), 0);
+        } else {
+          totalPieces += 1;
+        }
+      }
+    });
+
+    return {
+      tomorrowStr,
+      totalPieces,
+      ordersCount,
+      activeBranchesCount: branchesWithOrders.size,
+    };
+  }, [orders, tomorrowStr]);
+
   // Desglose de sumas por sucursal (para que las sumas de pedidos estén separadas por tienda y no revueltas)
   const branchOrdersBreakdown = useMemo(() => {
     // Pedidos base según el filtro de clasificación/historial activo
@@ -1482,7 +1515,23 @@ export default function PedidosPage() {
             </div>
           </div>
 
-          <div className="flex items-center gap-2 self-end sm:self-auto">
+          <div className="flex items-center gap-2 self-end sm:self-auto flex-wrap">
+            {/* Botón Resumen de Reparto y Producción de Pan para el Día Siguiente */}
+            <button
+              type="button"
+              onClick={() => setIsDistributionModalOpen(true)}
+              className="flex items-center justify-center gap-1.5 bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-700 hover:to-teal-800 text-white font-black px-3.5 py-2 rounded-xl shadow-md hover:shadow-lg transition-all text-xs tracking-wide shrink-0 cursor-pointer active:scale-95 border border-emerald-400/30"
+              title="Ver el resumen total de piezas de pan a hornear y repartir por sucursal para el día siguiente"
+            >
+              <Truck className="w-4 h-4 text-emerald-100 shrink-0" />
+              <span>🥖 Resumen de Reparto (Día Siguiente)</span>
+              {tomorrowBreadStats.totalPieces > 0 && (
+                <span className="bg-white text-emerald-950 text-[10px] font-black px-1.5 py-0.5 rounded-full shadow-2xs ml-0.5">
+                  {tomorrowBreadStats.totalPieces} pzas
+                </span>
+              )}
+            </button>
+
 
             <button
               type="button"
@@ -1836,6 +1885,42 @@ export default function PedidosPage() {
               <option value="liquidados">✓ 100% Liquidados</option>
             </select>
           </div>
+        </div>
+      </div>
+
+      {/* Banner Informativo y Acceso Rápido a Resumen de Reparto para el Día Siguiente */}
+      <div className="bg-gradient-to-r from-emerald-900 via-teal-900 to-emerald-950 text-white p-3 sm:p-3.5 px-4 sm:px-5 rounded-2xl shadow-md border border-emerald-700/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-in fade-in duration-200">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 flex items-center justify-center text-xl shrink-0 shadow-inner">
+            🥖
+          </div>
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-[11px] font-black uppercase tracking-wider text-emerald-400">
+                🚚 Reparto de Pan del Día Siguiente
+              </span>
+              <span className="text-[10px] font-black bg-emerald-500/20 text-emerald-300 border border-emerald-400/40 px-2 py-0.2 rounded-full">
+                Mañana ({tomorrowBreadStats.tomorrowStr.slice(5)})
+              </span>
+            </div>
+            <p className="text-xs sm:text-sm font-bold text-stone-100 truncate mt-0.5">
+              {tomorrowBreadStats.totalPieces > 0
+                ? `${tomorrowBreadStats.totalPieces} piezas de pan programadas para entrega en ${tomorrowBreadStats.activeBranchesCount} sucursal${tomorrowBreadStats.activeBranchesCount === 1 ? "" : "es"} (${tomorrowBreadStats.ordersCount} pedidos)`
+                : "Sin pedidos programados para repartir mañana. Toca para consultar otra fecha."}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
+          <button
+            type="button"
+            onClick={() => setIsDistributionModalOpen(true)}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-stone-950 font-black text-xs rounded-xl shadow-xs transition-all active:scale-95 cursor-pointer"
+          >
+            <ChefHat className="w-3.5 h-3.5" />
+            <span>Ver Resumen por Sucursal</span>
+            <ChevronRight className="w-3.5 h-3.5" />
+          </button>
         </div>
       </div>
 
@@ -4349,6 +4434,16 @@ export default function PedidosPage() {
           if (orderToDeliver) {
             handleConfirmDeliverOrder(orderToDeliver);
           }
+        }}
+      />
+      {/* Modal de Resumen de Reparto y Producción de Pan para el Día Siguiente */}
+      <NextDayDistributionModal
+        isOpen={isDistributionModalOpen}
+        onClose={() => setIsDistributionModalOpen(false)}
+        orders={orders}
+        branches={branches}
+        onViewOrderDetail={(order) => {
+          setSelectedOrderForDetail(order);
         }}
       />
     </div>
