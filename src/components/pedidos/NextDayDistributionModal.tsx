@@ -1327,46 +1327,23 @@ export default function NextDayDistributionModal({
             </div>
           </div>
 
-          {/* Card 2: PEDIDOS PROGRAMADOS */}
-          <div className="bg-white p-3 sm:p-3.5 rounded-2xl border-2 border-amber-300/90 shadow-2xs hover:shadow-md transition-all flex flex-col justify-between gap-2.5">
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2.5 min-w-0">
-                <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-900 font-black text-xl flex items-center justify-center shrink-0 shadow-2xs">
-                  📦
-                </div>
-                <div className="min-w-0">
-                  <span className="text-[10px] uppercase font-bold text-stone-400 block leading-tight tracking-wider">
-                    Pedidos de Clientes
-                  </span>
-                  <div className="flex items-baseline gap-1.5">
-                    <span className="text-xl sm:text-2xl font-black text-stone-900 block tabular-nums leading-tight">
-                      {totalGlobalOrders}
-                    </span>
-                    <span className="text-xs font-bold text-stone-500">pedidos</span>
-                  </div>
-                </div>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setViewMode(viewMode === "branch" ? "bread_options" : "branch")}
-                className={`text-[10px] font-bold px-2.5 py-1 rounded-lg border cursor-pointer transition-colors ${
-                  viewMode === "branch"
-                    ? "bg-amber-600 text-white border-amber-700 shadow-2xs"
-                    : "bg-amber-50 text-amber-900 border-amber-200 hover:bg-amber-100"
-                }`}
-              >
-                {viewMode === "branch" ? "✓ Viendo por tienda" : "Ver por Sucursal ▾"}
-              </button>
+          {/* Card 2: TOTAL DE PEDIDOS (ÚNICAMENTE EL TOTAL, LIMPIO) */}
+          <div className="bg-white p-3 sm:p-3.5 rounded-2xl border-2 border-amber-300/90 shadow-2xs hover:shadow-md transition-all flex items-center gap-3.5">
+            <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-amber-100 text-amber-900 font-black text-2xl sm:text-3xl flex items-center justify-center shrink-0 shadow-2xs">
+              📦
             </div>
-
-            <div className="space-y-1">
-              <span className="text-[10px] font-bold text-stone-400 uppercase block">
-                Detalle de Entrega:
+            <div className="min-w-0">
+              <span className="text-[10px] uppercase font-bold text-stone-400 block leading-tight tracking-wider">
+                Total de Pedidos
               </span>
-              <p className="text-xs font-bold text-amber-950 bg-amber-50/80 border border-amber-200 rounded-xl px-3 py-2 leading-tight">
-                {totalGlobalPieces} pzas de pan encargadas en {activeBranchesCount} sucursal{activeBranchesCount === 1 ? "" : "es"}
-              </p>
+              <div className="flex items-baseline gap-1.5 mt-0.5">
+                <span className="text-2xl sm:text-3xl font-black text-stone-900 block tabular-nums leading-tight">
+                  {totalGlobalOrders}
+                </span>
+                <span className="text-xs sm:text-sm font-bold text-stone-500">
+                  {totalGlobalOrders === 1 ? "pedido" : "pedidos"}
+                </span>
+              </div>
             </div>
           </div>
         </div>
