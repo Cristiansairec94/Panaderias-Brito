@@ -1159,19 +1159,6 @@ export default function NextDayDistributionModal({
             <div className="flex items-center bg-stone-100 p-1 rounded-xl shrink-0 flex-wrap gap-1">
               <button
                 type="button"
-                onClick={() => setViewMode("bread_options")}
-                className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer ${
-                  viewMode === "bread_options"
-                    ? "bg-gradient-to-r from-emerald-600 to-teal-700 text-white shadow-2xs"
-                    : "text-emerald-800 hover:bg-white/80"
-                }`}
-              >
-                <span>🥖</span>
-                <span>Desglose & Añadir Panes ({totalCombinedPieces} pzas)</span>
-              </button>
-
-              <button
-                type="button"
                 onClick={() => setViewMode("branch")}
                 className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer ${
                   viewMode === "branch"
