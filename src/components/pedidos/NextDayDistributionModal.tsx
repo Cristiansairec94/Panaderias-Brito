@@ -9,6 +9,8 @@ import {
   Check,
   Calendar,
   Clock,
+  Store,
+  ChefHat,
   ShoppingBag,
   ChevronDown,
   ChevronUp,
@@ -24,7 +26,7 @@ import {
 } from "lucide-react";
 import { CustomOrder, Branch, Product } from "@/types";
 import { formatCurrency, formatDeliveryDateDisplay } from "@/lib/utils";
-import { getStoredCategories, getStoredProducts, ProductCategory } from "@/lib/products";
+import { getStoredCategories, getStoredProducts, ProductCategory, DEFAULT_PRODUCT_CATEGORIES } from "@/lib/products";
 
 interface NextDayDistributionModalProps {
   isOpen: boolean;
@@ -409,6 +411,7 @@ export default function NextDayDistributionModal({
   // Filtros
   const [selectedDate, setSelectedDate] = useState<string>(tomorrowISO);
   const [selectedBranchId, setSelectedBranchId] = useState<string>("all");
+  const [viewMode, setViewMode] = useState<"categories" | "branch" | "consolidated">("categories");
   const [searchProduct, setSearchProduct] = useState("");
   const [includeDelivered, setIncludeDelivered] = useState(false);
   const [copiedToast, setCopiedToast] = useState(false);
@@ -716,6 +719,98 @@ export default function NextDayDistributionModal({
 
 
 
+  // 1. Obtener todas las categorías registradas en el sistema
+  const allRegisteredCategories = useMemo(() => {
+    const cats = storedCategories && storedCategories.length > 0
+      ? storedCategories
+      : DEFAULT_PRODUCT_CATEGORIES;
+    return cats.filter((c: ProductCategory) => c.id !== "all");
+  }, [storedCategories]);
+
+  // 2. Calcular para cada categoría el número de piezas NO editable según la sucursal seleccionada y pedidos activos
+  const categoriesWithPieces = useMemo(() => {
+    // Filtrar pedidos según selectedBranchId
+    const branchFilteredOrders = targetOrders.filter((order: CustomOrder) => {
+      if (selectedBranchId === "all") return true;
+      const targetBId = order.branchId || order.operatingBranchId || branches[0]?.id;
+      if (targetBId === selectedBranchId) return true;
+      const matchedByName = branches.find(
+        (b: Branch) => b.name.toLowerCase() === (order.branchName || "").toLowerCase()
+      );
+      return matchedByName?.id === selectedBranchId;
+    });
+
+    return allRegisteredCategories.map((cat: ProductCategory) => {
+      let totalPieces = 0;
+      const breadsMap = new Map<string, { name: string; pieces: number }>();
+      const branchBreakdownMap = new Map<string, { branchName: string; pieces: number }>();
+
+      branchFilteredOrders.forEach((order: CustomOrder) => {
+        const items = extractItemsFromOrder(order);
+        let bName = order.branchName;
+        if (!bName) {
+          const bObj = branches.find((b: Branch) => b.id === (order.branchId || order.operatingBranchId));
+          bName = bObj ? bObj.name : "Matriz";
+        }
+
+        items.forEach((it) => {
+          const itemCat = resolveBreadCategory(it.name, it.productId, storedProducts);
+          if (itemCat === cat.id) {
+            const qty = it.quantity || 1;
+            totalPieces += qty;
+
+            const norm = normalizeProductName(it.name);
+            if (!breadsMap.has(norm)) {
+              breadsMap.set(norm, { name: it.name, pieces: qty });
+            } else {
+              breadsMap.get(norm)!.pieces += qty;
+            }
+
+            if (!branchBreakdownMap.has(bName)) {
+              branchBreakdownMap.set(bName, { branchName: bName, pieces: qty });
+            } else {
+              branchBreakdownMap.get(bName)!.pieces += qty;
+            }
+          }
+        });
+      });
+
+      return {
+        category: cat,
+        totalPieces,
+        breads: Array.from(breadsMap.values()).sort((a, b) => b.pieces - a.pieces),
+        branchBreakdown: Array.from(branchBreakdownMap.values()).sort((a, b) => b.pieces - a.pieces),
+      };
+    });
+  }, [allRegisteredCategories, targetOrders, selectedBranchId, branches, storedProducts]);
+
+  const selectedBranchTotalPieces = useMemo(() => {
+    return categoriesWithPieces.reduce((acc: number, c: { totalPieces: number }) => acc + c.totalPieces, 0);
+  }, [categoriesWithPieces]);
+
+  const selectedBranchTotalOrders = useMemo(() => {
+    if (selectedBranchId === "all") return totalGlobalOrders;
+    return targetOrders.filter((order: CustomOrder) => {
+      const targetBId = order.branchId || order.operatingBranchId || branches[0]?.id;
+      if (targetBId === selectedBranchId) return true;
+      const matched = branches.find(
+        (b: Branch) => b.name.toLowerCase() === (order.branchName || "").toLowerCase()
+      );
+      return matched?.id === selectedBranchId;
+    }).length;
+  }, [selectedBranchId, targetOrders, totalGlobalOrders, branches]);
+
+  // Lista consolidada filtrada por buscador para la vista de taller
+  const filteredConsolidated = useMemo(() => {
+    return globalConsolidated.filter((it: BreadSummaryItem) => {
+      if (searchProduct.trim()) {
+        const q = normalizeProductName(it.name);
+        if (!normalizeProductName(it.name).includes(q)) return false;
+      }
+      return true;
+    });
+  }, [globalConsolidated, searchProduct]);
+
   // Conteo de sucursales activas (con al menos 1 pieza de pan)
   const activeBranchesCount = useMemo(() => {
     return branchGroups.filter((g) => g.totalPieces > 0).length;
@@ -913,24 +1008,65 @@ export default function NextDayDistributionModal({
           </div>
 
           {/* Segunda Fila: Modos de Vista, Filtro de Sucursal y Buscador */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pt-2 border-t border-stone-100">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-2.5 pt-2 border-t border-stone-100">
+            {/* Pestañas de Vista */}
+            <div className="flex items-center bg-stone-100 p-1 rounded-xl shrink-0 overflow-x-auto">
+              <button
+                type="button"
+                onClick={() => setViewMode("categories")}
+                className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer ${
+                  viewMode === "categories"
+                    ? "bg-white text-stone-900 shadow-2xs scale-102"
+                    : "text-stone-500 hover:text-stone-800"
+                }`}
+              >
+                <span>📊 Por Categorías</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setViewMode("branch")}
+                className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer ${
+                  viewMode === "branch"
+                    ? "bg-white text-stone-900 shadow-2xs scale-102"
+                    : "text-stone-500 hover:text-stone-800"
+                }`}
+              >
+                <Store className="w-3.5 h-3.5" />
+                <span>Por Sucursal</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setViewMode("consolidated")}
+                className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer ${
+                  viewMode === "consolidated"
+                    ? "bg-white text-stone-900 shadow-2xs scale-102"
+                    : "text-stone-500 hover:text-stone-800"
+                }`}
+              >
+                <ChefHat className="w-3.5 h-3.5" />
+                <span>Consolidado de Panes</span>
+              </button>
+            </div>
+
             {/* Filtros de Sucursal y Búsqueda */}
             <div className="flex items-center gap-2 flex-wrap">
-                              <div className="relative">
-                  <select
-                    value={selectedBranchId}
-                    onChange={(e) => setSelectedBranchId(e.target.value)}
-                    className="text-xs font-bold text-stone-800 bg-white border border-stone-200 rounded-xl px-2.5 py-1.5 pr-7 focus:outline-none focus:ring-2 focus:ring-amber-500 cursor-pointer shadow-2xs appearance-none"
-                  >
-                    <option value="all">🏬 Todas las Sucursales</option>
-                    {branches.map((b) => (
-                      <option key={b.id} value={b.id}>
-                        🏬 {b.name}
-                      </option>
-                    ))}
-                  </select>
-                  <ChevronDown className="w-3.5 h-3.5 text-stone-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
-                </div>
+              <div className="relative">
+                <select
+                  value={selectedBranchId}
+                  onChange={(e) => setSelectedBranchId(e.target.value)}
+                  className="text-xs font-bold text-stone-800 bg-white border border-stone-200 rounded-xl px-2.5 py-1.5 pr-7 focus:outline-none focus:ring-2 focus:ring-amber-500 cursor-pointer shadow-2xs appearance-none"
+                >
+                  <option value="all">🏬 Todas las Sucursales</option>
+                  {branches.map((b) => (
+                    <option key={b.id} value={b.id}>
+                      🏬 {b.name}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className="w-3.5 h-3.5 text-stone-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+              </div>
 
               {/* Buscador de pan específico */}
               <div className="relative min-w-[160px] sm:min-w-[200px]">
@@ -956,6 +1092,45 @@ export default function NextDayDistributionModal({
           </div>
         </div>
 
+        {/* Tarjetas KPI Resumen del Día */}
+        <div className="p-3 sm:p-4 bg-[#f8f5ef] border-b border-[#e8ded2] grid grid-cols-2 gap-2 sm:gap-3 shrink-0">
+          <div className="bg-white p-3 sm:p-3.5 rounded-2xl border border-emerald-300 shadow-2xs flex items-center gap-3 min-h-[72px] sm:min-h-[80px]">
+            <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-emerald-100 text-emerald-800 font-black text-2xl sm:text-3xl flex items-center justify-center shrink-0 shadow-2xs">
+              🥖
+            </div>
+            <div className="min-w-0 flex-1">
+              <span className="text-xs sm:text-sm uppercase font-bold text-stone-500 block leading-tight">
+                Total Piezas de Pan
+              </span>
+              <div className="flex items-baseline gap-2 mt-1">
+                <span className="text-2xl sm:text-3xl font-black text-emerald-950 block tabular-nums leading-none">
+                  {selectedBranchTotalPieces}
+                </span>
+                <span className="text-xs sm:text-sm font-bold text-stone-600">
+                  {selectedBranchId === "all" ? "pzas (todas)" : "pzas sucursal"}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white p-3 sm:p-3.5 rounded-2xl border border-amber-200/90 shadow-2xs flex items-center gap-3 min-h-[72px] sm:min-h-[80px]">
+            <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-amber-100 text-amber-900 font-black text-2xl sm:text-3xl flex items-center justify-center shrink-0 shadow-2xs">
+              📦
+            </div>
+            <div className="min-w-0 flex-1">
+              <span className="text-xs sm:text-sm uppercase font-bold text-stone-500 block leading-tight">
+                Pedidos Programados
+              </span>
+              <div className="flex items-baseline gap-2 mt-1">
+                <span className="text-2xl sm:text-3xl font-black text-stone-900 block tabular-nums leading-none">
+                  {selectedBranchTotalOrders}
+                </span>
+                <span className="text-xs sm:text-sm font-bold text-stone-500">pedidos</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* Contenido Principal con Scroll */}
         <div ref={printableRef} className="flex-1 overflow-y-auto p-3 sm:p-5 space-y-4 print:p-0">
           {/* Encabezado visible únicamente en Impresión */}
@@ -968,19 +1143,268 @@ export default function NextDayDistributionModal({
                 </p>
               </div>
               <div className="text-right">
-                <p className="text-xs font-black">TOTAL: {totalGlobalPieces} PIEZAS</p>
-                <p className="text-[10px] text-stone-500">{totalGlobalOrders} pedidos en {activeBranchesCount} sucursales</p>
+                <p className="text-xs font-black">TOTAL: {selectedBranchTotalPieces} PIEZAS</p>
+                <p className="text-[10px] text-stone-500">{selectedBranchTotalOrders} pedidos</p>
               </div>
             </div>
           </div>
 
-          {filteredBranchGroups.length === 0 ? (
-            <div className="py-8 px-4 text-center bg-white rounded-2xl border border-stone-200 text-stone-500 text-xs">
-              No se encontraron sucursales o pedidos para esta fecha.
+          {/* ========================================================================= */}
+          {/* VISTA 1: TODAS LAS CATEGORÍAS REGISTRADAS CON PIEZAS NO EDITABLES         */}
+          {/* ========================================================================= */}
+          {viewMode === "categories" ? (
+            <div className="space-y-4">
+              {/* Encabezado informativo */}
+              <div className="bg-gradient-to-r from-amber-50/90 via-orange-50/40 to-stone-50 border border-amber-200/90 p-3.5 sm:p-4 rounded-2xl flex items-center justify-between flex-wrap gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-11 h-11 rounded-2xl bg-amber-600 text-white font-black text-2xl flex items-center justify-center shrink-0 shadow-2xs">
+                    📊
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h4 className="text-base sm:text-lg font-black text-stone-900 tracking-tight">
+                        Categorías de Pan y Piezas Requeridas
+                      </h4>
+                      <span className="bg-amber-100 text-amber-900 font-extrabold text-[11px] px-2.5 py-0.5 rounded-full border border-amber-300">
+                        {selectedBranchId === "all"
+                          ? "Todas las Sucursales"
+                          : branches.find((b) => b.id === selectedBranchId)?.name || "Sucursal"}
+                      </span>
+                    </div>
+                    <p className="text-xs text-stone-600 font-medium mt-0.5">
+                      {selectedBranchId === "all"
+                        ? `Piezas calculadas automáticamente según los pedidos activos para el ${formatLongDateSpanish(selectedDate)}`
+                        : `Piezas calculadas para entrega en ${branches.find((b) => b.id === selectedBranchId)?.name || "esta sucursal"} el ${formatLongDateSpanish(selectedDate)}`}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <div className="text-right">
+                    <span className="text-[10px] uppercase font-bold text-stone-400 block leading-tight">
+                      Total a Elaborar
+                    </span>
+                    <span className="font-mono text-xl sm:text-2xl font-black text-emerald-950 block tabular-nums leading-none mt-0.5">
+                      {selectedBranchTotalPieces} <span className="text-xs font-bold text-stone-500">pzas</span>
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Lista de TODAS las categorías registradas */}
+              <div className="grid grid-cols-1 gap-3">
+                {categoriesWithPieces.map(({ category, totalPieces, breads, branchBreakdown }: any) => {
+                  const hasPieces = totalPieces > 0;
+
+                  return (
+                    <div
+                      key={category.id}
+                      className={`rounded-2xl border-2 transition-all shadow-xs p-3.5 sm:p-4 bg-white ${
+                        hasPieces
+                          ? "border-amber-300/90 shadow-sm"
+                          : "border-stone-200/80 bg-[#fbf9f6]/50"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-3 flex-wrap">
+                        {/* Categoría registrada */}
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div
+                            className={`w-12 h-12 rounded-2xl flex items-center justify-center text-2xl shrink-0 shadow-2xs ${
+                              hasPieces
+                                ? "bg-amber-100 text-amber-900 border border-amber-300"
+                                : "bg-stone-100 text-stone-400 border border-stone-200"
+                            }`}
+                          >
+                            {category.icon || "🥖"}
+                          </div>
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <h5 className="text-base sm:text-lg font-black text-stone-900 tracking-tight">
+                                {category.label}
+                              </h5>
+                              {hasPieces ? (
+                                <span className="bg-emerald-100 text-emerald-900 border border-emerald-300 text-[10px] font-black px-2 py-0.5 rounded-full">
+                                  {breads.length} {breads.length === 1 ? "tipo de pan" : "tipos de pan"}
+                                </span>
+                              ) : (
+                                <span className="bg-stone-100 text-stone-500 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                                  0 encargos
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-xs text-stone-500 font-medium mt-0.5">
+                              {hasPieces
+                                ? selectedBranchId === "all"
+                                  ? `Requerido para producción en ${branchBreakdown.length} sucursal(es)`
+                                  : `Requerido para entrega en ${branches.find((b) => b.id === selectedBranchId)?.name || "esta sucursal"}`
+                                : `No hay pedidos registrados para esta categoría`}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* ENFRENTE: NÚMERO DE PIEZAS NO EDITABLE */}
+                        <div className="flex items-center gap-2 shrink-0 ml-auto">
+                          <div className="text-right">
+                            <span className="text-[10px] uppercase font-bold text-stone-400 block leading-none">
+                              Piezas Requeridas
+                            </span>
+                            <div className="flex items-baseline justify-end gap-1.5 mt-1">
+                              <span
+                                className={`font-mono font-black text-2xl sm:text-3xl tabular-nums leading-none px-3.5 py-1 rounded-xl border ${
+                                  hasPieces
+                                    ? "bg-emerald-100/80 text-emerald-950 border-emerald-400 shadow-2xs"
+                                    : "bg-stone-100 text-stone-400 border-stone-200"
+                                }`}
+                              >
+                                {totalPieces}
+                              </span>
+                              <span className="text-xs sm:text-sm font-bold text-stone-600">
+                                pzas
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Desglose de panes específicos de esta categoría cuando hay piezas */}
+                      {hasPieces && (
+                        <div className="mt-3 pt-3 border-t border-stone-100 space-y-2.5">
+                          {/* Panes individuales */}
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="text-[10px] uppercase font-bold text-stone-400 mr-1">
+                              Panes a hornear:
+                            </span>
+                            {breads.map((b: any, bIdx: number) => (
+                              <span
+                                key={bIdx}
+                                className="inline-flex items-center gap-1.5 text-xs font-bold bg-[#faf7f2] text-stone-900 border border-stone-200 px-2.5 py-1 rounded-xl shadow-2xs"
+                              >
+                                <span className="font-mono font-black text-amber-900 bg-amber-100 px-1.5 py-0.2 rounded text-[11px]">
+                                  {b.pieces}x
+                                </span>
+                                <span>{b.name}</span>
+                              </span>
+                            ))}
+                          </div>
+
+                          {/* Reparto por sucursal */}
+                          {selectedBranchId === "all" && branchBreakdown.length > 0 && (
+                            <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
+                              <span className="text-[10px] uppercase font-bold text-stone-400 mr-1">
+                                Reparto por sucursal:
+                              </span>
+                              {branchBreakdown.map((br: any, brIdx: number) => (
+                                <span
+                                  key={brIdx}
+                                  className="inline-flex items-center gap-1 text-[11px] font-bold bg-stone-100 text-stone-800 px-2 py-0.5 rounded-lg border border-stone-200"
+                                >
+                                  <span className="text-emerald-800 font-extrabold">{br.pieces} pzas</span>
+                                  <span className="text-stone-500">➔</span>
+                                  <span>{br.branchName.replace(/^Sucursal\s+/i, "")}</span>
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ) : viewMode === "consolidated" ? (
+            /* ========================================================================= */
+            /* VISTA 3: CONSOLIDADO GENERAL DE PANES                                     */
+            /* ========================================================================= */
+            <div className="space-y-3">
+              <div className="bg-amber-50/90 border border-amber-200/90 p-3 sm:p-3.5 rounded-2xl flex items-center justify-between flex-wrap gap-2">
+                <div className="flex items-center gap-2">
+                  <ChefHat className="w-5 h-5 text-amber-700 shrink-0" />
+                  <div>
+                    <h4 className="text-xs sm:text-sm font-black text-amber-950">
+                      Lista Maestra de Horneado y Material Necesario
+                    </h4>
+                    <p className="text-[11px] text-amber-800 font-medium">
+                      Suma global de todas las piezas requeridas el {formatLongDateSpanish(selectedDate)}
+                    </p>
+                  </div>
+                </div>
+
+                <span className="font-mono text-xs font-black bg-white px-3 py-1 rounded-xl text-amber-900 border border-amber-300 shadow-2xs">
+                  {selectedBranchTotalPieces} piezas en total
+                </span>
+              </div>
+
+              <div className="bg-white rounded-2xl border border-stone-200 overflow-hidden shadow-xs">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse text-xs">
+                    <thead>
+                      <tr className="bg-stone-100 text-stone-600 border-b border-stone-200 text-[11px] font-black uppercase tracking-wider">
+                        <th className="py-2.5 px-3">#</th>
+                        <th className="py-2.5 px-3">Tipo de Pan / Producto</th>
+                        <th className="py-2.5 px-3 text-center">Total Piezas a Hornear</th>
+                        <th className="py-2.5 px-3 text-center">Pedidos</th>
+                        <th className="py-2.5 px-3">Desglose por Sucursal de Destino</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-stone-100">
+                      {filteredConsolidated.map((item: any, idx: number) => {
+                        const branchCounts: Record<string, number> = {};
+                        item.ordersDetails.forEach((od: any) => {
+                          const bName = od.order.branchName || "Matriz";
+                          branchCounts[bName] = (branchCounts[bName] || 0) + od.quantity;
+                        });
+
+                        return (
+                          <tr key={idx} className="hover:bg-amber-50/50 transition-colors">
+                            <td className="py-2.5 px-3 text-stone-400 font-mono font-bold">
+                              {idx + 1}
+                            </td>
+                            <td className="py-2.5 px-3">
+                              <span className="font-black text-stone-900 text-xs sm:text-[13px] block">
+                                {item.name}
+                              </span>
+                            </td>
+                            <td className="py-2.5 px-3 text-center">
+                              <span className="inline-flex items-center justify-center font-mono font-black text-xs sm:text-sm px-2.5 py-0.5 rounded-lg bg-emerald-100 text-emerald-950 border border-emerald-300 shadow-2xs">
+                                {item.totalPieces} pzas
+                              </span>
+                            </td>
+                            <td className="py-2.5 px-3 text-center font-bold text-stone-500">
+                              {item.ordersCount} encargo{item.ordersCount === 1 ? "" : "s"}
+                            </td>
+                            <td className="py-2.5 px-3">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                {Object.entries(branchCounts).map(([bName, qty], bIdx) => (
+                                  <span
+                                    key={bIdx}
+                                    className="inline-flex items-center gap-1 text-[10px] font-bold bg-stone-100 text-stone-800 border border-stone-200 px-2 py-0.5 rounded-md"
+                                  >
+                                    <span className="text-amber-800 font-extrabold">{qty}x</span>
+                                    <span>{bName.replace(/^Sucursal\s+/i, "")}</span>
+                                  </span>
+                                ))}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             </div>
           ) : (
-            <div className="space-y-4">
-              {filteredBranchGroups.map((group) => {
+            /* ========================================================================= */
+            /* VISTA 2: DESGLOSE POR SUCURSAL                                            */
+            /* ========================================================================= */
+            filteredBranchGroups.length === 0 ? (
+              <div className="py-8 px-4 text-center bg-white rounded-2xl border border-stone-200 text-stone-500 text-xs">
+                No se encontraron sucursales o pedidos para esta fecha.
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {filteredBranchGroups.map((group) => {
                 const hasPieces = group.totalPieces > 0;
                 const isExpanded = Boolean(expandedBranches[group.branchId]);
                 const isOrdersExpanded = Boolean(expandedOrdersList[group.branchId]);
@@ -1174,6 +1598,7 @@ export default function NextDayDistributionModal({
                 );
               })}
             </div>
+            )
           )}
         </div>
 
