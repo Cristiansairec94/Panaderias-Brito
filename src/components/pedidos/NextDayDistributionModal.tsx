@@ -327,6 +327,7 @@ export default function NextDayDistributionModal({
     return typeof window !== "undefined" ? getStoredCategories() : [];
   });
   const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false);
+  const [isPinned, setIsPinned] = useState(false);
   const [isCreateCategoryModalOpen, setIsCreateCategoryModalOpen] = useState(false);
   const [newCatLabel, setNewCatLabel] = useState("");
   const [newCatIcon, setNewCatIcon] = useState("🥖");
@@ -345,20 +346,21 @@ export default function NextDayDistributionModal({
     };
   }, []);
 
-  // Cerrar desplegable al hacer clic fuera
+  // Cerrar desplegable al hacer clic fuera (si no está fijado para recorte)
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
+      if (isPinned) return;
       if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
         setIsCategoryDropdownOpen(false);
       }
     };
-    if (isCategoryDropdownOpen) {
+    if (isCategoryDropdownOpen && !isPinned) {
       document.addEventListener("mousedown", handleClickOutside);
     }
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
     };
-  }, [isCategoryDropdownOpen]);
+  }, [isCategoryDropdownOpen, isPinned]);
 
   // Crear y guardar una nueva categoría de pan
   const handleCreateCategory = (e: React.FormEvent) => {
@@ -1263,54 +1265,222 @@ export default function NextDayDistributionModal({
               )}
             </div>
 
-            {/* LISTA DESPLEGABLE DIRECTA Y VISIBLE DE TODAS LAS CATEGORÍAS */}
-            <div className="space-y-1">
-              <label className="text-[10px] font-black uppercase text-emerald-800 flex items-center justify-between">
+            {/* LISTA DESPLEGABLE DIRECTA Y VISIBLE DE TODAS LAS CATEGORÍAS (HTML PURO, NO NATIVO DEL SO PARA QUE NO SE MINIMICE AL USAR RECORTES) */}
+            <div className="space-y-1 relative" ref={dropdownRef}>
+              <div className="flex items-center justify-between text-[10px] font-black uppercase text-emerald-800">
                 <span className="flex items-center gap-1">
-                  <span>📂 Lista Desplegable de Categorías:</span>
+                  <span>📂 Lista de Categorías de Pan:</span>
                 </span>
-                <span className="text-emerald-600 font-bold lowercase text-[9px]">
-                  {breadCategoryFilter === "all" ? "Todas seleccionadas" : "1 filtrada"}
-                </span>
-              </label>
-
-              <div className="relative">
-                <select
-                  value={breadCategoryFilter}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    if (val === "__new__") {
-                      setIsCreateCategoryModalOpen(true);
-                    } else {
-                      setBreadCategoryFilter(val);
-                      if (viewMode !== "bread_options") setViewMode("bread_options");
-                    }
-                  }}
-                  className="w-full text-xs font-black text-emerald-950 bg-emerald-50 hover:bg-emerald-100/80 border-2 border-emerald-500 rounded-xl px-3 py-2 pr-9 focus:outline-none focus:ring-2 focus:ring-emerald-600 cursor-pointer shadow-xs appearance-none transition-colors"
-                >
-                  <option value="all">
-                    🧺 Todas las Categorías de Pan ({totalCombinedPieces} pzas totales)
-                  </option>
-                  <option value="active">
-                    ⭐ Con Piezas Programadas ({activeVarietiesCount} variedades)
-                  </option>
-                  <optgroup label="─── Categorías de Pan Registradas ───">
-                    {allBreadCategories.map((cat) => {
-                      const stats = categoryStats[cat.id];
-                      const pzas = stats?.totalPieces || 0;
-                      return (
-                        <option key={cat.id} value={cat.id}>
-                          {cat.icon} {cat.label} ({pzas} pzas / {stats?.count || 0} tipos)
-                        </option>
-                      );
-                    })}
-                  </optgroup>
-                  <option value="__new__">
-                    ➕ + Añadir Nueva Categoría de Pan...
-                  </option>
-                </select>
-                <ChevronDown className="w-4 h-4 text-emerald-800 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsPinned((p) => !p);
+                      if (!isCategoryDropdownOpen) setIsCategoryDropdownOpen(true);
+                    }}
+                    className={`px-2 py-0.5 rounded-lg text-[10px] font-black cursor-pointer transition-all flex items-center gap-1 shadow-2xs ${
+                      isPinned
+                        ? "bg-emerald-700 text-white ring-2 ring-emerald-400"
+                        : "bg-emerald-100 text-emerald-900 hover:bg-emerald-200"
+                    }`}
+                    title="Fijar menú abierto para recortar con tranquilidad"
+                  >
+                    <span>📌</span>
+                    <span>{isPinned ? "Fijado para Recorte ✓" : "Fijar para Recorte"}</span>
+                  </button>
+                  <span className="text-emerald-600 font-bold lowercase text-[9px]">
+                    {breadCategoryFilter === "all" ? "Todas seleccionadas" : "1 filtrada"}
+                  </span>
+                </div>
               </div>
+
+              {/* Botón Personalizado HTML que NO se minimiza al recortar */}
+              <button
+                type="button"
+                onClick={() => setIsCategoryDropdownOpen((prev) => !prev)}
+                className="w-full text-xs font-black text-emerald-950 bg-emerald-50 hover:bg-emerald-100/80 border-2 border-emerald-500 rounded-xl px-3 py-2 flex items-center justify-between gap-2 cursor-pointer shadow-xs transition-colors text-left"
+                title="Toca para desplegar u ocultar todas las opciones de pan"
+              >
+                <div className="flex items-center gap-2 min-w-0 truncate">
+                  <span className="text-base shrink-0">
+                    {breadCategoryFilter === "all"
+                      ? "🧺"
+                      : breadCategoryFilter === "active"
+                      ? "⭐"
+                      : selectedCatInfo?.icon || "🥖"}
+                  </span>
+                  <span className="truncate">
+                    {breadCategoryFilter === "all"
+                      ? `Todas las Categorías de Pan (${totalCombinedPieces} pzas totales)`
+                      : breadCategoryFilter === "active"
+                      ? `Con Piezas Programadas (${activeVarietiesCount} variedades)`
+                      : `${selectedCatInfo?.label || "Categoría"} (${categoryStats[breadCategoryFilter]?.totalPieces || 0} pzas)`}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0 text-emerald-800">
+                  <span className="text-[10px] font-bold bg-white/90 px-1.5 py-0.5 rounded-md border border-emerald-200">
+                    {isCategoryDropdownOpen ? "Ocultar ▲" : "Ver opciones ▼"}
+                  </span>
+                  <ChevronDown
+                    className={`w-4 h-4 transition-transform duration-200 ${
+                      isCategoryDropdownOpen ? "rotate-180" : ""
+                    }`}
+                  />
+                </div>
+              </button>
+
+              {/* Menú HTML de Opciones (Permanente en pantalla, no desaparece con la Herramienta de Recortes) */}
+              {isCategoryDropdownOpen && (
+                <div className="absolute top-full left-0 right-0 mt-1 z-50 bg-white border-2 border-emerald-500 rounded-2xl shadow-2xl p-2.5 space-y-1.5 max-h-[360px] overflow-y-auto animate-in fade-in zoom-in-95 duration-100">
+                  <div className="flex items-center justify-between pb-1.5 border-b border-stone-100 text-[11px] font-bold text-stone-600">
+                    <span className="flex items-center gap-1">
+                      <span>🏷️ Opciones disponibles para ver y recortar:</span>
+                    </span>
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => setIsPinned((p) => !p)}
+                        className={`text-[10px] px-2 py-0.5 rounded font-black cursor-pointer ${
+                          isPinned
+                            ? "bg-emerald-600 text-white"
+                            : "bg-stone-100 text-stone-700 hover:bg-stone-200"
+                        }`}
+                      >
+                        📌 {isPinned ? "Fijado" : "Fijar"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setIsCategoryDropdownOpen(false)}
+                        className="text-stone-400 hover:text-stone-800 text-xs px-1.5 py-0.5 rounded font-bold cursor-pointer hover:bg-stone-100"
+                      >
+                        ✕ Cerrar
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Opción Todas */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setBreadCategoryFilter("all");
+                      if (!isPinned) setIsCategoryDropdownOpen(false);
+                    }}
+                    className={`w-full text-left px-3 py-2 rounded-xl text-xs font-black flex items-center justify-between gap-2 transition-all cursor-pointer ${
+                      breadCategoryFilter === "all"
+                        ? "bg-emerald-600 text-white shadow-xs"
+                        : "hover:bg-emerald-50 text-stone-900"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="text-base">🧺</span>
+                      <span className="truncate">Todas las Categorías de Pan</span>
+                    </div>
+                    <span
+                      className={`font-mono text-[11px] font-black px-2 py-0.5 rounded-lg shrink-0 ${
+                        breadCategoryFilter === "all"
+                          ? "bg-white/20 text-white"
+                          : "bg-emerald-100 text-emerald-900"
+                      }`}
+                    >
+                      {totalCombinedPieces} pzas totales
+                    </span>
+                  </button>
+
+                  {/* Opción Con piezas programadas */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setBreadCategoryFilter("active");
+                      if (!isPinned) setIsCategoryDropdownOpen(false);
+                    }}
+                    className={`w-full text-left px-3 py-2 rounded-xl text-xs font-black flex items-center justify-between gap-2 transition-all cursor-pointer ${
+                      breadCategoryFilter === "active"
+                        ? "bg-emerald-600 text-white shadow-xs"
+                        : "hover:bg-emerald-50 text-stone-900"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="text-base">⭐</span>
+                      <span className="truncate">Con Piezas Programadas</span>
+                    </div>
+                    <span
+                      className={`font-mono text-[11px] font-black px-2 py-0.5 rounded-lg shrink-0 ${
+                        breadCategoryFilter === "active"
+                          ? "bg-white/20 text-white"
+                          : "bg-amber-100 text-amber-900"
+                      }`}
+                    >
+                      {activeVarietiesCount} variedades
+                    </span>
+                  </button>
+
+                  {/* Separador de Categorías Registradas */}
+                  <div className="pt-1.5 pb-0.5 px-2 text-[10px] font-black uppercase text-stone-400 tracking-wider">
+                    Categorías de Pan Registradas ({allBreadCategories.length})
+                  </div>
+
+                  {allBreadCategories.map((cat) => {
+                    const stats = categoryStats[cat.id];
+                    const pzas = stats?.totalPieces || 0;
+                    const count = stats?.count || 0;
+                    const isSelected = breadCategoryFilter === cat.id;
+
+                    return (
+                      <button
+                        key={cat.id}
+                        type="button"
+                        onClick={() => {
+                          setBreadCategoryFilter(cat.id);
+                          if (!isPinned) setIsCategoryDropdownOpen(false);
+                        }}
+                        className={`w-full text-left px-3 py-2 rounded-xl text-xs font-bold flex items-center justify-between gap-2 transition-all cursor-pointer ${
+                          isSelected
+                            ? "bg-emerald-600 text-white font-black shadow-xs"
+                            : "hover:bg-stone-100 text-stone-800"
+                        }`}
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="text-base shrink-0">{cat.icon}</span>
+                          <span className="truncate">{cat.label}</span>
+                          <span
+                            className={`text-[10px] opacity-70 font-semibold ${
+                              isSelected ? "text-emerald-100" : "text-stone-400"
+                            }`}
+                          >
+                            ({count} tipos)
+                          </span>
+                        </div>
+                        <span
+                          className={`font-mono text-[11px] font-black px-2 py-0.5 rounded-lg shrink-0 ${
+                            isSelected
+                              ? "bg-white/20 text-white"
+                              : pzas > 0
+                              ? "bg-emerald-100 text-emerald-950"
+                              : "bg-stone-100 text-stone-500"
+                          }`}
+                        >
+                          {pzas} pzas
+                        </span>
+                      </button>
+                    );
+                  })}
+
+                  {/* Botón para añadir nueva categoría */}
+                  <div className="pt-1.5 border-t border-stone-100">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsCreateCategoryModalOpen(true);
+                        if (!isPinned) setIsCategoryDropdownOpen(false);
+                      }}
+                      className="w-full text-left px-3 py-2 rounded-xl text-xs font-black text-emerald-800 hover:bg-emerald-50 flex items-center gap-2 transition-colors cursor-pointer border border-dashed border-emerald-300"
+                    >
+                      <span className="text-base">➕</span>
+                      <span>+ Añadir Nueva Categoría de Pan...</span>
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
@@ -1355,303 +1525,9 @@ export default function NextDayDistributionModal({
             </div>
           </div>
 
-          {/* ========================================================================= */}
-          {/* MODO 1: DESGLOSE DE OPCIONES Y PLANIFICACIÓN DE PANES (SOLICITADO POR USUARIO) */}
-          {/* ========================================================================= */}
-          {viewMode === "bread_options" ? (
-            <div className="space-y-4">
-              {/* Barra Informativa y Acciones Rápidas */}
-              <div className="bg-gradient-to-r from-emerald-50 via-teal-50 to-amber-50 border border-emerald-200/90 p-3 sm:p-4 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-2xs">
-                <div className="flex items-start gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white font-black text-xl flex items-center justify-center shrink-0 shadow-2xs">
-                    🥖
-                  </div>
-                  <div>
-                    <h4 className="text-sm sm:text-base font-black text-emerald-950">
-                      Desglose y Programación de Pan para {formatLongDateSpanish(selectedDate)}
-                    </h4>
-                    <p className="text-xs text-emerald-800 font-medium mt-0.5">
-                      Aquí puedes ver todas las opciones de pan disponibles, consultar los pedidos de clientes y añadir las piezas totales que pondrás para mostrador y reparto.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2 flex-wrap shrink-0">
-                  <button
-                    type="button"
-                    onClick={() => setIsAddVarietyModalOpen(true)}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-black text-xs shadow-xs transition-colors cursor-pointer"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    <span>+ Añadir Nuevo Tipo de Pan</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={handleLoadStandardPreset}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white hover:bg-stone-50 border border-emerald-300 text-emerald-900 font-bold text-xs shadow-2xs transition-colors cursor-pointer"
-                    title="Carga cantidades estándar sugeridas (+120 Bolillos, +60 Teleras, +40 Conchas, etc.)"
-                  >
-                    <Sparkles className="w-3.5 h-3.5 text-amber-600" />
-                    <span>Cargar Estándar Diario</span>
-                  </button>
-
-                  {totalExtraPieces > 0 && (
-                    <button
-                      type="button"
-                      onClick={handleClearAllExtra}
-                      className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-800 font-bold text-xs transition-colors cursor-pointer"
-                      title="Reiniciar a 0 todas las piezas añadidas manualmente"
-                    >
-                      <RotateCcw className="w-3.5 h-3.5" />
-                      <span>Limpiar Añadidos ({totalExtraPieces})</span>
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              {/* Filtro por Categorías de Pan (Dinámico y Actualizable) */}
-              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
-                <button
-                  type="button"
-                  onClick={() => setBreadCategoryFilter("all")}
-                  className={`px-3 py-1.5 rounded-xl font-bold transition-all shrink-0 cursor-pointer ${
-                    breadCategoryFilter === "all"
-                      ? "bg-stone-900 text-white shadow-2xs font-black"
-                      : "bg-white border border-stone-200 text-stone-600 hover:bg-stone-50"
-                  }`}
-                >
-                  Todos ({unifiedBreadList.length})
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setBreadCategoryFilter("active")}
-                  className={`px-3 py-1.5 rounded-xl font-bold transition-all shrink-0 cursor-pointer flex items-center gap-1 ${
-                    breadCategoryFilter === "active"
-                      ? "bg-emerald-700 text-white shadow-2xs font-black"
-                      : "bg-emerald-50 border border-emerald-300 text-emerald-900 hover:bg-emerald-100"
-                  }`}
-                >
-                  <span>⭐</span>
-                  <span>Con Piezas ({activeVarietiesCount})</span>
-                </button>
-
-                {allBreadCategories.map((cat) => {
-                  const stats = categoryStats[cat.id];
-                  const pieces = stats?.totalPieces || 0;
-                  const isSelected = breadCategoryFilter === cat.id;
-                  return (
-                    <button
-                      key={cat.id}
-                      type="button"
-                      onClick={() => setBreadCategoryFilter(cat.id)}
-                      className={`px-3 py-1.5 rounded-xl font-bold transition-all shrink-0 cursor-pointer flex items-center gap-1.5 ${
-                        isSelected
-                          ? "bg-amber-700 text-white shadow-2xs font-black"
-                          : "bg-white border border-stone-200 text-stone-700 hover:bg-stone-50"
-                      }`}
-                    >
-                      <span>{cat.icon}</span>
-                      <span>{cat.label}</span>
-                      {pieces > 0 && (
-                        <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-black ${
-                          isSelected ? "bg-amber-900 text-white" : "bg-emerald-100 text-emerald-800"
-                        }`}>
-                          {pieces}
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
-
-                <button
-                  type="button"
-                  onClick={() => setIsCreateCategoryModalOpen(true)}
-                  className="px-2.5 py-1.5 rounded-xl border border-dashed border-stone-300 hover:border-emerald-500 text-stone-600 hover:text-emerald-800 font-bold transition-all shrink-0 cursor-pointer flex items-center gap-1 bg-stone-50"
-                  title="Añadir una nueva categoría de pan"
-                >
-                  <Plus className="w-3.5 h-3.5 text-emerald-600" />
-                  <span>+ Nueva Categoría</span>
-                </button>
-              </div>
-
-              {/* Grid de Tarjetas de Cada Tipo de Pan */}
-              {filteredUnifiedBreadList.length === 0 ? (
-                <div className="py-12 px-4 text-center bg-white rounded-3xl border-2 border-dashed border-stone-200 space-y-3">
-                  <div className="w-14 h-14 rounded-full bg-amber-50 text-amber-700 flex items-center justify-center text-2xl mx-auto">
-                    🔍
-                  </div>
-                  <h4 className="text-base font-black text-stone-800">
-                    No se encontraron tipos de pan con ese filtro
-                  </h4>
-                  <p className="text-xs text-stone-500 max-w-sm mx-auto">
-                    Intenta cambiar la búsqueda o categoría, o presiona el botón para añadir un nuevo tipo de pan.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setBreadCategoryFilter("all");
-                      setSearchProduct("");
-                    }}
-                    className="px-3.5 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs cursor-pointer shadow-xs"
-                  >
-                    Restablecer Filtros
-                  </button>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
-                  {filteredUnifiedBreadList.map((item) => (
-                    <div
-                      key={item.key}
-                      className={`rounded-2xl border-2 p-3 sm:p-3.5 transition-all shadow-2xs flex flex-col justify-between gap-3 ${
-                        item.totalPieces > 0
-                          ? "bg-white border-emerald-400 shadow-xs ring-1 ring-emerald-300/30"
-                          : "bg-stone-50/70 border-stone-200 hover:border-stone-300"
-                      }`}
-                    >
-                      {/* Cabecera del Pan */}
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex items-start gap-2.5 min-w-0">
-                          <div className="w-9 h-9 rounded-xl bg-amber-100 text-amber-900 font-bold text-lg flex items-center justify-center shrink-0 shadow-2xs">
-                            {item.icon}
-                          </div>
-                          <div className="min-w-0">
-                            <h5
-                              className="text-xs sm:text-sm font-black text-stone-900 leading-snug truncate"
-                              title={item.name}
-                            >
-                              {item.name}
-                            </h5>
-                            <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
-                              <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-md bg-stone-100 text-stone-600">
-                                {item.categoryLabel}
-                              </span>
-                              {item.price && (
-                                <span className="text-[10px] font-semibold text-stone-400">
-                                  {formatCurrency(item.price)}/pz
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Total Acumulado para este Pan */}
-                        <div className="text-right shrink-0">
-                          <span className="text-[9px] uppercase font-bold text-stone-400 block">Total</span>
-                          <span
-                            className={`font-mono font-black text-base sm:text-lg block tabular-nums leading-none ${
-                              item.totalPieces > 0 ? "text-emerald-700" : "text-stone-400"
-                            }`}
-                          >
-                            {item.totalPieces} <span className="text-[10px] font-bold text-stone-400">pz</span>
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Desglose de origen: Encargos vs Añadido */}
-                      <div className="bg-stone-100/80 rounded-xl p-2 flex items-center justify-between text-[11px] gap-2">
-                        <div className="flex items-center gap-1 text-stone-600">
-                          <Package className="w-3 h-3 text-amber-600 shrink-0" />
-                          <span>Encargos clientes:</span>
-                          <span className="font-mono font-black text-stone-900">{item.orderPieces}</span>
-                          {item.ordersCount > 0 && (
-                            <span className="text-[10px] text-stone-400 font-medium">
-                              ({item.ordersCount})
-                            </span>
-                          )}
-                        </div>
-
-                        <div className="flex items-center gap-1 text-emerald-800">
-                          <PlusCircle className="w-3 h-3 text-emerald-600 shrink-0" />
-                          <span>Añadido:</span>
-                          <span className="font-mono font-black text-emerald-950">{item.extraPieces}</span>
-                        </div>
-                      </div>
-
-                      {/* Controles para Añadir Piezas */}
-                      <div className="space-y-1.5 pt-1 border-t border-stone-100">
-                        <div className="flex items-center justify-between gap-1.5">
-                          <span className="text-[10px] font-bold text-stone-500 uppercase tracking-tight">
-                            Añadir / Programar:
-                          </span>
-
-                          {item.extraPieces > 0 && (
-                            <button
-                              type="button"
-                              onClick={() => handleSetExtraPieces(item.key, 0)}
-                              className="text-[10px] font-bold text-rose-600 hover:text-rose-800 cursor-pointer flex items-center gap-0.5"
-                              title="Poner piezas añadidas en 0"
-                            >
-                              <RotateCcw className="w-2.5 h-2.5" />
-                              <span>Reset (0)</span>
-                            </button>
-                          )}
-                        </div>
-
-                        {/* Stepper + Input */}
-                        <div className="flex items-center gap-1">
-                          <button
-                            type="button"
-                            onClick={() => handleQuickAddPieces(item.key, -1)}
-                            disabled={item.extraPieces <= 0}
-                            className="w-8 h-8 rounded-lg bg-stone-100 hover:bg-stone-200 disabled:opacity-30 disabled:cursor-not-allowed font-black text-stone-800 text-sm flex items-center justify-center cursor-pointer transition-colors active:scale-95"
-                            title="Restar 1 pieza"
-                          >
-                            <Minus className="w-3.5 h-3.5" />
-                          </button>
-
-                          <div className="relative flex-1">
-                            <input
-                              type="number"
-                              min="0"
-                              step="1"
-                              placeholder="0"
-                              value={item.extraPieces > 0 ? item.extraPieces : ""}
-                              onChange={(e) => {
-                                const val = e.target.value === "" ? 0 : parseInt(e.target.value, 10);
-                                handleSetExtraPieces(item.key, isNaN(val) ? 0 : val);
-                              }}
-                              className="w-full text-center py-1.5 px-2 bg-white border border-stone-200 rounded-lg font-mono font-black text-sm text-stone-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 tabular-nums shadow-2xs"
-                            />
-                            <span className="text-[9px] font-bold text-stone-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none">
-                              pz
-                            </span>
-                          </div>
-
-                          <button
-                            type="button"
-                            onClick={() => handleQuickAddPieces(item.key, 1)}
-                            className="w-8 h-8 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-black text-sm flex items-center justify-center cursor-pointer transition-colors active:scale-95 shadow-2xs"
-                            title="Sumar 1 pieza"
-                          >
-                            <Plus className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-
-                        {/* Botones de suma rápida (+10, +25, +50, +100) */}
-                        <div className="grid grid-cols-4 gap-1 pt-1">
-                          {[10, 25, 50, 100].map((increment) => (
-                            <button
-                              key={increment}
-                              type="button"
-                              onClick={() => handleQuickAddPieces(item.key, increment)}
-                              className="py-1 px-1 rounded-lg bg-stone-100 hover:bg-emerald-100 hover:text-emerald-900 border border-stone-200 hover:border-emerald-300 font-mono font-bold text-[10px] text-stone-700 transition-colors cursor-pointer active:scale-95 text-center"
-                              title={`Sumar +${increment} piezas de ${item.name}`}
-                            >
-                              +{increment}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          ) : viewMode === "consolidated" ? (
+          {viewMode === "consolidated" ? (
             /* ========================================================================= */
-            /* MODO 2: CONSOLIDADO GENERAL PARA EL TALLER / HORNEADO                     */
+            /* MODO 1: CONSOLIDADO GENERAL PARA EL TALLER / HORNEADO                     */
             /* ========================================================================= */
             <div className="space-y-3">
               <div className="bg-amber-50/90 border border-amber-200/90 p-3 sm:p-3.5 rounded-2xl flex items-center justify-between flex-wrap gap-2">
@@ -1662,7 +1538,7 @@ export default function NextDayDistributionModal({
                       Lista Maestra de Horneado y Producción
                     </h4>
                     <p className="text-[11px] text-amber-800 font-medium">
-                      Suma global de encargos de clientes + piezas añadidas para mostrador el {formatLongDateSpanish(selectedDate)}
+                      Suma global de encargos de clientes para el {formatLongDateSpanish(selectedDate)}
                     </p>
                   </div>
                 </div>
@@ -1671,13 +1547,6 @@ export default function NextDayDistributionModal({
                   <span className="font-mono text-xs font-black bg-white px-3 py-1 rounded-xl text-emerald-900 border border-emerald-300 shadow-2xs">
                     {totalCombinedPieces} piezas a hornear
                   </span>
-                  <button
-                    type="button"
-                    onClick={() => setViewMode("bread_options")}
-                    className="text-xs font-bold text-amber-800 underline hover:text-amber-950 cursor-pointer"
-                  >
-                    + Modificar cantidades
-                  </button>
                 </div>
               </div>
 
@@ -1690,15 +1559,8 @@ export default function NextDayDistributionModal({
                     No hay piezas de pan programadas para hornear
                   </h4>
                   <p className="text-xs text-stone-500 max-w-sm mx-auto">
-                    No se registraron encargos de clientes ni pan añadido para esta fecha. Puedes desglosar el catálogo y añadir las piezas deseadas ahora mismo.
+                    No se registraron encargos de clientes para esta fecha.
                   </p>
-                  <button
-                    type="button"
-                    onClick={() => setViewMode("bread_options")}
-                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-xs transition-colors cursor-pointer"
-                  >
-                    🥖 Desglosar y programar tipos de pan
-                  </button>
                 </div>
               ) : (
                 <div className="bg-white rounded-2xl border border-stone-200 overflow-hidden shadow-xs">
@@ -1805,16 +1667,9 @@ export default function NextDayDistributionModal({
                     No hay encargos de clientes programados para el {formatLongDateSpanish(selectedDate)}
                   </h4>
                   <p className="text-xs text-stone-500 max-w-md mx-auto">
-                    No se registraron pedidos directos de clientes para repartir en las sucursales este día. Puedes entrar a la pestaña de desglose de opciones para programar la producción general.
+                    No se registraron pedidos directos de clientes para repartir en las sucursales este día.
                   </p>
                   <div className="pt-2 flex items-center justify-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setViewMode("bread_options")}
-                      className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs rounded-xl shadow-xs transition-colors cursor-pointer"
-                    >
-                      🥖 Desglosar y programar producción de pan
-                    </button>
                     <button
                       type="button"
                       onClick={() => setSelectedDate(todayISO)}
