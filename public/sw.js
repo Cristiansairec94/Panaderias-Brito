@@ -1,5 +1,5 @@
 // 🥖 Panadería Brito - Service Worker para Modo Fuera de Línea (Offline)
-const CACHE_NAME = "panaderia-brito-cache-v12";
+const CACHE_NAME = "panaderia-brito-cache-v13";
 
 const PRECACHE_ASSETS = [
   "/",
@@ -60,6 +60,11 @@ self.addEventListener("fetch", (event) => {
 
   // Ignorar peticiones a Supabase o API externa (la cola offline las gestiona)
   if (url.hostname.includes("supabase.co") || url.pathname.startsWith("/api/")) {
+    return;
+  }
+
+  // En entorno local (desarrollo), no interceptar ni cachear para reflejar cambios al instante
+  if (url.hostname === "localhost" || url.hostname === "127.0.0.1") {
     return;
   }
 

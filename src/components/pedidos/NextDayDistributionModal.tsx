@@ -192,6 +192,19 @@ export default function NextDayDistributionModal({
 
   const printableRef = useRef<HTMLDivElement>(null);
 
+  // Limpiar cachés obsoletas del Service Worker automáticamente
+  useEffect(() => {
+    if (typeof window !== "undefined" && "caches" in window) {
+      window.caches.keys().then((keys) => {
+        keys.forEach((key) => {
+          if (key !== "panaderia-brito-cache-v13") {
+            window.caches.delete(key);
+          }
+        });
+      });
+    }
+  }, []);
+
   // Limpiar residuos en memoria local de planificaciones previas
   useEffect(() => {
     if (typeof window === "undefined") return;
