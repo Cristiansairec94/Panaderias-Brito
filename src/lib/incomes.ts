@@ -435,6 +435,10 @@ export function removePosSaleIncome(saleId: string): void {
 export function syncMissingSalesToIncomes(): void {
   if (typeof window === "undefined") return;
   try {
+    const clearedTimestampStr = localStorage.getItem("brito_incomes_cleared_timestamp");
+    const clearedTimestamp = clearedTimestampStr ? Number(clearedTimestampStr) : 0;
+    const deletedIds = getDeletedIncomeIds();
+
     const currentIncomes = getStoredIncomes();
     const existingSaleIds = new Set(
       currentIncomes
@@ -452,7 +456,23 @@ export function syncMissingSalesToIncomes(): void {
       const posSales: Sale[] = JSON.parse(rawPosSales);
       if (Array.isArray(posSales)) {
         for (const s of posSales) {
+          if (!s || s.total <= 0) continue;
           const normId = s.id.toLowerCase().replace(/^(pos-|ing-)/i, "");
+          const sTime = s.timestamp ? new Date(s.timestamp).getTime() : ((s as any).createdAt ? new Date((s as any).createdAt).getTime() : 0);
+
+          // Si la venta ocurrió antes de la purga total del historial de ingresos, omitir
+          if (clearedTimestamp > 0 && sTime > 0 && sTime <= clearedTimestamp) {
+            continue;
+          }
+          if (
+            deletedIds.has(normId) ||
+            deletedIds.has(s.id) ||
+            deletedIds.has(`ING-${normId}`) ||
+            deletedIds.has(`pos-${normId}`)
+          ) {
+            continue;
+          }
+
           if (!existingSaleIds.has(normId) && s.total > 0) {
             existingSaleIds.add(normId);
             const itemsSummary =
@@ -528,10 +548,28 @@ export async function fetchAndSyncIncomesFromSupabase(): Promise<{
     }
 
     const current = getStoredIncomes();
+    const deletedIds = getDeletedIncomeIds();
+    const clearedTimestampStr = localStorage.getItem("brito_incomes_cleared_timestamp");
+    const clearedTimestamp = clearedTimestampStr ? Number(clearedTimestampStr) : 0;
     const syncedIncomes: CashIncome[] = [];
 
     for (const mov of movements) {
       if (!mov || !mov.id || Number(mov.amount) <= 0) continue;
+
+      const rawId = mov.id.replace(/^(mov-|bmov-|ING-)+/gi, "");
+      if (
+        deletedIds.has(mov.id) ||
+        (rawId && deletedIds.has(rawId)) ||
+        deletedIds.has(`ING-${rawId}`) ||
+        deletedIds.has(`mov-${rawId}`)
+      ) {
+        continue;
+      }
+
+      const movTime = mov.created_at ? new Date(mov.created_at).getTime() : 0;
+      if (clearedTimestamp > 0 && movTime > 0 && movTime <= clearedTimestamp) {
+        continue;
+      }
 
       const bId = resolveBranchId(mov.branch_id, mov.authorized_by);
 
@@ -669,6 +707,77 @@ export function deleteIncomeInDb(id: string): void {
   })();
 }
 
+/**
+ * Elimina TODO el historial de ingresos de forma total y definitiva:
+ * - Registra todos los IDs actuales en el set de eliminados para evitar que resurjan
+ * - Registra la marca de tiempo de vaciado para evitar resurrección de ventas antiguas
+ * - Vacía brito_cash_incomes, brito_pos_current_incomes, brito_incomes, brito_incomes_v2
+ * - Notifica reactivamente vía evento y WebSocket a todas las pestañas/dispositivos
+ * - Borra en Supabase todos los registros en cash_movements con type = 'entrada'
+ */
+export async function clearAllIncomesInDb(): Promise<{ success: boolean; clearedCount: number }> {
+  if (typeof window === "undefined") return { success: false, clearedCount: 0 };
+
+  try {
+    const current = getStoredIncomes();
+    const count = current.length;
+
+    const deletedSet = getDeletedIncomeIds();
+    for (const inc of current) {
+      if (inc && inc.id) {
+        deletedSet.add(inc.id);
+        const rawId = inc.id.replace(/^(mov-|bmov-|ING-)+/gi, "");
+        if (rawId) {
+          deletedSet.add(rawId);
+          deletedSet.add(`ING-${rawId}`);
+          deletedSet.add(`mov-${rawId}`);
+        }
+      }
+      if (inc && inc.saleId) {
+        deletedSet.add(inc.saleId);
+        const rawSale = inc.saleId.replace(/^(pos-|ing-)/gi, "");
+        if (rawSale) {
+          deletedSet.add(rawSale);
+          deletedSet.add(`pos-${rawSale}`);
+          deletedSet.add(`ING-${rawSale}`);
+        }
+      }
+    }
+
+    const nowEpoch = Date.now();
+    localStorage.setItem("brito_incomes_cleared_timestamp", String(nowEpoch));
+    localStorage.setItem(DELETED_INCOMES_KEY, JSON.stringify(Array.from(deletedSet)));
+
+    localStorage.setItem(STORAGE_INCOMES_KEY, "[]");
+    localStorage.setItem("brito_pos_current_incomes", "[]");
+    localStorage.setItem("brito_incomes", "[]");
+    localStorage.setItem("brito_incomes_v2", "[]");
+    localStorage.setItem("brito_incomes_initialized", "true");
+
+    window.dispatchEvent(new Event("brito_incomes_updated"));
+
+    try {
+      if (realtimeHub?.broadcastIncome) {
+        realtimeHub.broadcastIncome("clear_all", { timestamp: nowEpoch });
+      }
+    } catch {}
+
+    void (async () => {
+      try {
+        const supabase = createClient();
+        await supabase.from("cash_movements").delete().eq("type", "entrada");
+      } catch (err) {
+        console.warn("[Incomes] Error clearing cash_movements in Supabase:", err);
+      }
+    })();
+
+    return { success: true, clearedCount: count };
+  } catch (err) {
+    console.error("[Incomes] Error en clearAllIncomesInDb:", err);
+    return { success: false, clearedCount: 0 };
+  }
+}
+
 // ─── SINCRONIZACIÓN EN TIEMPO REAL MULTI-SUCURSAL (WebSocket) ───────────
 if (typeof window !== "undefined") {
   // 0. Escuchar eventos directos de ingresos (creación, edición, eliminación)
@@ -677,6 +786,14 @@ if (typeof window !== "undefined") {
       try {
         if (!payload) return;
         const { action, income, deletedId } = payload;
+        if (action === "clear_all") {
+          saveStoredIncomes([]);
+          localStorage.setItem("brito_pos_current_incomes", "[]");
+          localStorage.setItem("brito_incomes", "[]");
+          localStorage.setItem("brito_incomes_v2", "[]");
+          window.dispatchEvent(new Event("brito_incomes_updated"));
+          return;
+        }
         const current = getStoredIncomes();
         if (action === "delete") {
           const targetId = deletedId || income?.id;
@@ -791,3 +908,22 @@ if (typeof window !== "undefined") {
   }
 }
 
+
+// Auto-purga única del historial de ingresos (solicitada por usuario)
+if (typeof window !== "undefined") {
+  const PURGE_FLAG_KEY = "brito_incomes_purged_epoch_20261022";
+  if (localStorage.getItem(PURGE_FLAG_KEY) !== "true") {
+    try {
+      localStorage.setItem(PURGE_FLAG_KEY, "true");
+      localStorage.setItem(STORAGE_INCOMES_KEY, "[]");
+      localStorage.setItem("brito_pos_current_incomes", "[]");
+      localStorage.setItem("brito_incomes", "[]");
+      localStorage.setItem("brito_incomes_v2", "[]");
+      localStorage.setItem("brito_incomes_initialized", "true");
+      localStorage.setItem("brito_incomes_cleared_timestamp", String(Date.now()));
+      void clearAllIncomesInDb();
+    } catch (e) {
+      console.warn("[Incomes] Error in auto purge migration:", e);
+    }
+  }
+}

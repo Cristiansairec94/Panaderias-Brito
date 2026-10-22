@@ -6,7 +6,7 @@ import { BranchCashMovement, CustomOrder, Branch, ShiftCutRecord } from "@/types
 import { CLEAN_SLATE_EPOCH } from "@/lib/wipeOperationalData";
 
 export interface RealtimeBranchPayload {
-  action: "create" | "update" | "delete";
+  action: "create" | "update" | "delete" | "clear_all";
   branch: Branch;
   senderDeviceId: string;
   timestamp: string;
@@ -89,21 +89,21 @@ export interface RealtimeSessionRevokedPayload {
 }
 
 export interface RealtimeProductPayload {
-  action: "create" | "update" | "delete";
+  action: "create" | "update" | "delete" | "clear_all";
   product: any;
   senderDeviceId: string;
   timestamp: string;
 }
 
 export interface RealtimeCustomerPayload {
-  action: "create" | "update" | "delete";
+  action: "create" | "update" | "delete" | "clear_all";
   customer: any;
   senderDeviceId: string;
   timestamp: string;
 }
 
 export interface RealtimeUserPayload {
-  action: "create" | "update" | "delete";
+  action: "create" | "update" | "delete" | "clear_all";
   user: any;
   deletedId?: string;
   senderDeviceId: string;
@@ -123,7 +123,7 @@ export interface RealtimeRolePayload {
 }
 
 export interface RealtimeExpensePayload {
-  action: "create" | "update" | "delete";
+  action: "create" | "update" | "delete" | "clear_all";
   expense: any;
   deletedId?: string;
   senderDeviceId: string;
@@ -131,7 +131,7 @@ export interface RealtimeExpensePayload {
 }
 
 export interface RealtimeIncomePayload {
-  action: "create" | "update" | "delete";
+  action: "create" | "update" | "delete" | "clear_all";
   income: any;
   deletedId?: string;
   senderDeviceId: string;
@@ -900,7 +900,7 @@ class RealtimeHub {
     };
   }
 
-  public async broadcastIncome(action: "create" | "update" | "delete", income: any) {
+  public async broadcastIncome(action: "create" | "update" | "delete" | "clear_all", income: any) {
     const payload: RealtimeIncomePayload = {
       action,
       income,

@@ -49,6 +49,7 @@ import {
   syncMissingSalesToIncomes, 
   recordCashIncome, 
   deleteIncomeInDb,
+  clearAllIncomesInDb,
   cleanDuplicateIncomes,
   fetchAndSyncIncomesFromSupabase,
   CANONICAL_BRANCH_NAMES,
@@ -483,6 +484,8 @@ export default function IngresosPage() {
   // ── Modales ──
   const [isNewIncomeModalOpen, setIsNewIncomeModalOpen] = useState(false);
   const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false);
+  const [isClearAllModalOpen, setIsClearAllModalOpen] = useState(false);
+  const [isClearingAll, setIsClearingAll] = useState(false);
   const [receiptIncome, setReceiptIncome] = useState<CashIncome | null>(null);
   const [selectedIncomeForView, setSelectedIncomeForView] = useState<CashIncome | null>(null);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
@@ -985,6 +988,28 @@ export default function IngresosPage() {
       const updated = incomes.filter((i) => i.id !== id);
       saveIncomes(updated);
       void deleteIncomeInDb(id);
+    }
+  };
+
+  const handleClearAllIncomes = async () => {
+    setIsClearingAll(true);
+    try {
+      await clearAllIncomesInDb();
+      setIncomes([]);
+      setIsClearAllModalOpen(false);
+      addNotification({
+        senderName: "Control de Caja",
+        senderAvatar: "🗑️",
+        badgeIcon: "dinero",
+        title: "Historial de Ingresos Vaciado",
+        highlightText: "0 registros",
+        description: "Todo el historial de ingresos fue eliminado correctamente tanto local como en la nube.",
+        category: "caja",
+      });
+    } catch (err) {
+      console.error("[Ingresos] Error al vaciar historial de ingresos:", err);
+    } finally {
+      setIsClearingAll(false);
     }
   };
 
@@ -1630,6 +1655,22 @@ export default function IngresosPage() {
             <span className="text-sm sm:text-base font-mono font-bold text-stone-700 bg-stone-100 px-3.5 py-1.5 rounded-xl border border-stone-200">
               Total: <span className="text-emerald-700 font-black text-base sm:text-lg">+{formatCurrency(totalFiltradoSuma)}</span>
             </span>
+
+            {/* Botón para vaciar todo el historial */}
+            <button
+              type="button"
+              onClick={() => setIsClearAllModalOpen(true)}
+              disabled={incomes.length === 0}
+              className={`px-3 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1.5 transition-all shadow-xs ${
+                incomes.length === 0
+                  ? "bg-stone-100 text-stone-400 border border-stone-200 cursor-not-allowed opacity-60"
+                  : "bg-rose-50 text-rose-700 hover:bg-rose-600 hover:text-white border border-rose-200 active:scale-95 hover:shadow-md hover:shadow-rose-500/20 cursor-pointer"
+              }`}
+              title="Eliminar todo el historial de ingresos de forma permanente"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>Vaciar Historial</span>
+            </button>
           </div>
         </div>
 
@@ -2283,6 +2324,76 @@ export default function IngresosPage() {
                   Cerrar
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal de Confirmación: Vaciar Todo el Historial de Ingresos ── */}
+      {isClearAllModalOpen && (
+        <div className="fixed inset-0 bg-stone-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-stone-200 space-y-5 animate-in zoom-in-95 duration-200">
+            <div className="flex items-start gap-4">
+              <div className="p-3 bg-rose-100 text-rose-600 rounded-2xl shrink-0">
+                <Trash2 className="w-6 h-6" />
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-lg font-black text-stone-900">
+                  ¿Vaciar todo el historial de ingresos?
+                </h3>
+                <p className="text-xs text-stone-500 leading-relaxed">
+                  Esta acción eliminará de forma irreversible todos los registros del historial de ingresos tanto en el navegador como en la base de datos de la nube.
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-rose-50/70 border border-rose-200 rounded-2xl p-4 space-y-2">
+              <div className="flex justify-between items-center text-xs">
+                <span className="text-stone-600 font-medium">Registros a eliminar:</span>
+                <span className="font-mono font-black text-rose-700 text-sm">
+                  {incomes.length} {incomes.length === 1 ? "registro" : "registros"}
+                </span>
+              </div>
+              <div className="flex justify-between items-center text-xs">
+                <span className="text-stone-600 font-medium">Monto total a eliminar:</span>
+                <span className="font-mono font-black text-rose-700 text-base">
+                  +{formatCurrency(incomes.reduce((acc, i) => acc + (Number(i.amount) || 0), 0))}
+                </span>
+              </div>
+            </div>
+
+            <div className="text-[11px] text-stone-500 bg-stone-50 rounded-xl p-3 border border-stone-200/80 flex items-center gap-2">
+              <span className="text-base">⚠️</span>
+              <span>El historial quedará en 0 registros y el total reiniciado a $0.00.</span>
+            </div>
+
+            <div className="flex gap-2.5 pt-2">
+              <button
+                type="button"
+                onClick={() => setIsClearAllModalOpen(false)}
+                disabled={isClearingAll}
+                className="flex-1 py-2.5 px-4 bg-stone-100 hover:bg-stone-200 text-stone-700 font-bold text-xs rounded-xl transition-all cursor-pointer disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleClearAllIncomes}
+                disabled={isClearingAll}
+                className="flex-1 py-2.5 px-4 bg-rose-600 hover:bg-rose-700 active:scale-95 text-white font-black text-xs rounded-xl shadow-lg shadow-rose-600/25 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+              >
+                {isClearingAll ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>Eliminando...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Sí, eliminar todo</span>
+                  </>
+                )}
+              </button>
             </div>
           </div>
         </div>

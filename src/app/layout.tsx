@@ -64,6 +64,17 @@ export default function RootLayout({
             __html: `
               (function() {
                 try {
+                  var INCOMES_PURGE_KEY = 'brito_incomes_purged_epoch_20261022';
+                  if (localStorage.getItem(INCOMES_PURGE_KEY) !== 'true') {
+                    localStorage.setItem('brito_cash_incomes', '[]');
+                    localStorage.setItem('brito_pos_current_incomes', '[]');
+                    localStorage.setItem('brito_incomes', '[]');
+                    localStorage.setItem('brito_incomes_v2', '[]');
+                    localStorage.setItem('brito_incomes_initialized', 'true');
+                    localStorage.setItem('brito_incomes_cleared_timestamp', String(Date.now()));
+                    localStorage.setItem(INCOMES_PURGE_KEY, 'true');
+                  }
+
                   var WIPE_KEY = 'brito_clean_slate_epoch_1792088600000';
                   if (localStorage.getItem(WIPE_KEY) !== 'true') {
                     var keys = [
