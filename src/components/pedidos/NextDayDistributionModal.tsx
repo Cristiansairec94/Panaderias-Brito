@@ -860,6 +860,12 @@ export default function NextDayDistributionModal({
     return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
   }, [storedProducts, targetOrders]);
 
+  // Lista de panes filtrada según la categoría seleccionada en la Barra de Categorías
+  const displayedBreadList = useMemo(() => {
+    if (breadCategoryFilter === "all") return allRegisteredBreadList;
+    return allRegisteredBreadList.filter((b: any) => b.category === breadCategoryFilter);
+  }, [allRegisteredBreadList, breadCategoryFilter]);
+
   // Conteo de piezas para la selección actual (global o sucursal activa)
   const getBreadTotalPiecesInSelection = (breadName: string): number => {
     const norm = normalizeProductName(breadName);
@@ -1184,42 +1190,86 @@ export default function NextDayDistributionModal({
           </div>
         </div>
 
-        {/* Tarjetas KPI Resumen del Día */}
-        <div className="p-3 sm:p-4 bg-[#f8f5ef] border-b border-[#e8ded2] grid grid-cols-2 gap-2 sm:gap-3 shrink-0">
-          <div className="bg-white p-3 sm:p-3.5 rounded-2xl border border-emerald-300 shadow-2xs flex items-center gap-3 min-h-[72px] sm:min-h-[80px]">
-            <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-emerald-100 text-emerald-800 font-black text-2xl sm:text-3xl flex items-center justify-center shrink-0 shadow-2xs">
-              🥖
-            </div>
-            <div className="min-w-0 flex-1">
-              <span className="text-xs sm:text-sm uppercase font-bold text-stone-500 block leading-tight">
-                Total Piezas de Pan
+        {/* ── BARRA HORIZONTAL DE CATEGORÍAS DE PAN ── */}
+        <div className="px-3 sm:px-4 py-2.5 bg-gradient-to-r from-amber-50/90 via-stone-50 to-amber-50/90 border-b border-amber-200/90 shrink-0">
+          <div className="flex items-center justify-between gap-2 mb-1.5 px-0.5">
+            <div className="flex items-center gap-1.5 text-xs font-black text-amber-950 uppercase tracking-wider">
+              <Layers className="w-4 h-4 text-amber-600" />
+              <span>Barra de Categorías de Pan</span>
+              <span className="bg-amber-200/90 text-amber-950 font-bold text-[10px] px-2 py-0.2 rounded-full border border-amber-300">
+                {allRegisteredCategories.length} categorías
               </span>
-              <div className="flex items-baseline gap-2 mt-1">
-                <span className="text-2xl sm:text-3xl font-black text-emerald-950 block tabular-nums leading-none">
-                  {selectedBranchTotalPieces}
-                </span>
-                <span className="text-xs sm:text-sm font-bold text-stone-600">
-                  {selectedBranchId === "all" ? "pzas (todas)" : "pzas sucursal"}
-                </span>
-              </div>
             </div>
+            {breadCategoryFilter !== "all" && (
+              <button
+                type="button"
+                onClick={() => setBreadCategoryFilter("all")}
+                className="text-xs font-bold text-amber-700 hover:text-amber-900 cursor-pointer underline flex items-center gap-1"
+              >
+                <span>Mostrar todas</span>
+                <span>✕</span>
+              </button>
+            )}
           </div>
 
-          <div className="bg-white p-3 sm:p-3.5 rounded-2xl border border-amber-200/90 shadow-2xs flex items-center gap-3 min-h-[72px] sm:min-h-[80px]">
-            <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-amber-100 text-amber-900 font-black text-2xl sm:text-3xl flex items-center justify-center shrink-0 shadow-2xs">
-              📦
-            </div>
-            <div className="min-w-0 flex-1">
-              <span className="text-xs sm:text-sm uppercase font-bold text-stone-500 block leading-tight">
-                Pedidos Programados
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-thin scrollbar-thumb-amber-300">
+            {/* 1. Opción Todas las Categorías */}
+            <button
+              type="button"
+              onClick={() => setBreadCategoryFilter("all")}
+              className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-black shrink-0 transition-all cursor-pointer shadow-2xs border ${
+                breadCategoryFilter === "all"
+                  ? "bg-amber-900 text-white border-amber-950 ring-2 ring-amber-400 shadow-xs scale-102"
+                  : "bg-white hover:bg-amber-50 text-stone-700 border-stone-200 hover:border-amber-300"
+              }`}
+            >
+              <span className="text-base">🧺</span>
+              <span>Todas las Categorías</span>
+              <span
+                className={`font-mono text-[10px] px-2 py-0.5 rounded-lg font-black ${
+                  breadCategoryFilter === "all"
+                    ? "bg-amber-950 text-white"
+                    : "bg-stone-100 text-stone-700 border border-stone-200"
+                }`}
+              >
+                {selectedBranchTotalPieces} pzas
               </span>
-              <div className="flex items-baseline gap-2 mt-1">
-                <span className="text-2xl sm:text-3xl font-black text-stone-900 block tabular-nums leading-none">
-                  {selectedBranchTotalOrders}
-                </span>
-                <span className="text-xs sm:text-sm font-bold text-stone-500">pedidos</span>
-              </div>
-            </div>
+            </button>
+
+            {/* 2. Categorías Registradas */}
+            {categoriesWithPieces.map(({ category: cat, totalPieces: pieces }: any) => {
+              const isSelected = breadCategoryFilter === cat.id;
+
+              return (
+                <button
+                  key={cat.id}
+                  type="button"
+                  onClick={() => setBreadCategoryFilter(isSelected ? "all" : cat.id)}
+                  className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-black shrink-0 transition-all cursor-pointer shadow-2xs border ${
+                    isSelected
+                      ? "bg-emerald-800 text-white border-emerald-900 ring-2 ring-emerald-400 shadow-xs scale-102"
+                      : pieces > 0
+                      ? "bg-emerald-50 text-emerald-950 border-emerald-300 hover:bg-emerald-100"
+                      : "bg-white text-stone-700 border-stone-200 hover:bg-stone-50 hover:border-stone-400"
+                  }`}
+                  title={`Filtrar por ${cat.label} (${pieces} pzas)`}
+                >
+                  <span className="text-base">{cat.icon || "🥖"}</span>
+                  <span className="truncate max-w-[160px]">{cat.label}</span>
+                  <span
+                    className={`font-mono text-[10px] px-2 py-0.5 rounded-lg font-black ${
+                      isSelected
+                        ? "bg-emerald-950 text-white"
+                        : pieces > 0
+                        ? "bg-emerald-200 text-emerald-950 border border-emerald-300"
+                        : "bg-stone-100 text-stone-500 border border-stone-200"
+                    }`}
+                  >
+                    {pieces} pzas
+                  </span>
+                </button>
+              );
+            })}
           </div>
         </div>
 
@@ -1239,7 +1289,7 @@ export default function NextDayDistributionModal({
           </div>
 
           <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-thin scrollbar-thumb-amber-300">
-            {allRegisteredBreadList.map((bread, bIdx) => {
+            {displayedBreadList.map((bread: any, bIdx: number) => {
               const isSelected = searchProduct.toLowerCase() === bread.name.toLowerCase();
               const piecesInSelection = getBreadTotalPiecesInSelection(bread.name);
 
