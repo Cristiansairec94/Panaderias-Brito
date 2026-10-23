@@ -22,8 +22,7 @@ import {
   Package,
   Building2,
   Filter,
-  Eye,
-  List
+  Eye
 } from "lucide-react";
 import { CustomOrder, Branch, Product } from "@/types";
 import { formatCurrency, formatDeliveryDateDisplay } from "@/lib/utils";
@@ -424,22 +423,6 @@ export default function NextDayDistributionModal({
   const [storedCategories, setStoredCategories] = useState<ProductCategory[]>([]);
   const [storedProducts, setStoredProducts] = useState<Product[]>([]);
   const [breadCategoryFilter, setBreadCategoryFilter] = useState<string>("all");
-  const [isCategoryMenuOpen, setIsCategoryMenuOpen] = useState(false);
-  const [categoryListDisplayMode, setCategoryListDisplayMode] = useState<"dropdown" | "vertical">("dropdown");
-  const categoryMenuRef = useRef<HTMLDivElement>(null);
-
-  // Cerrar menú de categorías con Escape
-  useEffect(() => {
-    function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") {
-        setIsCategoryMenuOpen(false);
-      }
-    }
-    if (isCategoryMenuOpen) {
-      window.addEventListener("keydown", handleKeyDown);
-      return () => window.removeEventListener("keydown", handleKeyDown);
-    }
-  }, [isCategoryMenuOpen]);
 
   useEffect(() => {
     if (isOpen) {
@@ -1171,32 +1154,12 @@ export default function NextDayDistributionModal({
                 <select
                   value={selectedBranchId}
                   onChange={(e) => setSelectedBranchId(e.target.value)}
-                  className="text-xs sm:text-sm font-bold text-stone-800 bg-white border border-stone-200 rounded-xl px-2.5 py-1.5 pr-7 focus:outline-none focus:ring-2 focus:ring-amber-500 cursor-pointer shadow-2xs appearance-none"
+                  className="text-xs font-bold text-stone-800 bg-white border border-stone-200 rounded-xl px-2.5 py-1.5 pr-7 focus:outline-none focus:ring-2 focus:ring-amber-500 cursor-pointer shadow-2xs appearance-none"
                 >
                   <option value="all">🏬 Todas las Sucursales</option>
                   {branches.map((b) => (
                     <option key={b.id} value={b.id}>
                       🏬 {b.name}
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown className="w-3.5 h-3.5 text-stone-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
-              </div>
-
-              {/* Selector de Categoría (Lista Desplegable Rápida) */}
-              <div className="relative">
-                <select
-                  value={breadCategoryFilter}
-                  onChange={(e) => setBreadCategoryFilter(e.target.value)}
-                  className="text-xs sm:text-sm font-bold text-stone-800 bg-white border border-stone-200 rounded-xl px-2.5 py-1.5 pr-7 focus:outline-none focus:ring-2 focus:ring-amber-500 cursor-pointer shadow-2xs appearance-none"
-                  title="Filtrar por lista de categorías de pan"
-                >
-                  <option value="all">
-                    🧺 Todas las Categorías ({selectedBranchTotalPieces} pzas)
-                  </option>
-                  {categoriesWithPieces.map(({ category: cat, totalPieces: pieces }: any) => (
-                    <option key={cat.id} value={cat.id}>
-                      {cat.icon || "🥖"} {cat.label} ({pieces} pzas)
                     </option>
                   ))}
                 </select>
@@ -1227,274 +1190,87 @@ export default function NextDayDistributionModal({
           </div>
         </div>
 
-        {/* ── LISTA DE CATEGORÍAS DE PAN (EN FORMA DE LISTA) ── */}
+        {/* ── BARRA HORIZONTAL DE CATEGORÍAS DE PAN ── */}
         <div className="px-3 sm:px-4 py-2.5 bg-gradient-to-r from-amber-50/90 via-stone-50 to-amber-50/90 border-b border-amber-200/90 shrink-0">
-          <div className="flex items-center justify-between gap-2 mb-2 px-0.5">
-            <div className="flex items-center gap-2 text-xs font-black text-amber-950 uppercase tracking-wider">
-              <List className="w-4 h-4 text-amber-700" />
-              <span>Lista de Categorías de Pan</span>
+          <div className="flex items-center justify-between gap-2 mb-1.5 px-0.5">
+            <div className="flex items-center gap-1.5 text-xs font-black text-amber-950 uppercase tracking-wider">
+              <Layers className="w-4 h-4 text-amber-600" />
+              <span>Barra de Categorías de Pan</span>
               <span className="bg-amber-200/90 text-amber-950 font-bold text-[10px] px-2 py-0.2 rounded-full border border-amber-300">
                 {allRegisteredCategories.length} categorías
               </span>
             </div>
-
-            <div className="flex items-center gap-2">
-              {breadCategoryFilter !== "all" && (
-                <button
-                  type="button"
-                  onClick={() => setBreadCategoryFilter("all")}
-                  className="text-xs font-bold text-amber-800 hover:text-amber-950 cursor-pointer underline flex items-center gap-1"
-                >
-                  <span>Mostrar todas</span>
-                  <span>✕</span>
-                </button>
-              )}
-
-              {/* Selector de modo de lista: Desplegable o Lista Vertical Completa */}
-              <div className="flex items-center bg-white rounded-lg p-0.5 border border-stone-200 shadow-2xs text-[11px] font-bold">
-                <button
-                  type="button"
-                  onClick={() => setCategoryListDisplayMode("dropdown")}
-                  className={`px-2 py-0.5 rounded-md transition-all cursor-pointer ${
-                    categoryListDisplayMode === "dropdown"
-                      ? "bg-amber-800 text-white font-black shadow-2xs"
-                      : "text-stone-600 hover:text-stone-900"
-                  }`}
-                  title="Ver selector en forma de lista desplegable"
-                >
-                  ▾ Desplegable
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setCategoryListDisplayMode("vertical")}
-                  className={`px-2 py-0.5 rounded-md transition-all cursor-pointer ${
-                    categoryListDisplayMode === "vertical"
-                      ? "bg-amber-800 text-white font-black shadow-2xs"
-                      : "text-stone-600 hover:text-stone-900"
-                  }`}
-                  title="Ver todas las categorías en forma de lista vertical"
-                >
-                  ☰ Lista completa
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* OPCIÓN A: EN FORMA DE LISTA DESPLEGABLE (INTERACTIVA CON LETRAS GRANDES) */}
-          {categoryListDisplayMode === "dropdown" ? (
-            <div ref={categoryMenuRef} className="relative w-full max-w-xl">
-              <button
-                type="button"
-                onClick={() => setIsCategoryMenuOpen((prev) => !prev)}
-                className="w-full bg-white hover:bg-amber-50/70 border-2 border-amber-400 rounded-2xl px-3.5 sm:px-4 py-2 sm:py-2.5 shadow-xs flex items-center justify-between gap-3 transition-all cursor-pointer text-left group"
-              >
-                <div className="flex items-center gap-3 min-w-0">
-                  <span className="text-2xl sm:text-3xl shrink-0 leading-none">
-                    {breadCategoryFilter === "all"
-                      ? "🧺"
-                      : allRegisteredCategories.find((c) => c.id === breadCategoryFilter)?.icon || "🥖"}
-                  </span>
-                  <div className="min-w-0">
-                    <span className="text-[10px] sm:text-xs uppercase font-extrabold text-amber-900/80 block leading-tight">
-                      Categoría Seleccionada:
-                    </span>
-                    <span className="text-sm sm:text-base font-black text-stone-900 block truncate leading-tight mt-0.5">
-                      {breadCategoryFilter === "all"
-                        ? "Todas las Categorías de Pan"
-                        : allRegisteredCategories.find((c) => c.id === breadCategoryFilter)?.label || "Categoría"}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2 shrink-0">
-                  <span className="font-mono text-xs sm:text-sm font-black px-2.5 py-1 rounded-xl bg-amber-100 text-amber-950 border border-amber-300">
-                    {breadCategoryFilter === "all"
-                      ? `${selectedBranchTotalPieces} pzas`
-                      : `${categoriesWithPieces.find((c: any) => c.category.id === breadCategoryFilter)?.totalPieces || 0} pzas`}
-                  </span>
-                  <ChevronDown
-                    className={`w-5 h-5 text-amber-700 transition-transform duration-200 ${
-                      isCategoryMenuOpen ? "rotate-180" : ""
-                    }`}
-                  />
-                </div>
-              </button>
-
-              {/* Menú Desplegable Flotante con LETRAS GRANDES */}
-              {isCategoryMenuOpen && (
-                <>
-                  <div
-                    className="fixed inset-0 z-40 bg-black/20 backdrop-blur-[0.5px]"
-                    onClick={() => setIsCategoryMenuOpen(false)}
-                  />
-
-                  <div className="fixed sm:absolute inset-x-3 bottom-6 sm:bottom-auto sm:inset-x-auto sm:left-0 sm:top-[calc(100%+8px)] sm:w-[480px] bg-white rounded-3xl shadow-2xl border-2 border-amber-500 z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
-                    <div className="bg-gradient-to-r from-amber-800 to-amber-900 text-white px-4 py-3 flex items-center justify-between border-b border-amber-700">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xl">🧺</span>
-                        <span className="text-sm sm:text-base font-black uppercase tracking-wide">
-                          Lista de Categorías de Pan
-                        </span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setIsCategoryMenuOpen(false)}
-                        className="text-amber-100 hover:text-white text-xs font-black px-2.5 py-1 rounded-xl bg-white/10 hover:bg-white/20 transition-colors cursor-pointer"
-                      >
-                        ✕ Cerrar
-                      </button>
-                    </div>
-
-                    <div className="max-h-[380px] sm:max-h-[420px] overflow-y-auto divide-y divide-stone-100 p-2 space-y-1">
-                      {/* 1. Todas las Categorías */}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setBreadCategoryFilter("all");
-                          setIsCategoryMenuOpen(false);
-                        }}
-                        className={`w-full text-left px-4 py-3 sm:py-3.5 rounded-2xl flex items-center justify-between gap-3 transition-colors cursor-pointer ${
-                          breadCategoryFilter === "all"
-                            ? "bg-amber-100/90 text-amber-950 font-black ring-2 ring-amber-500/80 shadow-xs"
-                            : "hover:bg-amber-50/70 text-stone-900 font-bold"
-                        }`}
-                      >
-                        <div className="flex items-center gap-3.5 min-w-0">
-                          <span className="text-2xl sm:text-3xl shrink-0 leading-none">🧺</span>
-                          <span className="text-base sm:text-lg font-black truncate">
-                            Todas las Categorías
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2.5 shrink-0">
-                          <span
-                            className={`text-sm sm:text-base font-black px-3 py-1 rounded-xl ${
-                              breadCategoryFilter === "all"
-                                ? "bg-amber-900 text-white"
-                                : "bg-stone-100 text-stone-800"
-                            }`}
-                          >
-                            {selectedBranchTotalPieces} pzas
-                          </span>
-                          {breadCategoryFilter === "all" && (
-                            <Check className="w-5 h-5 text-amber-800 stroke-[3] shrink-0" />
-                          )}
-                        </div>
-                      </button>
-
-                      {/* 2. Categorías Registradas */}
-                      {categoriesWithPieces.map(({ category: cat, totalPieces: pieces }: any) => {
-                        const isSelected = breadCategoryFilter === cat.id;
-                        return (
-                          <button
-                            key={cat.id}
-                            type="button"
-                            onClick={() => {
-                              setBreadCategoryFilter(cat.id);
-                              setIsCategoryMenuOpen(false);
-                            }}
-                            className={`w-full text-left px-4 py-3 sm:py-3.5 rounded-2xl flex items-center justify-between gap-3 transition-colors cursor-pointer ${
-                              isSelected
-                                ? "bg-emerald-100/90 text-emerald-950 font-black ring-2 ring-emerald-500/80 shadow-xs"
-                                : "hover:bg-amber-50/70 text-stone-900 font-bold"
-                            }`}
-                          >
-                            <div className="flex items-center gap-3.5 min-w-0">
-                              <span className="text-2xl sm:text-3xl shrink-0 leading-none">
-                                {cat.icon || "🥖"}
-                              </span>
-                              <span className="text-base sm:text-lg font-black truncate">
-                                {cat.label}
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-2.5 shrink-0">
-                              <span
-                                className={`text-sm sm:text-base font-black px-3 py-1 rounded-xl ${
-                                  isSelected
-                                    ? "bg-emerald-800 text-white"
-                                    : pieces > 0
-                                    ? "bg-emerald-100 text-emerald-950 border border-emerald-300"
-                                    : "bg-stone-100 text-stone-800"
-                                }`}
-                              >
-                                {pieces} pzas
-                              </span>
-                              {isSelected && (
-                                <Check className="w-5 h-5 text-emerald-800 stroke-[3] shrink-0" />
-                              )}
-                            </div>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </>
-              )}
-            </div>
-          ) : (
-            /* OPCIÓN B: EN FORMA DE LISTA VERTICAL COMPLETA (FILAS ORGANIZADAS SIN SCROLL HORIZONTAL) */
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2 pt-1">
-              {/* Opción 1: Todas las Categorías */}
+            {breadCategoryFilter !== "all" && (
               <button
                 type="button"
                 onClick={() => setBreadCategoryFilter("all")}
-                className={`w-full text-left px-3.5 py-2.5 rounded-xl flex items-center justify-between gap-2.5 transition-all cursor-pointer border ${
+                className="text-xs font-bold text-amber-700 hover:text-amber-900 cursor-pointer underline flex items-center gap-1"
+              >
+                <span>Mostrar todas</span>
+                <span>✕</span>
+              </button>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-thin scrollbar-thumb-amber-300">
+            {/* 1. Opción Todas las Categorías */}
+            <button
+              type="button"
+              onClick={() => setBreadCategoryFilter("all")}
+              className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-black shrink-0 transition-all cursor-pointer shadow-2xs border ${
+                breadCategoryFilter === "all"
+                  ? "bg-amber-900 text-white border-amber-950 ring-2 ring-amber-400 shadow-xs scale-102"
+                  : "bg-white hover:bg-amber-50 text-stone-700 border-stone-200 hover:border-amber-300"
+              }`}
+            >
+              <span className="text-base">🧺</span>
+              <span>Todas las Categorías</span>
+              <span
+                className={`font-mono text-[10px] px-2 py-0.5 rounded-lg font-black ${
                   breadCategoryFilter === "all"
-                    ? "bg-amber-900 text-white border-amber-950 ring-2 ring-amber-400 shadow-xs scale-[1.01]"
-                    : "bg-white hover:bg-amber-50 text-stone-700 border-stone-200"
+                    ? "bg-amber-950 text-white"
+                    : "bg-stone-100 text-stone-700 border border-stone-200"
                 }`}
               >
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <span className="text-xl shrink-0">🧺</span>
-                  <span className="text-xs sm:text-sm font-black truncate">Todas las Categorías</span>
-                </div>
-                <span
-                  className={`font-mono text-xs px-2.5 py-0.5 rounded-lg font-black shrink-0 ${
-                    breadCategoryFilter === "all"
-                      ? "bg-amber-950 text-white"
-                      : "bg-stone-100 text-stone-700"
+                {selectedBranchTotalPieces} pzas
+              </span>
+            </button>
+
+            {/* 2. Categorías Registradas */}
+            {categoriesWithPieces.map(({ category: cat, totalPieces: pieces }: any) => {
+              const isSelected = breadCategoryFilter === cat.id;
+
+              return (
+                <button
+                  key={cat.id}
+                  type="button"
+                  onClick={() => setBreadCategoryFilter(isSelected ? "all" : cat.id)}
+                  className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-black shrink-0 transition-all cursor-pointer shadow-2xs border ${
+                    isSelected
+                      ? "bg-emerald-800 text-white border-emerald-900 ring-2 ring-emerald-400 shadow-xs scale-102"
+                      : pieces > 0
+                      ? "bg-emerald-50 text-emerald-950 border-emerald-300 hover:bg-emerald-100"
+                      : "bg-white text-stone-700 border-stone-200 hover:bg-stone-50 hover:border-stone-400"
                   }`}
+                  title={`Filtrar por ${cat.label} (${pieces} pzas)`}
                 >
-                  {selectedBranchTotalPieces} pzas
-                </span>
-              </button>
-
-              {/* Categorías individuales */}
-              {categoriesWithPieces.map(({ category: cat, totalPieces: pieces }: any) => {
-                const isSelected = breadCategoryFilter === cat.id;
-
-                return (
-                  <button
-                    key={cat.id}
-                    type="button"
-                    onClick={() => setBreadCategoryFilter(isSelected ? "all" : cat.id)}
-                    className={`w-full text-left px-3.5 py-2.5 rounded-xl flex items-center justify-between gap-2.5 transition-all cursor-pointer border ${
+                  <span className="text-base">{cat.icon || "🥖"}</span>
+                  <span className="truncate max-w-[160px]">{cat.label}</span>
+                  <span
+                    className={`font-mono text-[10px] px-2 py-0.5 rounded-lg font-black ${
                       isSelected
-                        ? "bg-emerald-800 text-white border-emerald-900 ring-2 ring-emerald-400 shadow-xs scale-[1.01]"
+                        ? "bg-emerald-950 text-white"
                         : pieces > 0
-                        ? "bg-emerald-50 text-emerald-950 border-emerald-300 hover:bg-emerald-100"
-                        : "bg-white text-stone-700 border-stone-200 hover:bg-stone-50"
+                        ? "bg-emerald-200 text-emerald-950 border border-emerald-300"
+                        : "bg-stone-100 text-stone-500 border border-stone-200"
                     }`}
                   >
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <span className="text-xl shrink-0">{cat.icon || "🥖"}</span>
-                      <span className="text-xs sm:text-sm font-black truncate">{cat.label}</span>
-                    </div>
-                    <span
-                      className={`font-mono text-xs px-2.5 py-0.5 rounded-lg font-black shrink-0 ${
-                        isSelected
-                          ? "bg-emerald-950 text-white"
-                          : pieces > 0
-                          ? "bg-emerald-200 text-emerald-950"
-                          : "bg-stone-100 text-stone-500"
-                      }`}
-                    >
-                      {pieces} pzas
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          )}
+                    {pieces} pzas
+                  </span>
+                </button>
+              );
+            })}
+          </div>
         </div>
 
         {/* ── BARRA HORIZONTAL RÁPIDA DE TODOS LOS PRODUCTOS DE PAN REGISTRADOS ── */}
