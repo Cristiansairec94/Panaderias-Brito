@@ -411,7 +411,7 @@ export default function NextDayDistributionModal({
   // Filtros
   const [selectedDate, setSelectedDate] = useState<string>(tomorrowISO);
   const [selectedBranchId, setSelectedBranchId] = useState<string>("all");
-  const [viewMode, setViewMode] = useState<"categories" | "branch" | "consolidated" | "products">("branch");
+  const [viewMode, setViewMode] = useState<"categories" | "branch">("branch");
   const [searchProduct, setSearchProduct] = useState("");
   const [includeDelivered, setIncludeDelivered] = useState(false);
   const [copiedToast, setCopiedToast] = useState(false);
@@ -1121,31 +1121,6 @@ export default function NextDayDistributionModal({
                 <Store className="w-3.5 h-3.5" />
                 <span>Por Sucursal</span>
               </button>
-
-              <button
-                type="button"
-                onClick={() => setViewMode("consolidated")}
-                className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer ${
-                  viewMode === "consolidated"
-                    ? "bg-white text-stone-900 shadow-2xs scale-102"
-                    : "text-stone-500 hover:text-stone-800"
-                }`}
-              >
-                <ChefHat className="w-3.5 h-3.5" />
-                <span>Consolidado de Panes</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setViewMode("products")}
-                className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer ${
-                  viewMode === "products"
-                    ? "bg-white text-stone-900 shadow-2xs scale-102"
-                    : "text-stone-500 hover:text-stone-800"
-                }`}
-              >
-                <span>🥖 Barra de Panes</span>
-              </button>
             </div>
 
             {/* Filtros de Sucursal y Búsqueda */}
@@ -1507,93 +1482,7 @@ export default function NextDayDistributionModal({
                 })}
               </div>
             </div>
-          ) : viewMode === "consolidated" ? (
-            /* ========================================================================= */
-            /* VISTA 3: CONSOLIDADO GENERAL DE PANES                                     */
-            /* ========================================================================= */
-            <div className="space-y-3">
-              <div className="bg-amber-50/90 border border-amber-200/90 p-3 sm:p-3.5 rounded-2xl flex items-center justify-between flex-wrap gap-2">
-                <div className="flex items-center gap-2">
-                  <ChefHat className="w-5 h-5 text-amber-700 shrink-0" />
-                  <div>
-                    <h4 className="text-xs sm:text-sm font-black text-amber-950">
-                      Lista Maestra de Horneado y Material Necesario
-                    </h4>
-                    <p className="text-[11px] text-amber-800 font-medium">
-                      Suma global de todas las piezas requeridas el {formatLongDateSpanish(selectedDate)}
-                    </p>
-                  </div>
-                </div>
-
-                <span className="font-mono text-xs font-black bg-white px-3 py-1 rounded-xl text-amber-900 border border-amber-300 shadow-2xs">
-                  {selectedBranchTotalPieces} piezas en total
-                </span>
-              </div>
-
-              <div className="bg-white rounded-2xl border border-stone-200 overflow-hidden shadow-xs">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left border-collapse text-xs">
-                    <thead>
-                      <tr className="bg-stone-100 text-stone-600 border-b border-stone-200 text-[11px] font-black uppercase tracking-wider">
-                        <th className="py-2.5 px-3">#</th>
-                        <th className="py-2.5 px-3">Tipo de Pan / Producto</th>
-                        <th className="py-2.5 px-3 text-center">Total Piezas a Hornear</th>
-                        <th className="py-2.5 px-3 text-center">Pedidos</th>
-                        <th className="py-2.5 px-3">Desglose por Sucursal de Destino</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-stone-100">
-                      {filteredConsolidated.map((item: any, idx: number) => {
-                        const branchCounts: Record<string, number> = {};
-                        item.ordersDetails.forEach((od: any) => {
-                          const bName = od.order.branchName || "Matriz";
-                          branchCounts[bName] = (branchCounts[bName] || 0) + od.quantity;
-                        });
-
-                        return (
-                          <tr key={idx} className="hover:bg-amber-50/50 transition-colors">
-                            <td className="py-2.5 px-3 text-stone-400 font-mono font-bold">
-                              {idx + 1}
-                            </td>
-                            <td className="py-2.5 px-3">
-                              <span className="font-black text-stone-900 text-xs sm:text-[13px] block">
-                                {item.name}
-                              </span>
-                            </td>
-                            <td className="py-2.5 px-3 text-center">
-                              <span className="inline-flex items-center justify-center font-mono font-black text-xs sm:text-sm px-2.5 py-0.5 rounded-lg bg-emerald-100 text-emerald-950 border border-emerald-300 shadow-2xs">
-                                {item.totalPieces} pzas
-                              </span>
-                            </td>
-                            <td className="py-2.5 px-3 text-center font-bold text-stone-500">
-                              {item.ordersCount} encargo{item.ordersCount === 1 ? "" : "s"}
-                            </td>
-                            <td className="py-2.5 px-3">
-                              <div className="flex items-center gap-1.5 flex-wrap">
-                                {Object.entries(branchCounts).map(([bName, qty], bIdx) => (
-                                  <span
-                                    key={bIdx}
-                                    className="inline-flex items-center gap-1 text-[10px] font-bold bg-stone-100 text-stone-800 border border-stone-200 px-2 py-0.5 rounded-md"
-                                  >
-                                    <span className="text-amber-800 font-extrabold">{qty}x</span>
-                                    <span>{bName.replace(/^Sucursal\s+/i, "")}</span>
-                                  </span>
-                                ))}
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-          ) : viewMode === "branch" ? (
-            /* ========================================================================= */
-            /* VISTA 2: DESGLOSE POR SUCURSAL CON BARRA DE TODOS LOS PRODUCTOS DE PAN   */
-            /* ========================================================================= */
-            filteredBranchGroups.length === 0 ? (
+          ) : filteredBranchGroups.length === 0 ? (
               <div className="py-8 px-4 text-center bg-white rounded-2xl border border-stone-200 text-stone-500 text-xs">
                 No se encontraron sucursales o pedidos para esta fecha.
               </div>
@@ -1933,150 +1822,6 @@ export default function NextDayDistributionModal({
                   </div>
                 );
               })}
-            </div>
-          ))
-           : (
-            /* ========================================================================= */
-            /* VISTA 4: BARRA MAESTRA DE TODOS LOS PRODUCTOS DE PAN REGISTRADOS          */
-            /* ========================================================================= */
-            <div className="space-y-4">
-              <div className="bg-gradient-to-r from-amber-50 via-orange-50/40 to-stone-50 border border-amber-200/90 p-3.5 sm:p-4 rounded-2xl flex items-center justify-between flex-wrap gap-3">
-                <div className="flex items-center gap-3">
-                  <div className="w-11 h-11 rounded-2xl bg-amber-600 text-white font-black text-2xl flex items-center justify-center shrink-0 shadow-2xs">
-                    🥖
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <h4 className="text-base sm:text-lg font-black text-stone-900 tracking-tight">
-                        Barra de Todos los Productos de Pan Registrados
-                      </h4>
-                      <span className="bg-amber-100 text-amber-900 font-extrabold text-[11px] px-2.5 py-0.5 rounded-full border border-amber-300">
-                        {allRegisteredBreadList.length} productos registrados
-                      </span>
-                    </div>
-                    <p className="text-xs text-stone-600 font-medium mt-0.5">
-                      {selectedBranchId === "all"
-                        ? "Catálogo completo de panadería con piezas consolidadas para todas las sucursales"
-                        : `Catálogo completo de panadería con piezas para ${branches.find((b) => b.id === selectedBranchId)?.name || "la sucursal seleccionada"}`}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="text-right">
-                  <span className="text-[10px] uppercase font-bold text-stone-400 block leading-tight">
-                    Total Piezas
-                  </span>
-                  <span className="font-mono text-xl sm:text-2xl font-black text-emerald-950 block tabular-nums leading-none mt-0.5">
-                    {selectedBranchTotalPieces} <span className="text-xs font-bold text-stone-500">pzas</span>
-                  </span>
-                </div>
-              </div>
-
-              {/* Parrilla de la Barra Maestra */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                {allRegisteredBreadList
-                  .filter((b) => {
-                    if (breadCategoryFilter !== "all" && b.category !== breadCategoryFilter) return false;
-                    if (searchProduct.trim()) {
-                      const q = normalizeProductName(searchProduct);
-                      if (!normalizeProductName(b.name).includes(q)) return false;
-                    }
-                    return true;
-                  })
-                  .map((bread, bIdx) => {
-                    const pieces = getBreadTotalPiecesInSelection(bread.name);
-                    const isOrdered = pieces > 0;
-
-                    // Desglose por sucursal de este pan
-                    const branchBreakdown: Record<string, number> = {};
-                    targetOrders.forEach((o) => {
-                      if (selectedBranchId !== "all") {
-                        const bId = o.branchId || o.operatingBranchId || branches[0]?.id;
-                        const matched = branches.find((b) => b.name.toLowerCase() === (o.branchName || "").toLowerCase());
-                        if (bId !== selectedBranchId && matched?.id !== selectedBranchId) return;
-                      }
-                      const items = extractItemsFromOrder(o);
-                      items.forEach((it) => {
-                        if (normalizeProductName(it.name) === normalizeProductName(bread.name)) {
-                          const bName = o.branchName || "Matriz";
-                          branchBreakdown[bName] = (branchBreakdown[bName] || 0) + (it.quantity || 1);
-                        }
-                      });
-                    });
-
-                    return (
-                      <div
-                        key={bIdx}
-                        className={`rounded-2xl border-2 transition-all p-3.5 sm:p-4 shadow-2xs flex flex-col justify-between ${
-                          isOrdered
-                            ? "bg-white border-amber-300 shadow-sm"
-                            : "bg-[#faf9f6]/70 border-stone-200/90"
-                        }`}
-                      >
-                        <div>
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="flex items-center gap-2 min-w-0">
-                              <span className="text-2xl shrink-0">{bread.icon || "🥖"}</span>
-                              <div className="min-w-0">
-                                <h5 className="text-sm sm:text-base font-black text-stone-900 truncate" title={bread.name}>
-                                  {bread.name}
-                                </h5>
-                                <span className="text-[10px] font-bold text-stone-500 uppercase tracking-wider block">
-                                  {bread.category.replace(/_/g, " ")}
-                                </span>
-                              </div>
-                            </div>
-
-                            {/* Número de piezas enfrente */}
-                            <div className="text-right shrink-0">
-                              <span
-                                className={`font-mono font-black text-lg sm:text-xl px-2.5 py-0.5 rounded-xl border tabular-nums block ${
-                                  isOrdered
-                                    ? "bg-emerald-100 text-emerald-950 border-emerald-300 shadow-2xs"
-                                    : "bg-stone-100 text-stone-400 border-stone-200"
-                                }`}
-                              >
-                                {pieces} pzas
-                              </span>
-                            </div>
-                          </div>
-
-                          {/* Barra de Proporción */}
-                          <div className="w-full bg-stone-200 h-2 rounded-full overflow-hidden mt-3">
-                            <div
-                              className={`h-full rounded-full transition-all ${
-                                isOrdered ? "bg-amber-600" : "bg-stone-300"
-                              }`}
-                              style={{
-                                width: `${
-                                  selectedBranchTotalPieces > 0 && isOrdered
-                                    ? Math.max(10, Math.round((pieces / selectedBranchTotalPieces) * 100))
-                                    : 0
-                                }%`,
-                              }}
-                            />
-                          </div>
-                        </div>
-
-                        {/* Desglose de sucursales si aplica */}
-                        {isOrdered && Object.keys(branchBreakdown).length > 0 && (
-                          <div className="mt-3 pt-2.5 border-t border-stone-100 flex items-center gap-1.5 flex-wrap">
-                            <span className="text-[10px] font-bold text-stone-400">Entrega:</span>
-                            {Object.entries(branchBreakdown).map(([bName, qty], bbIdx) => (
-                              <span
-                                key={bbIdx}
-                                className="inline-flex items-center gap-1 text-[10px] font-bold bg-stone-100 text-stone-800 px-2 py-0.2 rounded-md border border-stone-200"
-                              >
-                                <span className="text-amber-800 font-extrabold">{qty}x</span>
-                                <span>{bName.replace(/^Sucursal\s+/i, "")}</span>
-                              </span>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-              </div>
             </div>
           )}
         </div>
