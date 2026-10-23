@@ -26,7 +26,7 @@ import {
 } from "lucide-react";
 import { CustomOrder, Branch, Product } from "@/types";
 import { formatCurrency, formatDeliveryDateDisplay } from "@/lib/utils";
-import { getStoredCategories, getStoredProducts, ProductCategory, DEFAULT_PRODUCT_CATEGORIES } from "@/lib/products";
+import { getStoredCategories, getStoredProducts, fetchProductsFromDb, ProductCategory, DEFAULT_PRODUCT_CATEGORIES } from "@/lib/products";
 
 interface NextDayDistributionModalProps {
   isOpen: boolean;
@@ -411,12 +411,13 @@ export default function NextDayDistributionModal({
   // Filtros
   const [selectedDate, setSelectedDate] = useState<string>(tomorrowISO);
   const [selectedBranchId, setSelectedBranchId] = useState<string>("all");
-  const [viewMode, setViewMode] = useState<"categories" | "branch" | "consolidated">("categories");
+  const [viewMode, setViewMode] = useState<"categories" | "branch" | "consolidated" | "products">("branch");
   const [searchProduct, setSearchProduct] = useState("");
   const [includeDelivered, setIncludeDelivered] = useState(false);
   const [copiedToast, setCopiedToast] = useState(false);
   const [expandedBranches, setExpandedBranches] = useState<Record<string, boolean>>({});
   const [expandedOrdersList, setExpandedOrdersList] = useState<Record<string, boolean>>({});
+  const [showAllStoreProducts, setShowAllStoreProducts] = useState<boolean>(true);
 
   // Categorías de pan
   const [storedCategories, setStoredCategories] = useState<ProductCategory[]>([]);
@@ -426,7 +427,15 @@ export default function NextDayDistributionModal({
   useEffect(() => {
     if (isOpen) {
       setStoredCategories(getStoredCategories());
-      setStoredProducts(getStoredProducts());
+      const localProds = getStoredProducts();
+      setStoredProducts(localProds);
+      fetchProductsFromDb()
+        .then((prods) => {
+          if (prods && prods.length > 0) {
+            setStoredProducts(prods);
+          }
+        })
+        .catch(() => {});
     }
   }, [isOpen]);
 
@@ -800,6 +809,77 @@ export default function NextDayDistributionModal({
     }).length;
   }, [selectedBranchId, targetOrders, totalGlobalOrders, branches]);
 
+  // Barra / Catálogo completo de todos los productos de pan registrados en la tienda
+  const allRegisteredBreadList = useMemo(() => {
+    const map = new Map<string, { id?: string; name: string; category: string; icon: string }>();
+
+    const fallbackBreads = [
+      { name: "Bolillo Tradicional", category: "pan_blanco", icon: "🍞" },
+      { name: "Telera para Torta", category: "pan_blanco", icon: "🥖" },
+      { name: "Concha de Vainilla", category: "pan_dulce", icon: "🥖" },
+      { name: "Concha de Chocolate", category: "pan_dulce", icon: "🥖" },
+      { name: "Cuerno de Mantequilla", category: "pan_dulce", icon: "🥐" },
+      { name: "Dona Glaseada", category: "pan_dulce", icon: "🍩" },
+      { name: "Dona de Chocolate", category: "pan_dulce", icon: "🍩" },
+      { name: "Oreja de Hojaldre", category: "pan_dulce", icon: "🥖" },
+      { name: "Polvorón Tradicional", category: "pan_dulce", icon: "🍪" },
+      { name: "Pastel Tres Leches", category: "pasteleria", icon: "🍰" },
+    ];
+
+    if (storedProducts && storedProducts.length > 0) {
+      storedProducts.forEach((p) => {
+        if (!p || !p.name) return;
+        const cat = p.category || resolveBreadCategory(p.name, p.id, storedProducts);
+        if (cat === "materia_prima" || cat === "abarrotes" || cat === "bebidas") return;
+        const norm = normalizeProductName(p.name);
+        const icon = cat === "pan_blanco" ? "🍞" : cat === "pasteleria" ? "🍰" : cat === "temporada" ? "✨" : "🥖";
+        map.set(norm, { id: p.id, name: p.name, category: cat, icon });
+      });
+    }
+
+    if (map.size === 0) {
+      fallbackBreads.forEach((fb) => {
+        map.set(normalizeProductName(fb.name), { name: fb.name, category: fb.category, icon: fb.icon });
+      });
+    }
+
+    targetOrders.forEach((o) => {
+      const items = extractItemsFromOrder(o);
+      items.forEach((it) => {
+        const norm = normalizeProductName(it.name);
+        if (!map.has(norm)) {
+          const cat = resolveBreadCategory(it.name, it.productId, storedProducts);
+          if (cat !== "materia_prima" && cat !== "abarrotes" && cat !== "bebidas") {
+            const icon = cat === "pan_blanco" ? "🍞" : cat === "pasteleria" ? "🍰" : cat === "temporada" ? "✨" : "🥖";
+            map.set(norm, { id: it.productId, name: it.name, category: cat, icon });
+          }
+        }
+      });
+    });
+
+    return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }, [storedProducts, targetOrders]);
+
+  // Conteo de piezas para la selección actual (global o sucursal activa)
+  const getBreadTotalPiecesInSelection = (breadName: string): number => {
+    const norm = normalizeProductName(breadName);
+    let total = 0;
+    targetOrders.forEach((o) => {
+      if (selectedBranchId !== "all") {
+        const bId = o.branchId || o.operatingBranchId || branches[0]?.id;
+        const matched = branches.find((b) => b.name.toLowerCase() === (o.branchName || "").toLowerCase());
+        if (bId !== selectedBranchId && matched?.id !== selectedBranchId) return;
+      }
+      const items = extractItemsFromOrder(o);
+      items.forEach((it) => {
+        if (normalizeProductName(it.name) === norm) {
+          total += it.quantity || 1;
+        }
+      });
+    });
+    return total;
+  };
+
   // Lista consolidada filtrada por buscador para la vista de taller
   const filteredConsolidated = useMemo(() => {
     return globalConsolidated.filter((it: BreadSummaryItem) => {
@@ -1048,6 +1128,18 @@ export default function NextDayDistributionModal({
                 <ChefHat className="w-3.5 h-3.5" />
                 <span>Consolidado de Panes</span>
               </button>
+
+              <button
+                type="button"
+                onClick={() => setViewMode("products")}
+                className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer ${
+                  viewMode === "products"
+                    ? "bg-white text-stone-900 shadow-2xs scale-102"
+                    : "text-stone-500 hover:text-stone-800"
+                }`}
+              >
+                <span>🥖 Barra de Panes</span>
+              </button>
             </div>
 
             {/* Filtros de Sucursal y Búsqueda */}
@@ -1128,6 +1220,59 @@ export default function NextDayDistributionModal({
                 <span className="text-xs sm:text-sm font-bold text-stone-500">pedidos</span>
               </div>
             </div>
+          </div>
+        </div>
+
+        {/* ── BARRA HORIZONTAL RÁPIDA DE TODOS LOS PRODUCTOS DE PAN REGISTRADOS ── */}
+        <div className="px-3 sm:px-4 py-2.5 bg-gradient-to-r from-amber-50/80 via-orange-50/30 to-amber-50/80 border-b border-amber-200/80 shrink-0">
+          <div className="flex items-center justify-between gap-2 mb-1.5 px-0.5">
+            <div className="flex items-center gap-1.5 text-xs font-black text-amber-950">
+              <ChefHat className="w-4 h-4 text-amber-700" />
+              <span>Barra de Productos de Pan Registrados en la Tienda</span>
+              <span className="bg-amber-200/80 text-amber-950 font-bold text-[10px] px-2 py-0.2 rounded-full border border-amber-300">
+                {allRegisteredBreadList.length} tipos de pan
+              </span>
+            </div>
+            <span className="text-[11px] text-amber-800 font-semibold hidden md:inline">
+              Toca un pan para filtrar o ver piezas en las tiendas
+            </span>
+          </div>
+
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-thin scrollbar-thumb-amber-300">
+            {allRegisteredBreadList.map((bread, bIdx) => {
+              const isSelected = searchProduct.toLowerCase() === bread.name.toLowerCase();
+              const piecesInSelection = getBreadTotalPiecesInSelection(bread.name);
+
+              return (
+                <button
+                  key={bIdx}
+                  type="button"
+                  onClick={() => setSearchProduct(isSelected ? "" : bread.name)}
+                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-bold shrink-0 transition-all cursor-pointer shadow-2xs border ${
+                    isSelected
+                      ? "bg-amber-900 text-white border-amber-950 ring-2 ring-amber-400"
+                      : piecesInSelection > 0
+                      ? "bg-white text-stone-900 border-amber-300 hover:border-amber-500 hover:bg-amber-50/50"
+                      : "bg-[#fcfbf9] text-stone-600 border-stone-200 hover:border-stone-400"
+                  }`}
+                  title={`Filtrar por ${bread.name} (${piecesInSelection} pzas)`}
+                >
+                  <span className="text-sm">{bread.icon || "🥖"}</span>
+                  <span className="truncate max-w-[130px]">{bread.name}</span>
+                  <span
+                    className={`font-mono text-[10px] font-black px-1.5 py-0.2 rounded-md ${
+                      isSelected
+                        ? "bg-amber-950 text-white"
+                        : piecesInSelection > 0
+                        ? "bg-emerald-100 text-emerald-950 border border-emerald-300"
+                        : "bg-stone-200 text-stone-500"
+                    }`}
+                  >
+                    {piecesInSelection} pzas
+                  </span>
+                </button>
+              );
+            })}
           </div>
         </div>
 
@@ -1394,9 +1539,9 @@ export default function NextDayDistributionModal({
                 </div>
               </div>
             </div>
-          ) : (
+          ) : viewMode === "branch" ? (
             /* ========================================================================= */
-            /* VISTA 2: DESGLOSE POR SUCURSAL                                            */
+            /* VISTA 2: DESGLOSE POR SUCURSAL CON BARRA DE TODOS LOS PRODUCTOS DE PAN   */
             /* ========================================================================= */
             filteredBranchGroups.length === 0 ? (
               <div className="py-8 px-4 text-center bg-white rounded-2xl border border-stone-200 text-stone-500 text-xs">
@@ -1406,8 +1551,56 @@ export default function NextDayDistributionModal({
               <div className="space-y-4">
                 {filteredBranchGroups.map((group) => {
                 const hasPieces = group.totalPieces > 0;
-                const isExpanded = Boolean(expandedBranches[group.branchId]);
                 const isOrdersExpanded = Boolean(expandedOrdersList[group.branchId]);
+
+                // Mapa de pedidos activos de esta sucursal
+                const branchOrderedMap = new Map<string, BreadSummaryItem>();
+                group.items.forEach((it) => {
+                  branchOrderedMap.set(normalizeProductName(it.name), it);
+                });
+
+                // Barra completa de todos los productos de pan registrados en la tienda para esta sucursal
+                const branchStoreBreadItems = allRegisteredBreadList
+                  .filter((b) => {
+                    if (breadCategoryFilter !== "all" && b.category !== breadCategoryFilter) return false;
+                    if (searchProduct.trim()) {
+                      const q = normalizeProductName(searchProduct);
+                      if (!normalizeProductName(b.name).includes(q)) return false;
+                    }
+                    return true;
+                  })
+                  .map((b) => {
+                    const norm = normalizeProductName(b.name);
+                    const ordered = branchOrderedMap.get(norm);
+                    if (ordered) {
+                      return {
+                        ...ordered,
+                        icon: b.icon || "🥖",
+                        categoryLabel: b.category,
+                      };
+                    }
+                    return {
+                      name: b.name,
+                      totalPieces: 0,
+                      ordersCount: 0,
+                      orderNumbers: [],
+                      ordersDetails: [],
+                      categoryId: b.category,
+                      productId: b.id,
+                      icon: b.icon || "🥖",
+                      categoryLabel: b.category,
+                    };
+                  })
+                  .sort((a, b) => {
+                    // Primero los que tienen piezas > 0, luego alfabéticamente
+                    if (a.totalPieces !== b.totalPieces) return b.totalPieces - a.totalPieces;
+                    return a.name.localeCompare(b.name);
+                  });
+
+                const activeCount = branchStoreBreadItems.filter((i) => i.totalPieces > 0).length;
+                const displayedBranchItems = showAllStoreProducts
+                  ? branchStoreBreadItems
+                  : branchStoreBreadItems.filter((it) => it.totalPieces > 0);
 
                 return (
                   <div
@@ -1415,7 +1608,7 @@ export default function NextDayDistributionModal({
                     className={`bg-white rounded-2xl border-2 transition-all shadow-xs overflow-hidden ${
                       hasPieces
                         ? "border-amber-300/90 shadow-sm"
-                        : "border-stone-200 opacity-60"
+                        : "border-stone-200/90 hover:border-amber-300 shadow-2xs"
                     }`}
                   >
                     {/* Encabezado de la Sucursal */}
@@ -1492,11 +1685,78 @@ export default function NextDayDistributionModal({
                       </div>
                     </div>
 
-                    {/* Tabla de Panes de esta Sucursal */}
-                    {hasPieces ? (
-                      <div className="p-3 sm:p-4 space-y-3">
+                    {/* ── BARRA DE PRODUCTOS DE PAN DE LA TIENDA ── */}
+                    <div className="p-3 sm:p-4 space-y-3">
+                      {/* Sub-barra de Control y Conteo de Panes */}
+                      <div className="flex items-center justify-between gap-2 flex-wrap pb-2 border-b border-stone-100">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-black text-stone-800 flex items-center gap-1.5">
+                            <ChefHat className="w-3.5 h-3.5 text-amber-700" />
+                            <span>Barra de Productos de Pan Registrados</span>
+                          </span>
+                          <span className="text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300 px-2 py-0.2 rounded-full">
+                            {displayedBranchItems.length} tipos de pan
+                          </span>
+                          {activeCount > 0 && (
+                            <span className="text-[10px] font-bold bg-emerald-100 text-emerald-900 border border-emerald-300 px-2 py-0.2 rounded-full">
+                              {activeCount} con entrega activa
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Botón de alternancia: Mostrar todos vs Solo con pedidos */}
+                        <div className="flex items-center gap-1 bg-stone-100 p-0.5 rounded-xl border border-stone-200">
+                          <button
+                            type="button"
+                            onClick={() => setShowAllStoreProducts(true)}
+                            className={`px-2.5 py-1 rounded-lg text-[10.5px] font-extrabold transition-all cursor-pointer ${
+                              showAllStoreProducts
+                                ? "bg-white text-stone-900 shadow-2xs"
+                                : "text-stone-500 hover:text-stone-800"
+                            }`}
+                            title="Mostrar todos los productos de pan registrados en el catálogo de la tienda"
+                          >
+                            Todos ({branchStoreBreadItems.length})
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setShowAllStoreProducts(false)}
+                            className={`px-2.5 py-1 rounded-lg text-[10.5px] font-extrabold transition-all cursor-pointer ${
+                              !showAllStoreProducts
+                                ? "bg-white text-stone-900 shadow-2xs"
+                                : "text-stone-500 hover:text-stone-800"
+                            }`}
+                            title="Mostrar únicamente los panes que tienen pedidos programados"
+                          >
+                            Solo con encargos ({activeCount})
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Notificación informativa si la sucursal no tiene pedidos */}
+                      {!hasPieces && (
+                        <div className="bg-amber-50/70 border border-amber-200/80 rounded-xl p-3 text-xs text-amber-900 flex items-center justify-between gap-2 flex-wrap">
+                          <div className="flex items-center gap-2">
+                            <span className="text-base shrink-0">🥖</span>
+                            <span className="font-semibold">
+                              Sin pedidos programados para esta tienda el {formatLongDateSpanish(selectedDate)}. A continuación tienes la barra completa de panes registrados:
+                            </span>
+                          </div>
+                          <span className="font-mono text-[11px] font-black bg-white px-2 py-0.5 rounded-lg border border-amber-300 text-amber-950">
+                            0 piezas requeridas
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Parrilla / Barra de Panes */}
+                      {displayedBranchItems.length === 0 ? (
+                        <div className="py-6 text-center text-xs text-stone-400 italic">
+                          No se encontraron panes con los filtros de búsqueda aplicados.
+                        </div>
+                      ) : (
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-                          {group.items.map((it, itIdx) => {
+                          {displayedBranchItems.map((it: any, itIdx: number) => {
+                            const isOrdered = it.totalPieces > 0;
                             const percent =
                               group.totalPieces > 0
                                 ? Math.round((it.totalPieces / group.totalPieces) * 100)
@@ -1505,29 +1765,59 @@ export default function NextDayDistributionModal({
                             return (
                               <div
                                 key={itIdx}
-                                className="bg-[#fcfaf7] border border-amber-200/80 rounded-xl p-2.5 sm:p-3 flex items-center justify-between gap-2 shadow-2xs hover:border-amber-400 transition-colors"
+                                className={`rounded-xl p-2.5 sm:p-3 flex items-center justify-between gap-2 shadow-2xs transition-all ${
+                                  isOrdered
+                                    ? "bg-[#fcfaf7] border border-amber-300/90 hover:border-amber-500 shadow-xs"
+                                    : "bg-white border border-stone-200/80 hover:border-stone-300 opacity-80 hover:opacity-100"
+                                }`}
                               >
                                 <div className="min-w-0 flex-1">
-                                  <span className="text-xs sm:text-sm font-black text-stone-900 block truncate" title={it.name}>
-                                    {it.name}
-                                  </span>
-                                  <div className="flex items-center gap-1.5 text-[10px] text-stone-500 font-medium mt-0.5">
-                                    <span>{it.ordersCount} encargo{it.ordersCount === 1 ? "" : "s"}</span>
-                                    <span>•</span>
-                                    <span>{percent}% de la tienda</span>
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="text-sm shrink-0">{it.icon || "🥖"}</span>
+                                    <span
+                                      className={`text-xs sm:text-sm font-black block truncate ${
+                                        isOrdered ? "text-stone-900" : "text-stone-700"
+                                      }`}
+                                      title={it.name}
+                                    >
+                                      {it.name}
+                                    </span>
+                                  </div>
+
+                                  <div className="flex items-center gap-1.5 text-[10px] text-stone-500 font-medium mt-0.5 pl-5">
+                                    {isOrdered ? (
+                                      <>
+                                        <span className="text-emerald-800 font-extrabold">
+                                          {it.ordersCount} encargo{it.ordersCount === 1 ? "" : "s"}
+                                        </span>
+                                        <span>•</span>
+                                        <span>{percent}% de la tienda</span>
+                                      </>
+                                    ) : (
+                                      <span className="text-stone-400 font-semibold">
+                                        0 encargos • Registrado en tienda
+                                      </span>
+                                    )}
                                   </div>
 
                                   {/* Barra de proporción visual */}
                                   <div className="w-full bg-stone-200 h-1.5 rounded-full overflow-hidden mt-1.5">
                                     <div
-                                      className="bg-amber-600 h-full rounded-full transition-all"
-                                      style={{ width: `${Math.max(5, percent)}%` }}
+                                      className={`h-full rounded-full transition-all ${
+                                        isOrdered ? "bg-amber-600" : "bg-stone-300"
+                                      }`}
+                                      style={{ width: `${isOrdered ? Math.max(8, percent) : 0}%` }}
                                     />
                                   </div>
                                 </div>
 
-                                <div className="text-right shrink-0 pl-2 border-l border-amber-200/60">
-                                  <span className="text-base sm:text-lg font-black text-amber-950 font-mono block tabular-nums leading-none">
+                                {/* Número de Piezas Enfrente (No editable) */}
+                                <div className="text-right shrink-0 pl-2.5 border-l border-stone-200/80 min-w-[60px]">
+                                  <span
+                                    className={`text-base sm:text-lg font-black font-mono block tabular-nums leading-none ${
+                                      isOrdered ? "text-amber-950" : "text-stone-400"
+                                    }`}
+                                  >
                                     {it.totalPieces}
                                   </span>
                                   <span className="text-[9px] uppercase font-bold text-stone-400 block mt-0.5">
@@ -1538,67 +1828,206 @@ export default function NextDayDistributionModal({
                             );
                           })}
                         </div>
+                      )}
 
-                        {/* Desplegable Opcional: Lista de pedidos individuales de la cajera */}
-                        {isOrdersExpanded && (
-                          <div className="mt-3 pt-3 border-t border-stone-200 space-y-2 animate-in fade-in duration-150">
-                            <div className="flex items-center justify-between text-xs font-bold text-stone-600 mb-1">
-                              <span>Pedidos de clientes que componen estas piezas:</span>
-                              <span className="text-[11px] text-stone-400">
-                                (Las cajeras entregan con estos números de pedido)
-                              </span>
-                            </div>
+                      {/* Desplegable Opcional: Lista de pedidos individuales de la cajera */}
+                      {isOrdersExpanded && group.orders.length > 0 && (
+                        <div className="mt-3 pt-3 border-t border-stone-200 space-y-2 animate-in fade-in duration-150">
+                          <div className="flex items-center justify-between text-xs font-bold text-stone-600 mb-1">
+                            <span>Pedidos de clientes que componen estas piezas:</span>
+                            <span className="text-[11px] text-stone-400">
+                              (Las cajeras entregan con estos números de pedido)
+                            </span>
+                          </div>
 
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                              {group.orders.map((order) => (
-                                <div
-                                  key={order.id}
-                                  onClick={() => onViewOrderDetail?.(order)}
-                                  className="bg-white p-2.5 rounded-xl border border-stone-200 hover:border-amber-400 text-xs shadow-2xs transition-all cursor-pointer flex items-center justify-between gap-2"
-                                  title="Toca para ver el detalle completo de este pedido"
-                                >
-                                  <div className="min-w-0">
-                                    <div className="flex items-center gap-1.5">
-                                      <span className="font-mono font-black text-amber-900 bg-amber-100 px-1.5 py-0.2 rounded text-[10px]">
-                                        {order.orderNumber || order.id}
-                                      </span>
-                                      <span className="font-black text-stone-900 truncate">
-                                        {order.customerName}
-                                      </span>
-                                    </div>
-                                    <p className="text-[10px] text-stone-500 truncate mt-0.5">
-                                      {order.items && order.items.length > 0
-                                        ? order.items.map((i) => `${i.quantity}x ${i.name}`).join(", ")
-                                        : order.description}
-                                    </p>
-                                  </div>
-
-                                  <div className="text-right shrink-0">
-                                    {order.deliveryTime && (
-                                      <span className="text-[10px] font-bold text-stone-600 block">
-                                        🕒 {order.deliveryTime}
-                                      </span>
-                                    )}
-                                    <span className="text-[10px] font-bold text-emerald-800">
-                                      {formatCurrency(order.total)}
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            {group.orders.map((order) => (
+                              <div
+                                key={order.id}
+                                onClick={() => onViewOrderDetail?.(order)}
+                                className="bg-white p-2.5 rounded-xl border border-stone-200 hover:border-amber-400 text-xs shadow-2xs transition-all cursor-pointer flex items-center justify-between gap-2"
+                                title="Toca para ver el detalle completo de este pedido"
+                              >
+                                <div className="min-w-0">
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="font-mono font-black text-amber-900 bg-amber-100 px-1.5 py-0.2 rounded text-[10px]">
+                                      {order.orderNumber || order.id}
+                                    </span>
+                                    <span className="font-black text-stone-900 truncate">
+                                      {order.customerName}
                                     </span>
                                   </div>
+                                  <p className="text-[10px] text-stone-500 truncate mt-0.5">
+                                    {order.items && order.items.length > 0
+                                      ? order.items.map((i) => `${i.quantity}x ${i.name}`).join(", ")
+                                      : order.description}
+                                  </p>
                                 </div>
-                              ))}
-                            </div>
+
+                                <div className="text-right shrink-0">
+                                  {order.deliveryTime && (
+                                    <span className="text-[10px] font-bold text-stone-600 block">
+                                      🕒 {order.deliveryTime}
+                                    </span>
+                                  )}
+                                  <span className="text-[10px] font-bold text-emerald-800">
+                                    {formatCurrency(order.total)}
+                                  </span>
+                                </div>
+                              </div>
+                            ))}
                           </div>
-                        )}
-                      </div>
-                    ) : (
-                      <div className="py-4 px-4 text-center text-xs text-stone-400 italic">
-                        Sin pedidos de pan programados para esta tienda el {formatLongDateSpanish(selectedDate)}.
-                      </div>
-                    )}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 );
               })}
             </div>
-            )
+          ))
+           : (
+            /* ========================================================================= */
+            /* VISTA 4: BARRA MAESTRA DE TODOS LOS PRODUCTOS DE PAN REGISTRADOS          */
+            /* ========================================================================= */
+            <div className="space-y-4">
+              <div className="bg-gradient-to-r from-amber-50 via-orange-50/40 to-stone-50 border border-amber-200/90 p-3.5 sm:p-4 rounded-2xl flex items-center justify-between flex-wrap gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-11 h-11 rounded-2xl bg-amber-600 text-white font-black text-2xl flex items-center justify-center shrink-0 shadow-2xs">
+                    🥖
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h4 className="text-base sm:text-lg font-black text-stone-900 tracking-tight">
+                        Barra de Todos los Productos de Pan Registrados
+                      </h4>
+                      <span className="bg-amber-100 text-amber-900 font-extrabold text-[11px] px-2.5 py-0.5 rounded-full border border-amber-300">
+                        {allRegisteredBreadList.length} productos registrados
+                      </span>
+                    </div>
+                    <p className="text-xs text-stone-600 font-medium mt-0.5">
+                      {selectedBranchId === "all"
+                        ? "Catálogo completo de panadería con piezas consolidadas para todas las sucursales"
+                        : `Catálogo completo de panadería con piezas para ${branches.find((b) => b.id === selectedBranchId)?.name || "la sucursal seleccionada"}`}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="text-right">
+                  <span className="text-[10px] uppercase font-bold text-stone-400 block leading-tight">
+                    Total Piezas
+                  </span>
+                  <span className="font-mono text-xl sm:text-2xl font-black text-emerald-950 block tabular-nums leading-none mt-0.5">
+                    {selectedBranchTotalPieces} <span className="text-xs font-bold text-stone-500">pzas</span>
+                  </span>
+                </div>
+              </div>
+
+              {/* Parrilla de la Barra Maestra */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {allRegisteredBreadList
+                  .filter((b) => {
+                    if (breadCategoryFilter !== "all" && b.category !== breadCategoryFilter) return false;
+                    if (searchProduct.trim()) {
+                      const q = normalizeProductName(searchProduct);
+                      if (!normalizeProductName(b.name).includes(q)) return false;
+                    }
+                    return true;
+                  })
+                  .map((bread, bIdx) => {
+                    const pieces = getBreadTotalPiecesInSelection(bread.name);
+                    const isOrdered = pieces > 0;
+
+                    // Desglose por sucursal de este pan
+                    const branchBreakdown: Record<string, number> = {};
+                    targetOrders.forEach((o) => {
+                      if (selectedBranchId !== "all") {
+                        const bId = o.branchId || o.operatingBranchId || branches[0]?.id;
+                        const matched = branches.find((b) => b.name.toLowerCase() === (o.branchName || "").toLowerCase());
+                        if (bId !== selectedBranchId && matched?.id !== selectedBranchId) return;
+                      }
+                      const items = extractItemsFromOrder(o);
+                      items.forEach((it) => {
+                        if (normalizeProductName(it.name) === normalizeProductName(bread.name)) {
+                          const bName = o.branchName || "Matriz";
+                          branchBreakdown[bName] = (branchBreakdown[bName] || 0) + (it.quantity || 1);
+                        }
+                      });
+                    });
+
+                    return (
+                      <div
+                        key={bIdx}
+                        className={`rounded-2xl border-2 transition-all p-3.5 sm:p-4 shadow-2xs flex flex-col justify-between ${
+                          isOrdered
+                            ? "bg-white border-amber-300 shadow-sm"
+                            : "bg-[#faf9f6]/70 border-stone-200/90"
+                        }`}
+                      >
+                        <div>
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span className="text-2xl shrink-0">{bread.icon || "🥖"}</span>
+                              <div className="min-w-0">
+                                <h5 className="text-sm sm:text-base font-black text-stone-900 truncate" title={bread.name}>
+                                  {bread.name}
+                                </h5>
+                                <span className="text-[10px] font-bold text-stone-500 uppercase tracking-wider block">
+                                  {bread.category.replace(/_/g, " ")}
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* Número de piezas enfrente */}
+                            <div className="text-right shrink-0">
+                              <span
+                                className={`font-mono font-black text-lg sm:text-xl px-2.5 py-0.5 rounded-xl border tabular-nums block ${
+                                  isOrdered
+                                    ? "bg-emerald-100 text-emerald-950 border-emerald-300 shadow-2xs"
+                                    : "bg-stone-100 text-stone-400 border-stone-200"
+                                }`}
+                              >
+                                {pieces} pzas
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Barra de Proporción */}
+                          <div className="w-full bg-stone-200 h-2 rounded-full overflow-hidden mt-3">
+                            <div
+                              className={`h-full rounded-full transition-all ${
+                                isOrdered ? "bg-amber-600" : "bg-stone-300"
+                              }`}
+                              style={{
+                                width: `${
+                                  selectedBranchTotalPieces > 0 && isOrdered
+                                    ? Math.max(10, Math.round((pieces / selectedBranchTotalPieces) * 100))
+                                    : 0
+                                }%`,
+                              }}
+                            />
+                          </div>
+                        </div>
+
+                        {/* Desglose de sucursales si aplica */}
+                        {isOrdered && Object.keys(branchBreakdown).length > 0 && (
+                          <div className="mt-3 pt-2.5 border-t border-stone-100 flex items-center gap-1.5 flex-wrap">
+                            <span className="text-[10px] font-bold text-stone-400">Entrega:</span>
+                            {Object.entries(branchBreakdown).map(([bName, qty], bbIdx) => (
+                              <span
+                                key={bbIdx}
+                                className="inline-flex items-center gap-1 text-[10px] font-bold bg-stone-100 text-stone-800 px-2 py-0.2 rounded-md border border-stone-200"
+                              >
+                                <span className="text-amber-800 font-extrabold">{qty}x</span>
+                                <span>{bName.replace(/^Sucursal\s+/i, "")}</span>
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+              </div>
+            </div>
           )}
         </div>
 
