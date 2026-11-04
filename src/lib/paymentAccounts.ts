@@ -1,4 +1,4 @@
-﻿import { TransferAccount, CardTerminalAccount } from "@/types";
+import { TransferAccount, CardTerminalAccount } from "@/types";
 
 export interface ExtendedTransferAccount extends TransferAccount {
   cardNumber?: string;

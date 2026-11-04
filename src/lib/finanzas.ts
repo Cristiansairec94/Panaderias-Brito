@@ -1,4 +1,5 @@
-import { ExpenseRecord, ShiftCutRecord, Customer, CustomOrder, CashIncome, Branch } from "@/types";
+import { ExpenseRecord, ShiftCutRecord, Customer, CustomOrder, CashIncome, Branch, InventoryMovement } from "@/types";
+import { parseDateTimeSafe } from "@/lib/utils";
 
 export type FinancialPeriod = "hoy" | "semana" | "mes" | "mes_anterior" | "trimestre" | "anio";
 
@@ -162,26 +163,42 @@ export function calculateFinancialSummary({
   const targetBranch = branches.find((b) => b.id === branchId);
   const branchName = isAll ? "Consolidado (Todas las sucursales)" : (targetBranch?.name || "Sucursal");
 
-  // Period multiplier and weights to provide realistic time-series projections
-  // based on active branch operations and shift history
+  // Period boundaries and weights for real period filtering
+  const now = new Date();
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0).getTime();
+  let periodStartTs = startOfToday;
+  let periodEndTs = now.getTime() + 86400000;
   let multiplier = 1;
   let periodLabel = "Hoy";
   if (period === "semana") {
     multiplier = 6.2;
     periodLabel = "Esta Semana";
+    periodStartTs = startOfToday - 6 * 86400000;
   } else if (period === "mes") {
     multiplier = 26.5;
     periodLabel = "Este Mes";
+    periodStartTs = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0).getTime();
   } else if (period === "mes_anterior") {
     multiplier = 25.8;
     periodLabel = "Mes Anterior";
+    periodStartTs = new Date(now.getFullYear(), now.getMonth() - 1, 1, 0, 0, 0, 0).getTime();
+    periodEndTs = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0).getTime() - 1;
   } else if (period === "trimestre") {
     multiplier = 79.5;
     periodLabel = "Trimestre Actual";
+    periodStartTs = startOfToday - 89 * 86400000;
   } else if (period === "anio") {
     multiplier = 318;
     periodLabel = "Año en Curso";
+    periodStartTs = new Date(now.getFullYear(), 0, 1, 0, 0, 0, 0).getTime();
   }
+
+  const isWithinPeriod = (rawTs?: number | string): boolean => {
+    if (!rawTs) return period !== "mes_anterior";
+    const ts = typeof rawTs === "number" ? rawTs : parseDateTimeSafe(String(rawTs));
+    if (!ts || isNaN(ts)) return period !== "mes_anterior";
+    return ts >= periodStartTs && ts <= periodEndTs;
+  };
 
   // Multi-branch base values (100% reales sin montos ficticios)
   const activeBranches = isAll ? branches : branches.filter((b) => b.id === branchId);
@@ -189,11 +206,24 @@ export function calculateFinancialSummary({
   const totalTicketsToday = activeBranches.reduce((acc, b) => acc + (b.todayTickets || 0), 0);
   const totalCashDrawer = activeBranches.reduce((acc, b) => acc + (b.cashInDrawer || 0), 0);
 
-  // Real Expenses from storage
+  // Historical shift cuts within period (prior to today to avoid double counting today's active shift)
+  const historicalCuts = getStoredShiftCuts().filter((c) => {
+    if (!isAll && c.branchId && c.branchId !== branchId) return false;
+    const ts = c.timestamp || parseDateTimeSafe(c.date);
+    return ts >= periodStartTs && ts < startOfToday && ts <= periodEndTs;
+  });
+  const historicalCutsSales = historicalCuts.reduce(
+    (acc, c) => acc + (Number(c.totalSalesAll ?? c.totalSales ?? ((c.cashSales || 0) + (c.cardSales || 0) + (c.transferSales || 0))) || 0),
+    0
+  );
+  const historicalCutsTickets = historicalCuts.reduce((acc, c) => acc + (Number(c.ticketsCount) || 0), 0);
+
+  // Real Expenses from storage filtered by branch and period
   const allExpenses = getStoredExpenses().filter((g) => g.status !== "anulado");
-  const filteredExpenses = isAll
+  const filteredExpenses = (isAll
     ? allExpenses
-    : allExpenses.filter((g) => g.branchId === branchId);
+    : allExpenses.filter((g) => g.branchId === branchId)
+  ).filter((g) => isWithinPeriod(g.timestamp || g.date));
 
   // Group real expenses by category
   let sumInsumos = 0;
@@ -244,24 +274,27 @@ export function calculateFinancialSummary({
   });
 
   const allIncomes = getStoredCashIncomes();
-  const filteredIncomes = isAll
+  const filteredIncomes = (isAll
     ? allIncomes
-    : allIncomes.filter((inc) => !inc.branchId || inc.branchId === branchId);
+    : allIncomes.filter((inc) => !inc.branchId || inc.branchId === branchId)
+  ).filter((inc) => isWithinPeriod(inc.timestamp || inc.date));
 
   const realOtherIncomes = filteredIncomes
     .filter((inc) => inc.category === "otros_ingresos" || inc.category === "venta_costales")
     .reduce((acc, inc) => acc + (Number(inc.amount) || 0), 0);
 
   const allOrders = getStoredOrdersData();
-  const filteredOrders = isAll
+  const filteredOrders = (isAll
     ? allOrders
-    : allOrders.filter((o) => !o.branchId || o.branchId === branchId);
+    : allOrders.filter((o) => !o.branchId || o.branchId === branchId)
+  ).filter((o) => isWithinPeriod(o.timestamp || o.createdAt));
   const realOrdersRevenue = filteredOrders
     .filter((o) => o.status !== "cancelado")
     .reduce((acc, o) => acc + (Number(o.deposit) || 0), 0);
 
-  // Ventas reales sin inflar con datos ficticios
-  const estimatedGrossSales = Math.round(totalBaseSalesToday * (period === "hoy" ? 1 : 1));
+  // Ventas reales sin inflar con datos ficticios (incluyendo cortes históricos del periodo seleccionado)
+  const todayBaseForPeriod = period === "mes_anterior" ? 0 : totalBaseSalesToday;
+  const estimatedGrossSales = Math.round(todayBaseForPeriod + historicalCutsSales);
   const ordersSales = Math.min(estimatedGrossSales, realOrdersRevenue);
   const otherIncomes = realOtherIncomes;
   const counterSales = Math.max(0, estimatedGrossSales - ordersSales);
@@ -284,7 +317,28 @@ export function calculateFinancialSummary({
   const opexOther = sumOtros;
   const totalOpex = opexPayroll + opexUtilities + opexMaintenance + opexFuelDelivery + opexOther;
 
-  const wasteLoss = 0;
+  // Merma real registrada en movimientos de inventario
+  let wasteLoss = 0;
+  if (typeof window !== "undefined") {
+    try {
+      const rawMovs = localStorage.getItem("brito_inventory_movements");
+      const movs: InventoryMovement[] = rawMovs ? JSON.parse(rawMovs) : [];
+      if (Array.isArray(movs)) {
+        wasteLoss = Math.round(
+          movs
+            .filter(
+              (m) =>
+                m &&
+                (m.type === "merma_horno" || m.type === "merma_mostrador" || String(m.type).startsWith("merma")) &&
+                isWithinPeriod(m.timestamp)
+            )
+            .reduce((acc, m) => acc + (Number(m.cost) || (Number(m.quantity) || 0) * 12), 0)
+        );
+      }
+    } catch {
+      wasteLoss = 0;
+    }
+  }
 
   // Operating Profit (EBITDA)
   const operatingProfit = Math.max(0, grossProfit - totalOpex - wasteLoss);
@@ -369,7 +423,7 @@ export function calculateFinancialSummary({
   };
 
   // ─── Bakery KPIs & Efficiency ───────────────────────────────────────────────
-  const totalTickets = totalTicketsToday;
+  const totalTickets = (period === "mes_anterior" ? 0 : totalTicketsToday) + historicalCutsTickets;
   const ticketAverage = totalTickets > 0 ? Math.round(estimatedGrossSales / totalTickets) : 0;
   const dailyFixedCosts = Math.round((totalOpex / Math.max(1, multiplier)) * 0.8);
   const grossMarginRatio = grossMarginPercent > 0 ? grossMarginPercent / 100 : 1;
@@ -439,6 +493,7 @@ export function calculateFinancialSummary({
 // ─── Exportación a CSV Formateado para Excel (UTF-8 BOM) ──────────────────────
 export function exportFinancialSummaryToCSV(summary: FullFinancialSummary): void {
   const { pl, treasury, receivables, kpis, periodLabel, branchName } = summary;
+  const pct = (val: number) => (pl.grossSales > 0 ? `${((val / pl.grossSales) * 100).toFixed(1)}%` : "0.0%");
 
   const rows = [
     ["PANADERIAS BRITO - REPORTE Y ESTADO FINANCIERO OFICIAL"],
@@ -447,29 +502,29 @@ export function exportFinancialSummaryToCSV(summary: FullFinancialSummary): void
     ["Fecha de Generacion:", new Date().toLocaleDateString("es-MX", { dateStyle: "long" })],
     [],
     ["1. ESTADO DE RESULTADOS (P&L)", "Monto (MXN)", "% sobre Ventas"],
-    ["(+) Ventas Brutas Totales", pl.grossSales, "100.0%"],
-    ["  - Venta en Mostrador (Efectivo/Tarjeta)", pl.counterSales, `${((pl.counterSales / pl.grossSales) * 100).toFixed(1)}%`],
-    ["  - Tienditas y Mayoristas", pl.wholesaleSales, `${((pl.wholesaleSales / pl.grossSales) * 100).toFixed(1)}%`],
-    ["  - Encargos Especiales y Pasteles", pl.ordersSales, `${((pl.ordersSales / pl.grossSales) * 100).toFixed(1)}%`],
-    ["  - Otros Ingresos", pl.otherIncomes, `${((pl.otherIncomes / pl.grossSales) * 100).toFixed(1)}%`],
+    ["(+) Ventas Brutas Totales", pl.grossSales, pl.grossSales > 0 ? "100.0%" : "0.0%"],
+    ["  - Venta en Mostrador (Efectivo/Tarjeta)", pl.counterSales, pct(pl.counterSales)],
+    ["  - Tienditas y Mayoristas", pl.wholesaleSales, pct(pl.wholesaleSales)],
+    ["  - Encargos Especiales y Pasteles", pl.ordersSales, pct(pl.ordersSales)],
+    ["  - Otros Ingresos", pl.otherIncomes, pct(pl.otherIncomes)],
     [],
-    ["(-) Costo de Ventas (COGS / Produccion)", pl.totalCogs, `${((pl.totalCogs / pl.grossSales) * 100).toFixed(1)}%`],
-    ["  - Harinas, Mantecas, Azucar e Insumos", pl.cogsIngredients, `${((pl.cogsIngredients / pl.grossSales) * 100).toFixed(1)}%`],
-    ["  - Gas LP Hornos de Lena/Gas", pl.cogsGasLP, `${((pl.cogsGasLP / pl.grossSales) * 100).toFixed(1)}%`],
-    ["  - Bolsas Kraft y Empaques", pl.cogsPackaging, `${((pl.cogsPackaging / pl.grossSales) * 100).toFixed(1)}%`],
+    ["(-) Costo de Ventas (COGS / Produccion)", pl.totalCogs, pct(pl.totalCogs)],
+    ["  - Harinas, Mantecas, Azucar e Insumos", pl.cogsIngredients, pct(pl.cogsIngredients)],
+    ["  - Gas LP Hornos de Lena/Gas", pl.cogsGasLP, pct(pl.cogsGasLP)],
+    ["  - Bolsas Kraft y Empaques", pl.cogsPackaging, pct(pl.cogsPackaging)],
     [],
     ["(=) MARGEN BRUTO RESULTANTE", pl.grossProfit, `${pl.grossMarginPercent}%`],
     [],
-    ["(-) Gastos Operativos (OPEX)", pl.totalOpex, `${((pl.totalOpex / pl.grossSales) * 100).toFixed(1)}%`],
-    ["  - Nominas y Sueldos Panaderos/Cajeras", pl.opexPayroll, `${((pl.opexPayroll / pl.grossSales) * 100).toFixed(1)}%`],
-    ["  - Servicios Fijos (Luz CFE, Agua, Internet)", pl.opexUtilities, `${((pl.opexUtilities / pl.grossSales) * 100).toFixed(1)}%`],
-    ["  - Mantenimiento Hornos y Amasadoras", pl.opexMaintenance, `${((pl.opexMaintenance / pl.grossSales) * 100).toFixed(1)}%`],
-    ["  - Gasolina Repartos", pl.opexFuelDelivery, `${((pl.opexFuelDelivery / pl.grossSales) * 100).toFixed(1)}%`],
-    ["  - Otros Gastos Menores", pl.opexOther, `${((pl.opexOther / pl.grossSales) * 100).toFixed(1)}%`],
-    ["(-) Costo de Mermas (Pan Frio)", pl.wasteLoss, `${((pl.wasteLoss / pl.grossSales) * 100).toFixed(1)}%`],
+    ["(-) Gastos Operativos (OPEX)", pl.totalOpex, pct(pl.totalOpex)],
+    ["  - Nominas y Sueldos Panaderos/Cajeras", pl.opexPayroll, pct(pl.opexPayroll)],
+    ["  - Servicios Fijos (Luz CFE, Agua, Internet)", pl.opexUtilities, pct(pl.opexUtilities)],
+    ["  - Mantenimiento Hornos y Amasadoras", pl.opexMaintenance, pct(pl.opexMaintenance)],
+    ["  - Gasolina Repartos", pl.opexFuelDelivery, pct(pl.opexFuelDelivery)],
+    ["  - Otros Gastos Menores", pl.opexOther, pct(pl.opexOther)],
+    ["(-) Costo de Mermas (Pan Frio)", pl.wasteLoss, pct(pl.wasteLoss)],
     [],
     ["(=) UTILIDAD OPERATIVA (EBITDA)", pl.operatingProfit, `${pl.operatingMarginPercent}%`],
-    ["(-) Retiros Personales Don Tono / Socios", pl.ownerDraws, `${((pl.ownerDraws / pl.grossSales) * 100).toFixed(1)}%`],
+    ["(-) Retiros Personales Don Tono / Socios", pl.ownerDraws, pct(pl.ownerDraws)],
     [],
     ["(=) UTILIDAD NETA FINAL REAL", pl.netProfit, `${pl.netMarginPercent}%`],
     [],

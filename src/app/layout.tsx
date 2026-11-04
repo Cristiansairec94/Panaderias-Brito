@@ -1,23 +1,8 @@
 import type { Metadata, Viewport } from "next";
-import { Satisfy, Dancing_Script } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/context/AuthContext";
 import { NotificationProvider } from "@/context/NotificationContext";
 import AppLayout from "@/components/layout/AppLayout";
-
-const satisfy = Satisfy({
-  weight: ["400"],
-  subsets: ["latin"],
-  variable: "--font-satisfy",
-  display: "swap",
-});
-
-const dancingScript = Dancing_Script({
-  weight: ["600", "700"],
-  subsets: ["latin"],
-  variable: "--font-dancing",
-  display: "swap",
-});
 
 export const viewport: Viewport = {
   width: "device-width",
@@ -51,8 +36,14 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="es" className={`${satisfy.variable} ${dancingScript.variable}`}>
+    <html lang="es">
       <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@600;700&family=Satisfy&display=swap"
+          rel="stylesheet"
+        />
         <link rel="manifest" href="/manifest.json" />
         <link rel="apple-touch-icon" href="/logo.png" />
         <link rel="apple-touch-icon" sizes="180x180" href="/logo.png" />

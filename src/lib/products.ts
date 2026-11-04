@@ -229,14 +229,13 @@ export function findProductByBarcodeOrCode(query: string, productsList?: Product
       if (by13) return by13;
     }
 
-    // 2d. Compatibilidad con ceros a la izquierda (UPC-A vs EAN-13)
+    // 2d. Compatibilidad con ceros a la izquierda (UPC-A vs EAN-13, coincidencia exacta sin prefijos ambiguos)
     const strippedQuery = queryDigits.replace(/^0+/, "");
     if (strippedQuery.length >= 4) {
       const byStripped = list.find((p) => {
         if (!p.barcode) return false;
         const pDigits = p.barcode.replace(/\D/g, "").replace(/^0+/, "");
-        return pDigits === strippedQuery || 
-               (pDigits.length > 4 && (pDigits.startsWith(strippedQuery) || strippedQuery.startsWith(pDigits)));
+        return pDigits === strippedQuery;
       });
       if (byStripped) return byStripped;
     }

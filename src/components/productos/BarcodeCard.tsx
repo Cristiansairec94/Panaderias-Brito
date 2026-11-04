@@ -497,9 +497,7 @@ export function BarcodeCard({
           <div class="name">${productName}</div>
           ${formattedPrice ? `<div class="price">${formattedPrice}</div>` : ""}
           <div class="barcode-box">
-            <svg viewBox="0 0 280 72" style="width:240px; height:auto;">
-              ${document.getElementById("active-product-barcode-svg")?.innerHTML || ""}
-            </svg>
+            ${renderBarcodeSvgString(displayBarcode)}
           </div>
           <div class="footer-note">Escanear en mostrador / caja</div>
           <script>

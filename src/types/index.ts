@@ -236,6 +236,7 @@ export interface ShiftCutRecord {
   incomesList?: CashIncome[];
   stockPieces?: number;
   stockValue?: number;
+  ticketsCount?: number;
 }
 
 export interface CashExpense {

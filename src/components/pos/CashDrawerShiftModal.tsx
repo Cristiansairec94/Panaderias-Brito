@@ -544,8 +544,6 @@ export default function CashDrawerShiftModal({
     return () => clearInterval(interval);
   }, []);
 
-  if (!isOpen) return null;
-
   // Límite temporal estricto del turno actual (timestamp en ms con soporte por sucursal, mínimo 00:00:00 de hoy)
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
@@ -967,6 +965,8 @@ export default function CashDrawerShiftModal({
       return true;
     });
   }, [currentCashierCuts, historySearchQuery, historyFilterType]);
+
+  if (!isOpen) return null;
 
   // Componente del Ticket Digital Animado (Reutilizable para Corte Actual e Historial)
   const renderDigitalTicket = (cut: ShiftCutRecord, isHistoryView = false) => {

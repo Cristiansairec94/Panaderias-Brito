@@ -9,7 +9,7 @@ import {
   Award, 
   ArrowUpRight
 } from "lucide-react";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, parseDateTimeSafe } from "@/lib/utils";
 
 interface ReportProductRank {
   rank: number;
@@ -24,20 +24,56 @@ export default function ReportesPage() {
   const [filterPeriod, setFilterPeriod] = useState<"semana" | "mes" | "hoy">("semana");
   const [topProducts, setTopProducts] = useState<ReportProductRank[]>([]);
   const [totalPiecesSold, setTotalPiecesSold] = useState(0);
+  const [wasteRatePercent, setWasteRatePercent] = useState(0);
 
   useEffect(() => {
     const computeReport = () => {
       try {
+        const now = new Date();
+        const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0).getTime();
+        const periodStartTs =
+          filterPeriod === "hoy"
+            ? startOfToday
+            : filterPeriod === "semana"
+            ? startOfToday - 6 * 86400000
+            : new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0).getTime();
+
         const raw = localStorage.getItem("brito_pos_master_sales");
         const sales = raw ? JSON.parse(raw) : [];
-        if (!Array.isArray(sales) || sales.length === 0) {
+        const filteredSales = Array.isArray(sales)
+          ? sales.filter((s) => {
+              const ts = Number(s?.timestamp) || parseDateTimeSafe(s?.date);
+              return !ts || ts >= periodStartTs;
+            })
+          : [];
+
+        // Calcular tasa real de merma desde movimientos de inventario
+        let wastePieces = 0;
+        try {
+          const rawMov = localStorage.getItem("brito_inventory_movements");
+          const movs = rawMov ? JSON.parse(rawMov) : [];
+          if (Array.isArray(movs)) {
+            wastePieces = movs
+              .filter((m) => {
+                if (!m || !String(m.type || "").startsWith("merma")) return false;
+                const ts = parseDateTimeSafe(m.timestamp);
+                return !ts || ts >= periodStartTs;
+              })
+              .reduce((acc, m) => acc + (Number(m.quantity) || 0), 0);
+          }
+        } catch {
+          wastePieces = 0;
+        }
+
+        if (filteredSales.length === 0) {
           setTopProducts([]);
           setTotalPiecesSold(0);
+          setWasteRatePercent(0);
           return;
         }
         const agg = new Map<string, { name: string; pieces: number; revenue: number; category: string }>();
         let sumPieces = 0;
-        for (const s of sales) {
+        for (const s of filteredSales) {
           if (!s || !Array.isArray(s.items)) continue;
           for (const item of s.items) {
             const prod = item.product || item;
@@ -70,9 +106,12 @@ export default function ReportesPage() {
           }));
         setTopProducts(ranked);
         setTotalPiecesSold(sumPieces);
+        const totalProduced = sumPieces + wastePieces;
+        setWasteRatePercent(totalProduced > 0 ? Number(((wastePieces / totalProduced) * 100).toFixed(1)) : 0);
       } catch {
         setTopProducts([]);
         setTotalPiecesSold(0);
+        setWasteRatePercent(0);
       }
     };
     computeReport();
@@ -137,7 +176,10 @@ export default function ReportesPage() {
               Este Mes
             </button>
           </div>
-          <button className="flex items-center gap-1.5 bg-brito-orange-600 hover:bg-brito-orange-700 text-white font-extrabold px-4 py-2 rounded-xl shadow-md text-xs transition-all active:scale-95">
+          <button
+            onClick={() => window.print()}
+            className="flex items-center gap-1.5 bg-brito-orange-600 hover:bg-brito-orange-700 text-white font-extrabold px-4 py-2 rounded-xl shadow-md text-xs transition-all active:scale-95 cursor-pointer"
+          >
             <Download className="w-4 h-4" /> Exportar Reporte PDF
           </button>
         </div>
@@ -165,9 +207,9 @@ export default function ReportesPage() {
               <Flame className="w-4 h-4" />
             </div>
           </div>
-          <p className="text-2xl font-black text-emerald-600">0%</p>
+          <p className={`text-2xl font-black ${wasteRatePercent > 5 ? "text-red-600" : "text-emerald-600"}`}>{wasteRatePercent}%</p>
           <p className="text-[11px] text-stone-400 font-medium mt-1">
-            Sin mermas registradas (Meta máx: 5.0%)
+            {wasteRatePercent > 0 ? "Calculada sobre movimientos de merma" : "Sin mermas registradas"} (Meta máx: 5.0%)
           </p>
         </div>
 

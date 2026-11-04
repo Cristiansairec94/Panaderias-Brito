@@ -1,6 +1,6 @@
 import { CLEAN_SLATE_EPOCH } from "@/lib/wipeOperationalData";
 import { CustomOrder, OrderItem, OrderPayment, CashIncome, Sale } from "@/types";
-import { formatCurrency, formatDateTimeSafe, parseDateTimeSafe, getStoredShiftStartBoundary, resolveBranchId, formatTime24, matchesCashier, isAdminCashier } from "@/lib/utils";
+import { formatCurrency, formatDateTimeSafe, parseDateTimeSafe, getStoredShiftStartBoundary, resolveBranchId, formatTime24, matchesCashier, isAdminCashier, getLocalDateISO } from "@/lib/utils";
 import { realtimeHub } from "@/lib/realtime/realtimeHub";
 import { createClient } from "@/lib/supabase/client";
 import { enqueueSyncItem, markRecordIdsAsSynced, getSyncQueue } from "@/lib/sync/syncService";
@@ -100,7 +100,7 @@ export function orderToSupabasePayload(order: CustomOrder): any {
     branch_name: effPickupBranchName,
     description: order.description || "Pedido de pastelería",
     items: Array.isArray(order.items) ? order.items : [],
-    delivery_date: order.deliveryDate ? order.deliveryDate.split("T")[0].split(" ")[0] : new Date().toISOString().split("T")[0],
+    delivery_date: order.deliveryDate ? order.deliveryDate.split("T")[0].split(" ")[0] : getLocalDateISO(),
     delivery_time: order.deliveryTime || "16:00",
     delivery_type: order.deliveryType || "sucursal",
     delivery_address: order.deliveryAddress || null,
@@ -411,7 +411,7 @@ export function normalizeOrder(order: any): CustomOrder {
   }
 
   const rawDate = order.deliveryDate || order.delivery_date;
-  const deliveryDate = rawDate ? String(rawDate).split("T")[0].split(" ")[0] : new Date().toISOString().split("T")[0];
+  const deliveryDate = rawDate ? String(rawDate).split("T")[0].split(" ")[0] : getLocalDateISO();
 
   const deliveryTime = order.deliveryTime || order.delivery_time || (rawDate && String(rawDate).includes(" ") ? String(rawDate).split(" ")[1] : "16:00");
   const deliveryType = order.deliveryType || order.delivery_type || "sucursal";

@@ -302,35 +302,43 @@ export default function FinanzasPage() {
             </div>
 
             {/* Barra de progreso de distribución */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-2 border-t border-emerald-200/60 text-xs">
-              <div className="bg-white/90 p-3 rounded-xl border border-emerald-100">
-                <span className="text-stone-500 block font-semibold text-[11px]">Mostrador (Efectivo & Tarjeta)</span>
-                <span className="font-black text-stone-900 text-sm">
-                  {plViewMode === "currency" ? formatCurrency(pl.counterSales) : "72.0%"}
-                </span>
-                <div className="w-full bg-stone-100 h-1.5 rounded-full mt-1.5 overflow-hidden">
-                  <div className="bg-emerald-500 h-full rounded-full" style={{ width: "72%" }} />
+            {(() => {
+              const totalChannelBase = Math.max(1, pl.grossSales + pl.otherIncomes);
+              const counterPct = pl.grossSales + pl.otherIncomes > 0 ? ((pl.counterSales / totalChannelBase) * 100).toFixed(1) : "0.0";
+              const ordersPct = pl.grossSales + pl.otherIncomes > 0 ? ((pl.ordersSales / totalChannelBase) * 100).toFixed(1) : "0.0";
+              const otherPct = pl.grossSales + pl.otherIncomes > 0 ? ((pl.otherIncomes / totalChannelBase) * 100).toFixed(1) : "0.0";
+              return (
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-2 border-t border-emerald-200/60 text-xs">
+                  <div className="bg-white/90 p-3 rounded-xl border border-emerald-100">
+                    <span className="text-stone-500 block font-semibold text-[11px]">Mostrador (Efectivo & Tarjeta)</span>
+                    <span className="font-black text-stone-900 text-sm">
+                      {plViewMode === "currency" ? formatCurrency(pl.counterSales) : `${counterPct}%`}
+                    </span>
+                    <div className="w-full bg-stone-100 h-1.5 rounded-full mt-1.5 overflow-hidden">
+                      <div className="bg-emerald-500 h-full rounded-full" style={{ width: `${Math.min(100, Number(counterPct))}%` }} />
+                    </div>
+                  </div>
+                  <div className="bg-white/90 p-3 rounded-xl border border-emerald-100">
+                    <span className="text-stone-500 block font-semibold text-[11px]">Pasteles & Encargos</span>
+                    <span className="font-black text-stone-900 text-sm">
+                      {plViewMode === "currency" ? formatCurrency(pl.ordersSales) : `${ordersPct}%`}
+                    </span>
+                    <div className="w-full bg-stone-100 h-1.5 rounded-full mt-1.5 overflow-hidden">
+                      <div className="bg-emerald-500 h-full rounded-full" style={{ width: `${Math.min(100, Number(ordersPct))}%` }} />
+                    </div>
+                  </div>
+                  <div className="bg-white/90 p-3 rounded-xl border border-emerald-100">
+                    <span className="text-stone-500 block font-semibold text-[11px]">Otros (Costales, Reciclaje)</span>
+                    <span className="font-black text-stone-900 text-sm">
+                      {plViewMode === "currency" ? formatCurrency(pl.otherIncomes) : `${otherPct}%`}
+                    </span>
+                    <div className="w-full bg-stone-100 h-1.5 rounded-full mt-1.5 overflow-hidden">
+                      <div className="bg-emerald-500 h-full rounded-full" style={{ width: `${Math.min(100, Number(otherPct))}%` }} />
+                    </div>
+                  </div>
                 </div>
-              </div>
-              <div className="bg-white/90 p-3 rounded-xl border border-emerald-100">
-                <span className="text-stone-500 block font-semibold text-[11px]">Pasteles & Encargos</span>
-                <span className="font-black text-stone-900 text-sm">
-                  {plViewMode === "currency" ? formatCurrency(pl.ordersSales) : "8.0%"}
-                </span>
-                <div className="w-full bg-stone-100 h-1.5 rounded-full mt-1.5 overflow-hidden">
-                  <div className="bg-emerald-500 h-full rounded-full" style={{ width: "8%" }} />
-                </div>
-              </div>
-              <div className="bg-white/90 p-3 rounded-xl border border-emerald-100">
-                <span className="text-stone-500 block font-semibold text-[11px]">Otros (Costales, Reciclaje)</span>
-                <span className="font-black text-stone-900 text-sm">
-                  {plViewMode === "currency" ? formatCurrency(pl.otherIncomes) : "2.0%"}
-                </span>
-                <div className="w-full bg-stone-100 h-1.5 rounded-full mt-1.5 overflow-hidden">
-                  <div className="bg-emerald-500 h-full rounded-full" style={{ width: "2%" }} />
-                </div>
-              </div>
-            </div>
+              );
+            })()}
           </div>
         </div>
       </div>
